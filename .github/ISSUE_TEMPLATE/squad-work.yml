@@ -1,0 +1,62 @@
+name: Squad work item
+description: Track an independently owned Squad task
+title: "[Squad] "
+labels:
+  - squad
+body:
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What customer, business, risk, or operational outcome requires this work?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals
+      description: State included work, excluded work, and phase.
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Proposed owner
+      description: Squad member or human owner; requires Cyrus approval before assignment.
+    validations:
+      required: true
+  - type: textarea
+    id: artifacts
+    attributes:
+      label: Exclusive artifact paths
+      description: List the paths this issue owns and may edit.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Use measurable outcomes and identify evidence class.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and merge order
+      description: Link prerequisite issues and state integration order.
+    validations:
+      required: true
+  - type: textarea
+    id: trust
+    attributes:
+      label: Privacy, security, accessibility, legal, environmental, and social considerations
+      description: State applicable reviews and approval gates.
+    validations:
+      required: true
+  - type: textarea
+    id: execution
+    attributes:
+      label: Execution and cleanup
+      description: Record base SHA, model/settings, worktree/session, teardown, and archive requirements.
+    validations:
+      required: true

@@ -1,0 +1,46 @@
+name: Squad Heartbeat (Ralph)
+
+on:
+  issues:
+    types: [closed]
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report untriaged Squad work
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'squad',
+              state: 'open',
+              per_page: 100,
+            });
+
+            const untriaged = issues.filter(issue => {
+              const labels = issue.labels.map(label =>
+                typeof label === 'string' ? label : label.name
+              );
+              return !labels.some(label => label && label.startsWith('squad:'));
+            });
+
+            if (untriaged.length === 0) {
+              core.info('Ralph: no untriaged Squad issues.');
+              return;
+            }
+
+            core.warning(
+              `Ralph: ${untriaged.length} issue(s) await the authoritative Squad Triage workflow: ` +
+              untriaged.map(issue => `#${issue.number}`).join(', ')
+            );

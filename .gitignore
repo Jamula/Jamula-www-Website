@@ -38,6 +38,10 @@ ScaffoldingReadMe.txt
 
 # dotenv environment variables file
 .env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
 
 # Others
 ~$*
@@ -55,3 +59,25 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+# Squad: ignore runtime state (logs, inbox, sessions)
+# Note: .squad/casting/* is identity and MUST be committed to main, not ignored
+.squad/orchestration-log/
+.squad/log/
+.squad/decisions/inbox/
+.squad/sessions/
+.squad/.scratch/
+.squad/.cache/
+# Squad: state owned by squad-state branch (two-layer/orphan backend)
+.squad/decisions.md
+.squad/agents/*/history.md
+# /Squad: state owned by squad-state branch
+# Squad: SubSquad activation file (local to this machine)
+.squad-workstream
+# Squad: machine-local configuration and runtime markers
+.squad/config.json
+.squad/.first-run
+.squad/memory/audit.jsonl
+
+# Python validation artifacts
+__pycache__/
+*.py[cod]

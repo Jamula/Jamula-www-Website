@@ -1,0 +1,45 @@
+name: Governance Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.copilot/**'
+      - '.mcp.json'
+      - '.gitignore'
+      - '.vscode/**'
+      - '.github/**'
+      - '.squad/**'
+      - 'docs/**'
+      - 'scripts/validate_governance.py'
+      - 'LICENSE*'
+      - 'TRADEMARKS.md'
+      - 'CONTRIBUTING.md'
+      - 'THIRD_PARTY_NOTICES.md'
+  push:
+    branches: [main]
+    paths:
+      - '.copilot/**'
+      - '.mcp.json'
+      - '.gitignore'
+      - '.vscode/**'
+      - '.github/**'
+      - '.squad/**'
+      - 'docs/**'
+      - 'scripts/validate_governance.py'
+      - 'LICENSE*'
+      - 'TRADEMARKS.md'
+      - 'CONTRIBUTING.md'
+      - 'THIRD_PARTY_NOTICES.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Validate governance files
+        run: python scripts/validate_governance.py
