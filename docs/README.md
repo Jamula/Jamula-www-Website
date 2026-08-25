@@ -4,7 +4,11 @@
 
 All six child workstreams, [#4](https://github.com/Jamula/Jamula-www-Website/issues/4)
 through [#9](https://github.com/Jamula/Jamula-www-Website/issues/9), and their
-review corrections are incorporated in the working tree. Fact Checker's
+review corrections are incorporated in reviewed commit
+`d02a2448a5438fb0e895c4c46166fe39c79ccb86`. Each child received an
+incorporation comment naming that commit and [draft PR
+#10](https://github.com/Jamula/Jamula-www-Website/pull/10), then was explicitly
+closed as completed on 2026-08-25. Fact Checker's
 terminal FCR-018 verdict is **CLEAR: 0 unresolved content findings / 0
 unresolved ledger findings / 0 new findings**. The independent adversarial
 FCR-018 recheck is also **CLEAR: 0 unresolved content findings / 0 unresolved
@@ -14,17 +18,26 @@ owner-provenance defect are resolved.
 
 Rai's remediation re-review remains **Green: 4 resolved / 0 unresolved** only
 for the six fingerprinted working-tree artifacts. The original Red remains
-preserved as review history. Canonical Git blob OIDs, the full PR-head SHA,
-Cyrus approval, and all professional gates remain pending; a material change
-to a fingerprinted file reopens its affected Rai finding.
+preserved as review history. Canonical Git blob OIDs for these changed ledger artifacts,
+the exact final PR-head SHA, Cyrus approval, and all professional gates remain
+pending; a material change to a fingerprinted file reopens its affected Rai
+finding.
 
-Issues [#3](https://github.com/Jamula/Jamula-www-Website/issues/3) through
-[#9](https://github.com/Jamula/Jamula-www-Website/issues/9) are open. No platform,
+[Issue #3](https://github.com/Jamula/Jamula-www-Website/issues/3) remains open
+while PR #10 is draft; issues #4-#9 are closed as completed. PR #10 targets
+`main` from branch `u/cyrusjamula/3-website-platform-evaluation` and is
+intentionally stacked on unmerged [draft PR
+#2](https://github.com/Jamula/Jamula-www-Website/pull/2)
+(`cyrusjamula-jamula-website-platform-evaluation`), so its diff will narrow
+after PR #2 merges. Issue #1 and PR #2 were not part of the child closure
+action. No PR was merged and no production deployment occurred. No platform,
 framework, host, CMS, CRM, scheduler, connector, payment processor, ADR, public
 claim, founder wording, legal text, professional conclusion, implementation, or
 deployment is accepted or approved.
 
 ## PR 2 synthesis
+
+Here, “PR 2 work package” is the evaluation-plan phase name, not GitHub PR #2.
 
 - [Business and product requirements](requirements/business-product-requirements.md)
 - [Decision framework](architecture/decision-framework.md) — proposed method;
@@ -90,33 +103,38 @@ All ADRs are proposed. None is accepted.
 - [Professional review](legal/professional-review-register.md)
 - [Repository license/provenance inventory](legal/license-inventory.md)
 
-Every PR 2 approval and every professional disposition remains pending.
+Every approval for this work package and every professional disposition remains
+pending.
 
 ## Integration and governance
 
 - [Documentation index (this file)](README.md)
 - [Complete artifact manifest](artifacts-manifest.md)
-- [PR 2 work ownership, lockouts, issue state and residual actions](planning/work-ownership.md)
+- [PR 2 work-package ownership, lockouts, issue state and residual actions](planning/work-ownership.md)
 
 The manifest covers every Markdown file under `docs/`; there are no intentionally
 unindexed documentation artifacts. Coverage is **60/60**.
 
-## Remaining incorporation sequence
+## Lifecycle sequence
 
-1. Validate the exact working tree, then commit it.
-2. Open a draft PR to `main` whose body uses `Closes #3`; do not merge it.
-3. Post child incorporation comments on #4-#9 identifying the actual commit and
-   draft PR, then explicitly close #4-#9.
-4. Update/check the ledgers if anything material changed. Keep #3 open while the
-   PR is draft; material changes reopen affected review and identifiers.
-5. Record canonical Git blob OIDs and the full final PR-head SHA.
-6. Keep every decision pending and do not merge. Cyrus must approve that exact
-   final head; all named professional gates remain separate and pending.
+1. **Complete:** validate and incorporate the reviewed domain package in commit
+   `d02a2448a5438fb0e895c4c46166fe39c79ccb86`.
+2. **Complete:** open draft PR #10 to `main`; comment on #4-#9 with the reviewed
+   commit and PR, then explicitly close those child issues on 2026-08-25.
+3. **Pending:** validate these ledger-only edits, commit and push them. That next
+   ledger-only commit will become the candidate final head only after validation
+   and push; `d02a2448a5438fb0e895c4c46166fe39c79ccb86` is not the final PR head.
+4. **Pending:** verify PR #10's exact head, draft status, and `main` base; record
+   the changed ledger artifacts' canonical blob OIDs from that head and report
+   the exact full candidate-final-head SHA externally for Cyrus.
+5. **Pending:** keep #3 open and every decision and professional gate pending.
+   Cyrus must approve that exact full SHA. Do not merge or deploy.
 
 ## Core governance
 
 - [Approved evaluation plan](planning/evaluation-plan.md) — historical plan
-  approval only; its legacy filesystem hash is not portable PR 2 proof
+  approval only; its legacy filesystem hash is not portable proof for this work
+  package
 - [Provisional operating principles](company/operating-principles.md)
 - [Draft public values](company/public-values-draft.md)
 

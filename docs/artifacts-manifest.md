@@ -1,9 +1,15 @@
 # Artifact Manifest
 
-**Ledger status:** Final independent status/sequence reconciliation. Issues
-[#3](https://github.com/Jamula/Jamula-www-Website/issues/3) through
-[#9](https://github.com/Jamula/Jamula-www-Website/issues/9) are open. No
-incorporation commit or PR evidence is recorded yet.
+**Ledger status:** Lifecycle evidence reconciliation. Reviewed incorporation
+commit `d02a2448a5438fb0e895c4c46166fe39c79ccb86` is recorded in [draft PR
+#10](https://github.com/Jamula/Jamula-www-Website/pull/10), which targets
+`main` from branch `u/cyrusjamula/3-website-platform-evaluation`. Issues
+[#4](https://github.com/Jamula/Jamula-www-Website/issues/4)
+through [#9](https://github.com/Jamula/Jamula-www-Website/issues/9) each
+received a comment naming that commit and PR, then were explicitly closed as
+completed on 2026-08-25. [Issue
+#3](https://github.com/Jamula/Jamula-www-Website/issues/3) remains open while
+PR #10 is draft.
 
 **C2 status:** `C2` means all six child workstreams #4-#9 are incorporated and
 their review corrections are present in the working tree. Fact Checker's
@@ -14,9 +20,13 @@ ledger findings / 0 new findings**. FCR-018 and the remaining N-11
 owner-provenance defect are resolved; prior Reject/Revise dispositions remain
 historical. Rai's Green remains limited to its fingerprinted working-tree
 revision; material changes to those files reopen affected findings. Canonical
-Git blob OIDs, the full PR-head SHA, Cyrus approval, professional gates,
-commit/PR evidence, and child comments and closure remain pending. `C2` does
-not mean accepted, implemented, deployed, or approved.
+Git blob OIDs for these changed ledger artifacts, the exact final PR-head SHA,
+Cyrus approval, and professional gates remain pending. PR #10 is intentionally
+stacked on unmerged draft PR #2
+(`cyrusjamula-jamula-website-platform-evaluation`) but targets `main`; its diff
+will narrow after PR #2 merges. Issue #1 and PR #2 were not part of the child
+closure action. No PR was merged and no production deployment occurred. `C2`
+does not mean accepted, implemented, deployed, or approved.
 
 Durable child mapping is unchanged: **#4 Uhura content; #5 Dax experience; #6
 Seven customer platform; #7 Miles security/quality; #8 Geordi platform/cost; #9
@@ -29,10 +39,10 @@ approval.
 
 | Artifact | Original author | Independent revision owner | Reviewers / approver | Issue and dependency | Current status | Index |
 |---|---|---|---|---|---|---|
-| `docs/README.md` | Picard (integration) | Fact Checker (Cycle 2); Ralph (N-01/N-04); Sarek (N-11 ledger) | all owners; Cyrus | Refs #3 and #4-#9 | Final status/sequence ledger; approvals pending | [Integration](README.md#integration-and-governance) |
-| `docs/artifacts-manifest.md` | Picard (integration) | Fact Checker (Cycle 2); Ralph (N-01/N-04); Sarek (N-11, then FCR-018 owner-provenance ledger) | all owners; Cyrus | Refs #3 and #4-#9 | FCR-018 and remaining N-11 owner-provenance defect resolved; complete 60/60 docs inventory | [Integration](README.md#integration-and-governance) |
-| `docs/planning/evaluation-plan.md` | Coordinator; approved by Cyrus | — | all owners | #3 baseline | PR 1 baseline; historical approval is not PR 2 approval | [Governance](README.md#core-governance) |
-| `docs/planning/work-ownership.md` | Picard (integration) | Fact Checker (Cycle 2); Ralph (N-01/N-04); Sarek (N-11, then FCR-018 owner-provenance ledger) | all owners; Cyrus | Refs #3 and #4-#9 issue bodies | FCR-018 and remaining N-11 owner-provenance defect resolved | [Integration](README.md#integration-and-governance) |
+| `docs/README.md` | Picard (integration) | Fact Checker (Cycle 2); Ralph (N-01/N-04); Sarek (N-11 ledger, then lifecycle evidence) | all owners; Cyrus | Refs #3 and #4-#9 | Incorporation commit, draft PR and child closure recorded; exact final head and approvals pending | [Integration](README.md#integration-and-governance) |
+| `docs/artifacts-manifest.md` | Picard (integration) | Fact Checker (Cycle 2); Ralph (N-01/N-04); Sarek (N-11, FCR-018 owner-provenance ledger, then lifecycle evidence) | all owners; Cyrus | Refs #3 and #4-#9 | FCR-018 and N-11 resolved; lifecycle evidence recorded; complete 60/60 docs inventory | [Integration](README.md#integration-and-governance) |
+| `docs/planning/evaluation-plan.md` | Coordinator; approved by Cyrus | — | all owners | #3 baseline | PR 1 baseline; historical approval is not approval of this evaluation work package | [Governance](README.md#core-governance) |
+| `docs/planning/work-ownership.md` | Picard (integration) | Fact Checker (Cycle 2); Ralph (N-01/N-04); Sarek (N-11, FCR-018 owner-provenance ledger, then lifecycle evidence) | all owners; Cyrus | Refs #3 and #4-#9 issue bodies | Lockouts preserved; child closures and remaining parent/approval sequence recorded | [Integration](README.md#integration-and-governance) |
 | `docs/company/operating-principles.md` | Cyrus / Squad bootstrap | — | Cyrus | pre-existing governance | Provisional; exact-version approval pending | [Governance](README.md#core-governance) |
 | `docs/company/public-values-draft.md` | Cyrus / Squad bootstrap | — | Fact Checker, Rai, Sarek; Cyrus | public-claims gate | Provisional; not approved for publication | [Governance](README.md#core-governance) |
 | `docs/content/content-strategy.md` | Nyota Uhura | Jadzia Dax | Sarek, Rai, Fact Checker; Cyrus | #4; #3 | C2; no publishing approval | [Content](README.md#child-research) |
@@ -82,12 +92,12 @@ approval.
 | `docs/decisions/adr-004-privacy-security-reliability.md` | Picard | Geordi La Forge | Seven, Miles, Sarek, Rai, Fact Checker, professionals; Cyrus | #3; #6/#7/#9 | C2 synthesis; proposed, professional gates pending | [Decisions](README.md#proposed-adrs) |
 | `docs/decisions/adr-005-cost-portability-and-lock-in.md` | Picard | Geordi La Forge (prior synthesis correction) → **Seven of Nine (latest; N-10/FCR-017 exit symmetry)** | Miles, Fact Checker; Cyrus | #3; #8 + RWL .3 | C2 synthesis; proposed method, no score, selection or approval | [Decisions](README.md#proposed-adrs) |
 | `docs/decisions/adr-006-repository-content-and-legal-gates.md` | Picard | Geordi La Forge | Uhura, Sarek, Rai, Fact Checker, professionals; Cyrus | #3; #4/#9 | C2 synthesis; proposed, no legal/public approval | [Decisions](README.md#proposed-adrs) |
-| `docs/decisions/approvals.md` | Coordinator/Scribe; integrated by Picard | Fact Checker (Cycle 2); Ralph (N-01/N-04); Sarek (N-11 final ledger) | Fact Checker, professionals; Cyrus | Refs #3 and #4-#9; committed identifiers | Final status ledger; every PR 2 approval pending | [Registers](README.md#shared-registers) |
+| `docs/decisions/approvals.md` | Coordinator/Scribe; integrated by Picard | Fact Checker (Cycle 2); Ralph (N-01/N-04); Sarek (N-11 final ledger, then lifecycle evidence) | Fact Checker, professionals; Cyrus | Refs #3 and #4-#9; committed identifiers | Reviewed incorporation commit and PR #10 recorded; exact final-head approval pending | [Registers](README.md#shared-registers) |
 | `docs/roadmap/phase-gates.md` | Picard | Miles O'Brien (RAI-03 lockout) | all owners, Rai, Fact Checker; Cyrus | #3; ADRs + legal gates | C2; Rai Green for fingerprinted revision; no phase authorized | [Roadmap](README.md#pr-2-synthesis) |
 | `docs/roadmap/implementation-backlog.md` | Picard | Miles O'Brien (RAI-03 lockout) | all owners, Rai, Fact Checker; Cyrus | #3; phase gates | C2; docs-only, no implementation issue authorized | [Roadmap](README.md#pr-2-synthesis) |
 | `docs/roadmap/ownership-matrix.md` | Picard | Miles O'Brien | all owners, Fact Checker; Cyrus | #3; backlog | C2; proposed, no assignment authorized | [Roadmap](README.md#pr-2-synthesis) |
-| `docs/reviews/fact-check-report.md` | Fact Checker | — | Cyrus / assigned re-reviewers | Refs #3 and #4-#9; PR 2 package | Original/intermediate **REVISE** history preserved; terminal FCR-018 verdict **CLEAR**: 0 unresolved content / 0 unresolved ledger / 0 new findings | [Reviews](README.md#independent-reviews) |
-| `docs/reviews/rai-review.md` | Rai | — | Cyrus / Rai | #3; PR 2 package | Original **REJECT** preserved; re-review **GREEN**, 4 resolved / 0 unresolved, fingerprinted working tree; canonical identifiers pending | [Reviews](README.md#independent-reviews) |
+| `docs/reviews/fact-check-report.md` | Fact Checker | — | Cyrus / assigned re-reviewers | Refs #3 and #4-#9; evaluation work package | Original/intermediate **REVISE** history preserved; terminal FCR-018 verdict **CLEAR**: 0 unresolved content / 0 unresolved ledger / 0 new findings | [Reviews](README.md#independent-reviews) |
+| `docs/reviews/rai-review.md` | Rai | — | Cyrus / Rai | #3; evaluation work package | Original **REJECT** preserved; re-review **GREEN**, 4 resolved / 0 unresolved, fingerprinted working tree; canonical identifiers pending | [Reviews](README.md#independent-reviews) |
 | `docs/reviews/adversarial-review.md` | Independent rubber-duck review (not Fact Checker) | Fact Checker (Cycle 2 register); Ralph (second-pass status ledger); Sarek (N-11 ledger) | independent adversarial reviewer; Cyrus | Refs #3 and #4-#9; F/N/R register | Original **Reject** and intermediate **Revise** history preserved; independent FCR-018 recheck **CLEAR**: 0 unresolved content / 0 unresolved ledger / 0 new findings | [Reviews](README.md#independent-reviews) |
 
 ## Coverage rule
@@ -99,9 +109,11 @@ removed.
 
 ## Remaining integration sequence
 
-Validate the exact tree; commit it; open a draft PR to `main` with `Closes #3`;
-comment on #4-#9 with the actual commit and PR and explicitly close them; then
-update/check ledgers if material, record canonical Git blob OIDs and the full
-final PR-head SHA, and keep #3 open while the PR is draft. Do not merge. Every
-decision remains pending until Cyrus approves that exact final head, and all
-named professional gates remain separate and pending.
+The reviewed incorporation commit, draft PR #10, child comments, and explicit
+#4-#9 closures are complete. Validate these ledger-only edits, commit and push
+them, then verify PR #10's exact head plus its draft and `main` base state. That
+next ledger-only commit becomes the candidate final head only after validation
+and push; resolve the four changed ledgers' canonical blob OIDs from it and
+record/report its exact full SHA externally for Cyrus. Keep #3 open. Do not
+merge or deploy. Every decision and named professional gate remains pending,
+and Cyrus must approve that exact full SHA.
