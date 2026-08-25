@@ -8,7 +8,9 @@
 
 ## Licensing
 
-Unless explicitly marked otherwise, intentionally submitted Jamula-authored code and technical documentation are contributed under Apache License 2.0.
+Unless explicitly marked otherwise, a contributor who intentionally submits code or technical documentation represents that they have authority to do so and agrees to license the contribution under Apache License 2.0.
+
+External contributions may be discussed and reviewed, but they are not merged until qualified counsel approves the inbound contribution policy (including whether Jamula should use Apache section 5 alone, a DCO, a CLA, or additional employer-authority representations).
 
 Do not submit:
 
@@ -16,6 +18,7 @@ Do not submit:
 - customer or employer-confidential material;
 - trademarks, logos, copyrighted media, personal data, or generated content without provenance and approval;
 - code copied from another project without preserving its license and attribution.
+- work owned by an employer, customer, or other party unless you have documented authority to contribute it.
 
 Third-party and reserved-content paths in `LICENSE_SCOPE.md` require maintainer review. Contributions do not grant rights to Jamula or third-party trademarks.
 

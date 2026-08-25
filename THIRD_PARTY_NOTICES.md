@@ -5,6 +5,7 @@
 - Package: `@bradygaster/squad-cli`
 - Version: `0.12.0`
 - Source: https://github.com/bradygaster/squad
+- Source tag commit: `54f699f252e826b385b1d406a611a14a5fba14d6`
 - License: MIT
 - Redistributed/derived paths include `.squad/`, `.github/agents/squad.agent.md`, generic `.github/skills/`, `.github/workflows/`, `.github/copilot-instructions.md`, `.mcp.json`, `.gitattributes`, and `.vscode/settings.json`.
 - Jamula modifications include project roster/routing/casting, main-only git guidance, project instructions, workflow hardening, machine-readable routing, secret/PII example sanitization, omission of an unused unsafe auth-isolation template, and project-specific governance.

@@ -179,6 +179,8 @@ def validate_workflow_policy() -> None:
         fail("Squad Triage must use boundary-aware scored routing")
     if "copilot-swe-agent[bot]" not in triage or "COPILOT_ASSIGN_TOKEN" not in triage:
         fail("Squad Triage must perform approved Copilot assignment directly")
+    if "COPILOT_ASSIGN_TOKEN ||" in triage:
+        fail("Copilot assignment must fail closed instead of falling back to GITHUB_TOKEN")
     if "slugify(cells[0]) === memberName" not in assignment:
         fail("Squad Issue Assign must compare slugged roster names")
     if "steps.copilot_policy.outputs.enabled == 'true'" not in assignment:
