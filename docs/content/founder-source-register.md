@@ -1,9 +1,16 @@
-# Founder Content Source Register
+# Founder Source Register — Public Repository Stub
 
-**Status:** No founder copy is approved for publication.
+**Status:** Intentionally contains no founder facts or sources.
 
-| Source/fact | Public URL or user source | Identity match | Allowed use | Excluded details | Verified | Cyrus approval |
-|---|---|---|---|---|---|---|
-| User-provided working profile | Private attachment; not for publication | Direct | Collaboration context only | Internal Microsoft/workplace details | 2026-08-25 | Context use approved |
-| LinkedIn profile | https://www.linkedin.com/in/cyrusjamula/ | Name, employer, GitHub cross-match | Public professional facts only | Contact data, unsupported claims | 2026-08-25 | Wording pending |
-| GitHub profile | https://github.com/cyrusjamula | Username and name | Public projects/activity selected by Cyrus | Private or unrelated repositories | 2026-08-25 | Selection pending |
+Any controlled private source register must be maintained outside this public repository with access limited to approved reviewers. It must not be linked, summarized, mirrored, or described here in a way that exposes personal URLs, private-source existence or details, employer/workplace metadata, identity cross-matches, personal contact data, or unapproved facts.
+
+| Public-repository field | Value |
+|---|---|
+| Approved founder facts | None |
+| Approved founder wording | None |
+| Publishable source links | None |
+| Publication disposition | Blocked |
+
+Before any founder copy replaces the neutral placeholder, Cyrus must approve the exact fact and wording, and the controlled private record must capture source evidence, claim-level verification status, permitted channels, exclusions, required reviews, expiry, and correction/removal action.
+
+**Context:** `Refs #3; child #4`; Cycle 2 independent revision after reviewer rejection.
