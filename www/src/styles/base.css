@@ -1,0 +1,120 @@
+/* Base / reset — opinionated minimal reset */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 100%; /* respect browser default (typically 16px) */
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Honour reduced-motion everywhere */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  font-family: var(--j-font-sans);
+  font-size: var(--j-text-base);
+  line-height: var(--j-leading-normal);
+  color: var(--j-color-text);
+  background-color: var(--j-color-bg);
+  min-height: 100dvh;
+  text-rendering: optimizeSpeed;
+}
+
+/* ── Typography ──────────────────────────────────────────────── */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  line-height: var(--j-leading-tight);
+  font-weight: 700;
+}
+
+p,
+li,
+dt,
+dd {
+  max-width: var(--j-content-width);
+}
+
+a {
+  color: var(--j-color-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  transition: color var(--j-transition-fast);
+}
+
+a:hover {
+  color: var(--j-color-accent-hover);
+}
+
+/* Visible focus for all interactive elements */
+:focus-visible {
+  outline: 3px solid var(--j-color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--j-radius-sm);
+}
+
+/* ── Media ───────────────────────────────────────────────────── */
+
+img,
+video,
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* ── Skip link ───────────────────────────────────────────────── */
+
+.skip-link {
+  position: absolute;
+  inset-inline-start: var(--j-space-4);
+  inset-block-start: var(--j-space-4);
+  padding: var(--j-space-2) var(--j-space-4);
+  background: var(--j-color-accent);
+  color: #fff;
+  font-weight: 700;
+  border-radius: var(--j-radius-sm);
+  text-decoration: none;
+  /* Hidden until focused */
+  transform: translateY(-150%);
+  transition: transform var(--j-transition-fast);
+  z-index: 100;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* ── Utilities ───────────────────────────────────────────────── */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

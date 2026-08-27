@@ -81,3 +81,8 @@ nunit-*.xml
 # Python validation artifacts
 __pycache__/
 *.py[cod]
+
+# Node / Astro website (www/)
+www/node_modules/
+www/dist/
+www/.astro/
