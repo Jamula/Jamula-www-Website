@@ -1,0 +1,78 @@
+---
+/**
+ * BaseLayout — semantic shell for every page.
+ *
+ * Props:
+ *   title       – <title> content (page-specific part)
+ *   description – meta description
+ *   canonicalUrl – canonical href; defaults to the current page URL
+ *   ogImage     – optional absolute URL for Open Graph image
+ */
+import "../styles/tokens.css";
+import "../styles/base.css";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+
+interface Props {
+  title: string;
+  description: string;
+  canonicalUrl?: string;
+  ogImage?: string;
+}
+
+const SITE_NAME = "Jamula";
+const SITE_URL = "https://jamula.net";
+
+const { title, description, canonicalUrl = Astro.url.href, ogImage } = Astro.props;
+
+const fullTitle = `${title} — ${SITE_NAME}`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Primary metadata -->
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+
+    <!-- Canonical site identifier -->
+    <meta name="application-name" content={SITE_NAME} />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:site_name" content={SITE_NAME} />
+    {ogImage && <meta property="og:image" content={ogImage} />}
+
+    <!-- Twitter / X Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    {ogImage && <meta name="twitter:image" content={ogImage} />}
+
+    <!-- Favicon placeholder — replace with approved brand assets -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+    <!-- Sitemap autodiscovery -->
+    <link rel="sitemap" href={`${SITE_URL}/sitemap-index.xml`} />
+  </head>
+  <body>
+    <!-- Skip navigation link — must be the first focusable element -->
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <SiteHeader />
+
+    <main id="main-content" tabindex="-1">
+      <slot />
+    </main>
+
+    <SiteFooter />
+  </body>
+</html>
