@@ -17,6 +17,11 @@
   --j-color-accent-hover: #003d7a;
   --j-color-focus-ring: #0078d4;
 
+  /* ── Skip-link safe pair ─────────────────────────────────────── */
+  /* Light: #005ea2 bg + #ffffff fg → 6.17:1 (WCAG 2.2 AA ✓) */
+  --j-color-skip-link-bg: #005ea2;
+  --j-color-skip-link-fg: #ffffff;
+
   /* ── Typography ──────────────────────────────────────────────── */
   --j-font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --j-font-mono: ui-monospace, "Cascadia Code", "Fira Code", Consolas, monospace;
@@ -69,5 +74,9 @@
     --j-color-accent: #4dabf7;
     --j-color-accent-hover: #74c0fc;
     --j-color-focus-ring: #4dabf7;
+
+    /* Dark: #003d7a bg + #ffffff fg → 9.57:1 (WCAG 2.2 AA ✓) */
+    --j-color-skip-link-bg: #003d7a;
+    --j-color-skip-link-fg: #ffffff;
   }
 }
