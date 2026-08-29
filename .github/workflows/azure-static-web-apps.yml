@@ -1,0 +1,161 @@
+# Deploys jamula.net to Azure Static Web Apps.
+#
+# Resources (AzPay2Go subscription):
+#   Resource group:  rg-jamula-web-prod
+#   Static Web App:  swa-jamula-web-prod  (West US 2, Free SKU)
+#   Default hostname: ashy-beach-033c7d01e.7.azurestaticapps.net
+#
+# GitHub secret: AZURE_STATIC_WEB_APPS_API_TOKEN_SWA_JAMULA_WEB_PROD
+#   Provisioned by piping `az staticwebapp secrets list` directly into
+#   `gh secret set`. Never written to disk, logs, or repository files.
+#
+# DNS/custom-domain changes are explicitly out of scope for this workflow.
+#
+# Preview environment noindex limitation:
+#   Azure Static Web Apps Free tier does not support per-environment response
+#   header overrides. The globalHeaders in www/staticwebapp.config.json apply
+#   to all environments (production and preview). No X-Robots-Tag: noindex
+#   is automatically injected for preview hostnames. Preview URLs are ephemeral
+#   azurestaticapps.net subdomains unlikely to be indexed in practice; adding
+#   per-environment noindex requires Standard SKU or a middleware layer and is
+#   deferred to a later issue.
+#
+# Action pins (verified against official repositories):
+#   actions/checkout v4          → 34e114876b0b11c390a56381ad16ebd13914f8d5
+#   actions/setup-node v4        → 49933ea5288caeca8642d1e84afbd3f7d6820020
+#   Azure/static-web-apps-deploy v1 → 1a947af9992250f3bc2e68ad0754c0b0c11566c9
+#
+# Rollback: redeploy by re-running the workflow on the prior commit on main.
+# Teardown: delete swa-jamula-web-prod and rg-jamula-web-prod via Azure Portal
+#   or `az group delete --name rg-jamula-web-prod --yes`.
+#   Remove the GitHub secret AZURE_STATIC_WEB_APPS_API_TOKEN_SWA_JAMULA_WEB_PROD
+#   after teardown.
+
+name: Azure Static Web Apps
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'www/**'
+      - '.github/workflows/azure-static-web-apps.yml'
+  pull_request:
+    # 'closed' has no paths filter so preview cleanup always runs even when
+    # no website files were changed in the PR.
+    types: [opened, synchronize, reopened, closed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  # PRs share a group keyed by PR number; a new push to the PR branch cancels
+  # the prior in-progress run. Push-to-main and PR-close events use the unique
+  # run_id so they are never cancelled.
+  group: >-
+    swa-${{
+      github.event_name == 'pull_request' && github.event.action != 'closed'
+        && github.event.pull_request.number
+        || github.run_id
+    }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action != 'closed' }}
+
+jobs:
+  build_and_deploy:
+    name: Build and deploy
+    # Same-repo PRs only: forks cannot access the deployment token.
+    # PR 'closed' events are handled by the close_preview job.
+    if: >-
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'pull_request' &&
+        github.event.action != 'closed' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: write
+    defaults:
+      run:
+        working-directory: www
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect website changes
+        id: changes
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" \
+            -- ':(top)www/' ':(top).github/workflows/azure-static-web-apps.yml')"
+          if [[ -n "$changed_files" ]]; then
+            echo "website=true" >> "$GITHUB_OUTPUT"
+            echo "Website changes detected — build and deploy required."
+          else
+            echo "website=false" >> "$GITHUB_OUTPUT"
+            echo "No website changes in this PR — skipping build and deploy."
+          fi
+
+      - name: Set up Node.js 22.12.0
+        if: github.event_name == 'push' || steps.changes.outputs.website == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.12.0'
+          cache: npm
+          cache-dependency-path: www/package-lock.json
+
+      - name: Install npm 12.0.2
+        if: github.event_name == 'push' || steps.changes.outputs.website == 'true'
+        run: npm install --global npm@12.0.2
+
+      - name: Install website dependencies
+        if: github.event_name == 'push' || steps.changes.outputs.website == 'true'
+        run: npm ci
+
+      - name: Build website
+        if: github.event_name == 'push' || steps.changes.outputs.website == 'true'
+        run: npm exec -- astro build
+
+      - name: Deploy to Azure Static Web Apps
+        if: github.event_name == 'push' || steps.changes.outputs.website == 'true'
+        uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SWA_JAMULA_WEB_PROD }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: www
+          output_location: dist
+          skip_app_build: true
+          production_branch: main
+
+  close_preview:
+    name: Close pull request preview
+    # Runs for all closed PRs from the same repo, regardless of which files
+    # changed — ensures preview environments are cleaned up even when the
+    # website files were not touched in the PR.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: write
+    steps:
+      - name: Close preview environment
+        uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SWA_JAMULA_WEB_PROD }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: close
+          app_location: /
