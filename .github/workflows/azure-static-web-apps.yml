@@ -113,14 +113,36 @@ jobs:
           cache: npm
           cache-dependency-path: www/package-lock.json
 
-      - name: Install npm 12.0.2
+      - name: Activate npm 12.0.2
         if: github.event_name == 'push' || steps.changes.outputs.website == 'true'
-        # Node 22.12.0 ships with npm 10.x; npm 12's own engine field requires
-        # ^22.22.2 || ^24.15.0 || >=26.0.0, which would block the upgrade when
-        # the bundled npm enforces it. --ignore-engines bypasses the install-time
-        # check; npm 12.0.2 runs correctly on Node 22.12.0 in practice, and any
-        # actual runtime incompatibility would surface immediately on `npm ci`.
-        run: npm install --global npm@12.0.2 --ignore-engines
+        # Node 22.12.0 ships with npm 10.x whose engine check rejects npm 12.
+        # Try corepack first because it can activate an exact package-manager
+        # version without asking the bundled npm to install it. If the runner's
+        # corepack path does not yield npm 12.0.2, fall back to replacing the
+        # global npm package directory directly from the registry tarball.
+        shell: bash
+        run: |
+          desired_npm='12.0.2'
+          actual_npm=''
+
+          if command -v corepack >/dev/null 2>&1; then
+            corepack enable
+            corepack prepare "npm@${desired_npm}" --activate || true
+            actual_npm="$(npm --version 2>/dev/null || true)"
+          fi
+
+          if [[ "$actual_npm" != "$desired_npm" ]]; then
+            echo "corepack did not activate npm ${desired_npm}; installing from tarball"
+            npm_root="$(npm root -g)"
+            rm -rf "${npm_root}/npm"
+            mkdir -p "${npm_root}/npm"
+            curl -fsSL "https://registry.npmjs.org/npm/-/npm-${desired_npm}.tgz" |
+              tar -xz --strip-components=1 -C "${npm_root}/npm"
+            hash -r
+            actual_npm="$(npm --version)"
+          fi
+
+          [[ "$actual_npm" == "$desired_npm" ]]
 
       - name: Install website dependencies
         if: github.event_name == 'push' || steps.changes.outputs.website == 'true'
@@ -137,10 +159,11 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SWA_JAMULA_WEB_PROD }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
-          app_location: www
-          output_location: dist
+          # With skip_app_build=true, app_location must point at the built app
+          # artifacts rather than the source tree; output_location is unused.
+          app_location: www/dist
+          output_location: ''
           skip_app_build: true
-          production_branch: main
 
   close_preview:
     name: Close pull request preview
