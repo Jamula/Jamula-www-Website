@@ -63,7 +63,7 @@ ownership and lockouts are in [work ownership](planning/work-ownership.md).
 
 | Domain | Documents |
 |---|---|
-| Content | [strategy](content/content-strategy.md), [editorial workflow](content/editorial-workflow.md), [multimedia/social](content/multimedia-social-plan.md), [founder placeholder](content/founder-profile-draft.md) |
+| Content | [strategy](content/content-strategy.md), [editorial workflow](content/editorial-workflow.md), [multimedia/social](content/multimedia-social-plan.md), [founder placeholder](content/founder-profile-draft.md), [homepage copy draft](content/homepage-copy-draft.md) |
 | Experience | [requirements](experience/experience-requirements.md), [accessibility/SEO/performance](experience/accessibility-seo-performance.md), [acceptance journeys](experience/acceptance-journeys.md) |
 | Customer platform | [options](research/customer-platform-options.md), [sources](research/customer-platform-source-register.md), [architecture](architecture/customer-platform.md), [data inventory](privacy/data-inventory.md), [lifecycle](privacy/data-lifecycle.md), [payments](payments/phase-4-evaluation.md) |
 | Connector packets | [index](spikes/connectors/README.md), [OneDrive](spikes/connectors/onedrive.md), [Google Drive](spikes/connectors/google-drive.md), [Box](spikes/connectors/box.md) — all blocked/deferred; no live mechanism spike |
@@ -113,7 +113,7 @@ pending.
 - [PR 2 work-package ownership, lockouts, issue state and residual actions](planning/work-ownership.md)
 
 The manifest covers every Markdown file under `docs/`; there are no intentionally
-unindexed documentation artifacts. Coverage is **60/60**.
+unindexed documentation artifacts. Coverage is **61/61**.
 
 ## Lifecycle sequence
 
