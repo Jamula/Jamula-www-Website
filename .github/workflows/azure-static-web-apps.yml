@@ -49,16 +49,13 @@ permissions:
   contents: read
 
 concurrency:
-  # PRs share a group keyed by PR number; a new push to the PR branch cancels
-  # the prior in-progress run. Push-to-main and PR-close events use the unique
-  # run_id so they are never cancelled.
-  group: >-
-    swa-${{
-      github.event_name == 'pull_request' && github.event.action != 'closed'
-        && github.event.pull_request.number
-        || github.run_id
-    }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action != 'closed' }}
+  # Production deploys share one group and are never cancelled, ensuring pushes
+  # to main complete in queue order so a faster later run cannot overwrite a
+  # slower earlier one and restore stale content. Each PR (including its
+  # 'closed' event) uses a per-PR group so a new push cancels the prior preview
+  # and the close event cancels any in-progress preview upload before cleanup.
+  group: ${{ github.event_name == 'push' && 'swa-production' || format('swa-pr-{0}', github.event.pull_request.number) }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
   build_and_deploy:
@@ -132,12 +129,23 @@ jobs:
           fi
 
           if [[ "$actual_npm" != "$desired_npm" ]]; then
-            echo "corepack did not activate npm ${desired_npm}; installing from tarball"
+            echo "corepack did not activate npm ${desired_npm}; installing from registry tarball"
+            # sha512 from https://registry.npmjs.org/npm/12.0.2 → dist.integrity
+            # Update this hash when bumping desired_npm above.
+            expected_digest='uIXokLlBj6FpNUTQX1PmT5pz7BlIN9QlixX+zdaSNHsd0qUXsbDLr50xzY6Sw7cJVr0uzHKDOle0swmPW/p5Qw=='
+            tmpfile="$(mktemp)"
+            curl -fsSL "https://registry.npmjs.org/npm/-/npm-${desired_npm}.tgz" -o "$tmpfile"
+            actual_digest="$(openssl dgst -sha512 -binary "$tmpfile" | base64 -w0)"
+            if [[ "$actual_digest" != "$expected_digest" ]]; then
+              echo "sha512 mismatch for npm@${desired_npm} tarball — aborting" >&2
+              rm -f "$tmpfile"
+              exit 1
+            fi
             npm_root="$(npm root -g)"
             rm -rf "${npm_root}/npm"
             mkdir -p "${npm_root}/npm"
-            curl -fsSL "https://registry.npmjs.org/npm/-/npm-${desired_npm}.tgz" |
-              tar -xz --strip-components=1 -C "${npm_root}/npm"
+            tar -xz --strip-components=1 -C "${npm_root}/npm" < "$tmpfile"
+            rm -f "$tmpfile"
             hash -r
             actual_npm="$(npm --version)"
           fi
