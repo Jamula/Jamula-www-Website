@@ -114,7 +114,7 @@
     --j-rule-color: #3a362a; /* hairline rule on the inked field */
     --j-rule-ink: #6f6a58; /* strong rule */
 
-    /* Dark: #17160f on #63bd8d → 8.3:1 (WCAG 2.2 AA ✓) */
+    /* Dark: #17160f on #63bd8d → 7.9:1 (WCAG 2.2 AA ✓) */
     --j-color-skip-link-bg: #63bd8d;
     --j-color-skip-link-fg: #17160f;
   }
