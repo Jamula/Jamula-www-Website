@@ -1,0 +1,296 @@
+name: Azure Static Web Apps
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "www/**"
+      - ".github/workflows/azure-static-web-apps.yml"
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: >-
+    swa-${{
+      github.event_name == 'pull_request'
+      && format('pr-{0}', github.event.pull_request.number)
+      || 'production'
+    }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: "24.15.0"
+  NPM_VERSION: "12.0.2"
+  NPM_INTEGRITY: "sha512-uIXokLlBj6FpNUTQX1PmT5pz7BlIN9QlixX+zdaSNHsd0qUXsbDLr50xzY6Sw7cJVr0uzHKDOle0swmPW/p5Qw=="
+  DEPLOYMENT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  prepare:
+    name: Select deployment
+    if: >-
+      github.event_name == 'push'
+      || (
+        github.event.action != 'closed'
+        && github.event.pull_request.head.repo.full_name == github.repository
+      )
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.gate.outputs.should_deploy }}
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Select current production or relevant preview
+        id: gate
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            latest_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+            if [[ "$latest_main" == "$GITHUB_SHA" ]]; then
+              echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Skipping stale production revision $GITHUB_SHA; main is $latest_main."
+              echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            fi
+          elif git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- \
+            ':(top)www/' \
+            ':(top).github/workflows/azure-static-web-apps.yml'; then
+            echo "No deployable website changes remain in this pull request."
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build verified artifact
+    needs: prepare
+    if: needs.prepare.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: www
+    outputs:
+      artifact_digest: ${{ steps.artifact.outputs.artifact-digest }}
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: www/package-lock.json
+
+      - name: Install verified npm
+        shell: bash
+        run: |
+          set -euo pipefail
+          observed_integrity="$(
+            npm view "npm@${NPM_VERSION}" dist.integrity \
+              --registry=https://registry.npmjs.org/
+          )"
+          if [[ "$observed_integrity" != "$NPM_INTEGRITY" ]]; then
+            echo "::error::npm ${NPM_VERSION} registry integrity did not match the pinned value."
+            exit 1
+          fi
+          npm install --global "npm@${NPM_VERSION}" \
+            --ignore-scripts \
+            --registry=https://registry.npmjs.org/
+          [[ "$(npm --version)" == "$NPM_VERSION" ]]
+
+      - name: Install website dependencies
+        run: npm ci
+
+      - name: Check changed-file formatting
+        run: >-
+          npm exec -- prettier --check
+          ../.github/workflows/azure-static-web-apps.yml
+          public/staticwebapp.config.json
+
+      - name: Check Astro project
+        run: npm run check
+
+      - name: Build static website
+        run: npm run build
+
+      - name: Verify deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f dist/staticwebapp.config.json
+          node -e "
+            const fs = require('node:fs');
+            const config = JSON.parse(fs.readFileSync('dist/staticwebapp.config.json', 'utf8'));
+            if (config.responseOverrides?.['404']?.statusCode !== 404) process.exit(1);
+            if (!config.globalHeaders?.['Content-Security-Policy']) process.exit(1);
+            if (config.mimeTypes?.['.txt'] !== 'text/plain') process.exit(1);
+          "
+
+      - name: Upload immutable deployment artifact
+        id: artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: swa-site-${{ env.DEPLOYMENT_SHA }}
+          path: www/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    name: Deploy and verify
+    needs: [prepare, build]
+    if: needs.prepare.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download verified deployment artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: swa-site-${{ env.DEPLOYMENT_SHA }}
+          path: www/dist
+
+      - name: Verify downloaded configuration
+        shell: bash
+        run: test -f www/dist/staticwebapp.config.json
+
+      - name: Deploy prebuilt site
+        id: deploy
+        uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1 (official immutable tag)
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SWA_JAMULA_WEB_PROD }}
+          action: upload
+          app_location: www/dist
+          output_location: ""
+          skip_app_build: true
+
+      - name: Verify live site
+        shell: bash
+        env:
+          DEPLOYED_URL: ${{ steps.deploy.outputs.static_web_app_url }}
+          ARTIFACT_DIGEST: ${{ needs.build.outputs.artifact_digest }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$DEPLOYED_URL" =~ ^https://[a-z0-9.-]+\.azurestaticapps\.net/?$ ]]; then
+            echo "::error::The deployment action returned an unexpected URL."
+            exit 1
+          fi
+
+          headers="$(mktemp)"
+          robots_headers="$(mktemp)"
+          body="$(mktemp)"
+          trap 'rm -f "$headers" "$robots_headers" "$body"' EXIT
+
+          for attempt in {1..18}; do
+            if curl --fail --silent --show-error --location \
+              --proto '=https' --tlsv1.2 \
+              --dump-header "$headers" --output "$body" \
+              "${DEPLOYED_URL%/}/"; then
+              break
+            fi
+            if [[ "$attempt" == 18 ]]; then
+              echo "::error::The deployed home page did not become ready."
+              exit 1
+            fi
+            sleep 10
+          done
+
+          header_value() {
+            awk -F': ' -v wanted="$1" '
+              tolower($1) == tolower(wanted) {
+                sub(/\r$/, "", $2)
+                value = $2
+              }
+              END { print value }
+            ' "$headers"
+          }
+          expect_header() {
+            local name="$1"
+            local expected="$2"
+            local observed
+            observed="$(header_value "$name")"
+            if [[ "$observed" != "$expected" ]]; then
+              echo "::error::Unexpected ${name} header."
+              exit 1
+            fi
+          }
+
+          grep -qi '<title>.*Jamula' "$body"
+          expect_header "Content-Security-Policy" \
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'"
+          expect_header "X-Frame-Options" "DENY"
+          expect_header "X-Content-Type-Options" "nosniff"
+          expect_header "Referrer-Policy" "strict-origin-when-cross-origin"
+          expect_header "Permissions-Policy" "camera=(), microphone=(), geolocation=()"
+
+          hsts="$(header_value "Strict-Transport-Security")"
+          [[ -n "$hsts" ]] || {
+            echo "::error::Strict-Transport-Security was not enforced."
+            exit 1
+          }
+
+          curl --fail --silent --show-error --location \
+            --proto '=https' --tlsv1.2 \
+            --dump-header "$robots_headers" --output /dev/null \
+            "${DEPLOYED_URL%/}/robots.txt"
+          grep -Eiq '^content-type: *text/plain([;[:space:]]|$)' "$robots_headers"
+
+          missing_status="$(
+            curl --silent --show-error --location \
+              --proto '=https' --tlsv1.2 \
+              --output "$body" --write-out '%{http_code}' \
+              "${DEPLOYED_URL%/}/__jamula_missing_route__"
+          )"
+          [[ "$missing_status" == "404" ]]
+          grep -qi 'Page not found' "$body"
+
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            x_robots_tag="$(header_value "X-Robots-Tag")"
+            if [[ "${x_robots_tag,,}" != *"none"* ]]; then
+              echo "::error::Azure did not enforce X-Robots-Tag: none on the preview."
+              exit 1
+            fi
+          fi
+
+          {
+            echo "### Verified Azure deployment"
+            echo "- Revision: \`${DEPLOYMENT_SHA}\`"
+            echo "- Artifact digest: \`${ARTIFACT_DIGEST}\`"
+            echo "- URL: ${DEPLOYED_URL}"
+            echo "- Configuration: CSP, framing, MIME, referrer, permissions, 404 response"
+            echo "- Azure platform: TLS/HSTS$( [[ "$GITHUB_EVENT_NAME" == "pull_request" ]] && printf ', X-Robots-Tag: none' )"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  cleanup-preview:
+    name: Remove obsolete preview
+    needs: prepare
+    if: >-
+      always()
+      && github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && (
+        github.event.action == 'closed'
+        || needs.prepare.outputs.should_deploy == 'false'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close pull request preview
+        uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1 (official immutable tag)
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SWA_JAMULA_WEB_PROD }}
+          action: close
+          app_location: www/dist
