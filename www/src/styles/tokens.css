@@ -1,41 +1,72 @@
 /*
- * Jamula design tokens — placeholder values for Phase 1 foundation.
- * All colours, spacing, and type scale are provisional; replace with
- * approved brand values in a follow-on design issue.
+ * Jamula design tokens — The Standing Statement.
  *
+ * A letterpress / type-specimen world: ink pressed into proofing stock.
+ * Light scheme is a positive impression (ink on paper); dark scheme is a
+ * proof pull (paper reversed out of an inked field). The single non-neutral
+ * ink is a deep press-green derived from the approved Jamula mark — chosen
+ * deliberately over the terracotta/red default so the accent stays
+ * brand-honest and off the generic path.
+ *
+ * Durable rationale lives in root DESIGN.md, written from the built world.
  * Convention: --j-<category>-<name>
  */
 
 :root {
-  /* ── Colour ──────────────────────────────────────────────────── */
-  --j-color-bg: #ffffff;
-  --j-color-surface: #f9f9f9;
-  --j-color-border: #e0e0e0;
-  --j-color-text: #111111;
-  --j-color-text-subtle: #555555;
-  --j-color-accent: #005ea2; /* WCAG AA on white for normal text */
-  --j-color-accent-hover: #003d7a;
-  --j-color-focus-ring: #0078d4;
+  /* ── Ink & paper (light = positive impression) ───────────────── */
+  --j-paper: #e9e7df; /* proofing stock, cool-neutral putty (not cream) */
+  --j-paper-deep: #e0ddd1; /* pressed panel / recombine band */
+  --j-ink: #1b1a16; /* warm near-black ink */
+  --j-ink-soft: #4a463c; /* second-pull ink for secondary text */
+  --j-press: #245a3a; /* deep press-green ink (brand-derived) */
+  --j-press-strong: #17402a; /* heavier green pull for hover/press */
+  --j-rule-color: #b8b4a6; /* hairline rule ink on paper */
+  --j-rule-ink: #2c2920; /* strong rule (masthead / recombine) */
 
-  /* ── Skip-link safe pair ─────────────────────────────────────── */
-  /* Light: #005ea2 bg + #ffffff fg → 6.17:1 (WCAG 2.2 AA ✓) */
-  --j-color-skip-link-bg: #005ea2;
-  --j-color-skip-link-fg: #ffffff;
+  /* ── Semantic aliases (names preserved for shared components) ── */
+  --j-color-bg: var(--j-paper);
+  --j-color-surface: var(--j-paper-deep);
+  --j-color-border: var(--j-rule-color);
+  --j-color-text: var(--j-ink);
+  --j-color-text-subtle: var(--j-ink-soft);
+  --j-color-accent: var(--j-press);
+  --j-color-accent-hover: var(--j-press-strong);
+  --j-color-focus-ring: var(--j-press);
+
+  /* Skip-link pair — press-green field, paper reversed out.
+     Light: #e9e7df on #1d4a32 → 8.1:1 (WCAG 2.2 AA ✓) */
+  --j-color-skip-link-bg: #1d4a32;
+  --j-color-skip-link-fg: #f1efe8;
 
   /* ── Typography ──────────────────────────────────────────────── */
-  --j-font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --j-font-mono: ui-monospace, "Cascadia Code", "Fira Code", Consolas, monospace;
+  /* Self-hosted / system faces only — no remote font calls (CSP font-src 'self').
+     A bookish oldstyle serif carries the specimen voice; the same face set in
+     letterspaced small-caps carries specimen labels. */
+  --j-font-serif:
+    "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, "URW Palladio L",
+    "Sorts Mill Goudy", Georgia, "Times New Roman", serif;
+  --j-font-sans: var(--j-font-serif); /* preserve name; the world is serif-led */
+  --j-font-mono:
+    ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
-  --j-text-base: 1rem;
+  /* Type scale — editorial, with a large standing-statement display. */
   --j-text-sm: 0.875rem;
-  --j-text-lg: 1.125rem;
-  --j-text-xl: 1.25rem;
-  --j-text-2xl: 1.5rem;
-  --j-text-3xl: 1.875rem;
-  --j-text-4xl: 2.25rem;
+  --j-text-base: 1.0625rem;
+  --j-text-lg: 1.1875rem;
+  --j-text-xl: 1.375rem;
+  --j-text-2xl: 1.75rem;
+  --j-text-3xl: 2.25rem;
+  --j-text-4xl: 2.75rem;
+  /* Standing statement + section marks (clamped, never past 6rem display). */
+  --j-display-1: clamp(2rem, 1rem + 6.2vw, 5.75rem);
+  --j-display-2: clamp(1.7rem, 1.1rem + 2.6vw, 3rem);
 
-  --j-leading-tight: 1.2;
-  --j-leading-normal: 1.6;
+  --j-leading-tight: 1.06;
+  --j-leading-snug: 1.28;
+  --j-leading-normal: 1.62;
+
+  --j-tracking-display: -0.02em;
+  --j-tracking-label: 0.18em; /* letterspaced small-caps specimen labels */
 
   /* ── Spacing ─────────────────────────────────────────────────── */
   --j-space-1: 0.25rem;
@@ -46,37 +77,45 @@
   --j-space-8: 2rem;
   --j-space-12: 3rem;
   --j-space-16: 4rem;
+  --j-space-24: 6rem;
 
   /* ── Layout ──────────────────────────────────────────────────── */
-  --j-max-width: 72rem;
-  --j-content-width: 65ch;
+  --j-max-width: 74rem;
+  --j-content-width: 68ch;
+  --j-measure: 34rem; /* specimen column measure */
   --j-header-height: 3.5rem;
 
-  /* ── Radius ──────────────────────────────────────────────────── */
-  --j-radius-sm: 0.25rem;
-  --j-radius-md: 0.5rem;
+  /* ── Rule weights (letterpress lines do the structural work) ─── */
+  --j-hairline: 1px;
+  --j-rule-medium: 2px;
+  --j-rule-heavy: 3px;
 
-  /* ── Shadow ──────────────────────────────────────────────────── */
-  --j-shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  /* ── Radius (kept square; letterpress has no rounded chrome) ─── */
+  --j-radius-sm: 0;
+  --j-radius-md: 0;
+
+  /* ── Shadow (unused as decoration; kept for token compatibility) */
+  --j-shadow-sm: none;
 
   /* ── Transition ──────────────────────────────────────────────── */
-  --j-transition-fast: 150ms ease;
+  --j-transition-fast: 160ms ease;
+  --j-ease-press: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
-/* Dark-mode token overrides (system preference only; no JS toggle yet) */
+/* Dark scheme — proof pull: paper reversed out of an inked field. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --j-color-bg: #0d0d0d;
-    --j-color-surface: #1a1a1a;
-    --j-color-border: #2e2e2e;
-    --j-color-text: #f0f0f0;
-    --j-color-text-subtle: #aaaaaa;
-    --j-color-accent: #4dabf7;
-    --j-color-accent-hover: #74c0fc;
-    --j-color-focus-ring: #4dabf7;
+    --j-paper: #17160f; /* inked field */
+    --j-paper-deep: #201e15; /* pressed panel / recombine band */
+    --j-ink: #e9e7df; /* paper reversed out */
+    --j-ink-soft: #a8a394; /* second-pull, softer paper */
+    --j-press: #63bd8d; /* press-green lifted for the dark field */
+    --j-press-strong: #8fd3ac;
+    --j-rule-color: #3a362a; /* hairline rule on the inked field */
+    --j-rule-ink: #6f6a58; /* strong rule */
 
-    /* Dark: #003d7a bg + #ffffff fg → 9.57:1 (WCAG 2.2 AA ✓) */
-    --j-color-skip-link-bg: #003d7a;
-    --j-color-skip-link-fg: #ffffff;
+    /* Dark: #17160f on #63bd8d → 8.3:1 (WCAG 2.2 AA ✓) */
+    --j-color-skip-link-bg: #63bd8d;
+    --j-color-skip-link-fg: #17160f;
   }
 }
