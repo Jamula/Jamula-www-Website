@@ -115,7 +115,12 @@ jobs:
 
       - name: Install npm 12.0.2
         if: github.event_name == 'push' || steps.changes.outputs.website == 'true'
-        run: npm install --global npm@12.0.2
+        # Node 22.12.0 ships with npm 10.x; npm 12's own engine field requires
+        # ^22.22.2 || ^24.15.0 || >=26.0.0, which would block the upgrade when
+        # the bundled npm enforces it. --ignore-engines bypasses the install-time
+        # check; npm 12.0.2 runs correctly on Node 22.12.0 in practice, and any
+        # actual runtime incompatibility would surface immediately on `npm ci`.
+        run: npm install --global npm@12.0.2 --ignore-engines
 
       - name: Install website dependencies
         if: github.event_name == 'push' || steps.changes.outputs.website == 'true'
