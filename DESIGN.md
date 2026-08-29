@@ -120,7 +120,7 @@ press 6.0:1.
 | --- | --- | --- |
 | `ink` (body) | `#e9e7df` | 14.5:1 |
 | `ink-soft` | `#a8a394` | 7.3:1 |
-| `press` | `#63bd8d` | 8.3:1 |
+| `press` | `#63bd8d` | 7.9:1 |
 
 Color is committed at page scale as ink-and-paper fields, never as accents
 scattered over a neutral ground. `::selection` is press-green with paper text.
