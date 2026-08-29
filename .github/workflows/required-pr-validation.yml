@@ -1,0 +1,83 @@
+name: Required PR Validation
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  required-pr-validation:
+    name: required-pr-validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: www
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect website changes
+        id: changes
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)www/')"
+          if [[ -n "$changed_files" ]]; then
+            echo "website=true" >> "$GITHUB_OUTPUT"
+            echo "Website validation required."
+          else
+            echo "website=false" >> "$GITHUB_OUTPUT"
+            echo "No website changes; npm validation is not required."
+          fi
+
+      - name: Set up Node.js
+        if: steps.changes.outputs.website == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+          cache-dependency-path: www/package-lock.json
+
+      - name: Install npm 12
+        if: steps.changes.outputs.website == 'true'
+        run: npm install --global npm@12.0.2
+
+      - name: Install website dependencies
+        if: steps.changes.outputs.website == 'true'
+        run: npm ci
+
+      - name: Check website formatting
+        if: steps.changes.outputs.website == 'true'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --name-only --diff-filter=ACMRT -z "$BASE_SHA" "$HEAD_SHA" -- ':(top)www/' |
+            while IFS= read -r -d '' file; do
+              case "$file" in
+                www/.prettierrc|*.astro|*.css|*.js|*.jsx|*.json|*.md|*.mdx|*.mjs|*.ts|*.tsx|*.yaml|*.yml)
+                  printf './%s\0' "${file#www/}"
+                  ;;
+              esac
+            done |
+            xargs --null --no-run-if-empty npm exec -- prettier --check
+
+      - name: Check Astro project
+        if: steps.changes.outputs.website == 'true'
+        run: npm run check
+
+      - name: Build static website
+        if: steps.changes.outputs.website == 'true'
+        run: npm exec -- astro build
