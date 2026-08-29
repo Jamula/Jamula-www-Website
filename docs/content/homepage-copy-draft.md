@@ -82,8 +82,8 @@ organizations think clearly about AI: what it can do for your situation, what it
 and how to make a decision that holds up.
 
 That means grounded scoping before any commitment, honest assessment of capability and risk,
-and a strategy you can evaluate against something measurable — not a promise of
-transformation.
+and a strategy you can evaluate against something measurable — with clear criteria and an
+honest account of what the evaluation found.
 
 **What this engagement includes:**
 - Evaluation of AI fit for a specific business problem
@@ -160,13 +160,16 @@ surprise you on a bill, and it doesn't create problems when you need to move.
 — This wording must be reviewed by Sarek (endorsement/trademark risk, BLOCKING) and Fact
 Checker (capability baseline) before publication. It must convey Jamula's own capability
 only, never Microsoft endorsement, partnership, or affiliation. Sarek must approve the exact
-wording. Do not use placeholder text in place of the approved sentence.]`
+wording. Additional prerequisite: Cyrus must confirm no employer-conflict disclosure
+requirement and, if required, obtain appropriate counsel clearance before any publication.
+Do not use placeholder text in place of the approved sentence.]`
 
 That expertise exists to give organizations optionality, not lock them into one vendor.
 `[REVIEW-GATED #43-H-007: "We work on Microsoft and Azure because that's where we're deepest
 — but we build in ways that preserve your ability to move." — Blocked pending Sarek
-endorsement-risk review and Fact Checker wording review. Current multi-cloud claims-register
-entry is also blocked. Do not publish until both gates clear.]`
+endorsement-risk review and Fact Checker wording review. Same employer-conflict/counsel-
+disclosure prerequisite as #43-H-006 applies. Current multi-cloud claims-register
+entry is also blocked. Do not publish until all gates clear.]`
 
 **What this engagement includes:**
 - Infrastructure design and implementation for cloud-hosted software and AI workloads
@@ -235,24 +238,24 @@ How we approach AI
 Jamula's work on AI starts from a practical question: what will this actually do, for this
 organization, in this situation? That question is harder than it sounds.
 
-Most AI problems are information problems: incomplete data, unclear objectives, or assumptions
-that haven't been tested. `[REVIEWER NOTE #43-H-009: This is a generalization about the AI
-field. Fact Checker must verify it is supportable as a Jamula perspective or identify a
-credible source. If unsupported, rephrase as "In our experience, many AI problems..." or
-similar qualified framing.]` We work to surface those problems early — before the commitment,
+Most AI problems turn out to involve incomplete data, unclear objectives, or assumptions that
+haven't been tested. `[REVIEWER NOTE #43-H-009: Reframed as Jamula's scoped perspective per
+Fact Checker feedback. Full candidate wording: "Jamula starts by checking whether incomplete
+data, unclear objectives, or untested assumptions are the real problem." See
+public-claims-register.md for exact register entry.]` We work to surface those problems early — before the commitment,
 before the build — because an honest scoping conversation is more valuable than a confident
 one.
 
 We don't claim AI is safe by default, and we don't claim any particular AI implementation is
-safe until we can evaluate it against something measurable. We do commit to making the
-evaluation criteria clear and to telling you what we find. `[REVIEWER NOTE #43-H-010: Rai
+safe until we can evaluate it against something measurable. We aim to make the evaluation
+criteria clear and to tell you what we find. `[REVIEWER NOTE #43-H-010: Rai
 review is blocking for this paragraph. Rai must confirm this accurately represents Jamula's
 approach and carries no unintended implication — e.g., it should not suggest Jamula provides
 safety certification or that any evaluation exhaustively proves safety.]`
 
 ---
 
-*Claim cross-reference:* `#43-H-009` (Fact Checker may require reframing),
+*Claim cross-reference:* `#43-H-009` (reframed as scoped Jamula perspective per Fact Checker feedback),
 `#43-H-010` (Rai blocking review).
 Status: proposed; not approved.
 
@@ -345,13 +348,13 @@ Status: proposed; not approved.
 |---|---|---|---|---|
 | #43-H-001 | Hero | "Jamula provides AI strategy, custom software, and cloud consulting." | Proposed; category-level truth owner-approved; exact copy review-gated | `public-claims-register.md` |
 | #43-H-002 | Hero / Synthesis | "Together — not as separate projects." | Proposed; unverified | `public-claims-register.md` |
-| #43-H-003 | AI Strategy | AI approach / grounding description | Proposed; unverified; comparative framing requires Sarek | `public-claims-register.md` |
-| #43-H-004 | AI Strategy | "A strategy you can evaluate against something measurable" | Proposed; unverified | `public-claims-register.md` |
+| #43-H-003 | AI Strategy | "Jamula helps organizations think clearly about AI: what it can do for your situation, what it cannot do, and how to make a decision that holds up." | Proposed; unverified; no competitor implication | `public-claims-register.md` |
+| #43-H-004 | AI Strategy | "A strategy you can evaluate against something measurable — with clear criteria and an honest account of what the evaluation found." | Proposed; unverified | `public-claims-register.md` |
 | #43-H-005 | Custom Software | Custom software positioning | Proposed; unverified | `public-claims-register.md` |
 | #43-H-006 | Cloud Consulting | Microsoft and Azure expertise statement | Proposed; **blocked** — Sarek endorsement-risk review blocking | `public-claims-register.md` |
 | #43-H-007 | Cloud Consulting | Multi-cloud optionality positioning | Proposed; **blocked** — Sarek endorsement-risk review | `public-claims-register.md` |
 | #43-H-008 | Synthesis | Process description ("typically starts with understanding") | Proposed; unverified | `public-claims-register.md` |
-| #43-H-009 | Responsible AI | "Most AI problems are information problems…" | Proposed; unverified; Fact Checker may require reframing | `public-claims-register.md` |
+| #43-H-009 | Responsible AI | "Jamula starts by checking whether incomplete data, unclear objectives, or untested assumptions are the real problem." | Proposed; unverified; reframed as Jamula scoped perspective per Fact Checker feedback | `public-claims-register.md` |
 | #43-H-010 | Responsible AI | Safety-evaluation commitment | Proposed; unverified; Rai review **blocking** | `public-claims-register.md` |
 | #43-H-011 | Next Step | CTA / conversation framing | Proposed; unverified; contact mechanism separately gated | `public-claims-register.md` |
 | #43-F-001 | Founder | "Cyrus Jamula founded Jamula." | Proposed; identification approved in principle; exact copy gated | `founder-source-register.md`, `public-claims-register.md` |
