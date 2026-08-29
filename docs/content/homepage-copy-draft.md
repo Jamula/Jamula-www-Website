@@ -4,11 +4,11 @@
 All sections require independent gate reviews and Cyrus exact-SHA approval before any copy
 is published, implemented in code, or used in any channel.
 
-**Issue:** #43 (parent #39)
+**Issue:** #43 (parent #39); review-condition fixes in #46
 **Owner:** Nyota Uhura
 **Visual direction:** The Standing Statement — letterpress-inspired editorial narrative;
 three offerings split and recombine.
-**Base SHA:** `b3c405d39ce6b6dfc3d5d4d50588060ea63688a3`
+**Base SHA:** `b3c405d39ce6b6dfc3d5d4d50588060ea63688a3`; review-fix base `de96810a01ad09d040666eff3012b67e42c9c720`
 
 **Required gates before merge or publication:**
 
@@ -82,8 +82,7 @@ organizations think clearly about AI: what it can do for your situation, what it
 and how to make a decision that holds up.
 
 That means grounded scoping before any commitment, honest assessment of capability and risk,
-and a strategy you can evaluate against something measurable — not a promise of
-transformation.
+and a strategy you can evaluate against something measurable — defined before work starts.
 
 **What this engagement includes:**
 - Evaluation of AI fit for a specific business problem
@@ -160,13 +159,21 @@ surprise you on a bill, and it doesn't create problems when you need to move.
 — This wording must be reviewed by Sarek (endorsement/trademark risk, BLOCKING) and Fact
 Checker (capability baseline) before publication. It must convey Jamula's own capability
 only, never Microsoft endorsement, partnership, or affiliation. Sarek must approve the exact
-wording. Do not use placeholder text in place of the approved sentence.]`
+wording. Do not use placeholder text in place of the approved sentence.
+— ADDITIONAL PREREQUISITE (#46): Before publication clearance of this sentence, Cyrus must
+disclose any current or recent Microsoft employment, contractor, or advisory relationship to
+qualified counsel. The nature of any such relationship must not be recorded in this
+repository.]`
 
 That expertise exists to give organizations optionality, not lock them into one vendor.
 `[REVIEW-GATED #43-H-007: "We work on Microsoft and Azure because that's where we're deepest
 — but we build in ways that preserve your ability to move." — Blocked pending Sarek
 endorsement-risk review and Fact Checker wording review. Current multi-cloud claims-register
-entry is also blocked. Do not publish until both gates clear.]`
+entry is also blocked. Do not publish until both gates clear.
+— ADDITIONAL PREREQUISITE (#46): Before publication clearance of this sentence, Cyrus must
+disclose any current or recent Microsoft employment, contractor, or advisory relationship to
+qualified counsel. The nature of any such relationship must not be recorded in this
+repository.]`
 
 **What this engagement includes:**
 - Infrastructure design and implementation for cloud-hosted software and AI workloads
@@ -235,17 +242,14 @@ How we approach AI
 Jamula's work on AI starts from a practical question: what will this actually do, for this
 organization, in this situation? That question is harder than it sounds.
 
-Most AI problems are information problems: incomplete data, unclear objectives, or assumptions
-that haven't been tested. `[REVIEWER NOTE #43-H-009: This is a generalization about the AI
-field. Fact Checker must verify it is supportable as a Jamula perspective or identify a
-credible source. If unsupported, rephrase as "In our experience, many AI problems..." or
-similar qualified framing.]` We work to surface those problems early — before the commitment,
+Jamula starts by checking whether incomplete data, unclear objectives, or untested assumptions
+are the real problem. We work to surface those problems early — before the commitment,
 before the build — because an honest scoping conversation is more valuable than a confident
 one.
 
 We don't claim AI is safe by default, and we don't claim any particular AI implementation is
-safe until we can evaluate it against something measurable. We do commit to making the
-evaluation criteria clear and to telling you what we find. `[REVIEWER NOTE #43-H-010: Rai
+safe until we can evaluate it against something measurable. We aim to make the evaluation
+criteria clear and to tell you what we find. `[REVIEWER NOTE #43-H-010: Rai
 review is blocking for this paragraph. Rai must confirm this accurately represents Jamula's
 approach and carries no unintended implication — e.g., it should not suggest Jamula provides
 safety certification or that any evaluation exhaustively proves safety.]`
@@ -345,14 +349,14 @@ Status: proposed; not approved.
 |---|---|---|---|---|
 | #43-H-001 | Hero | "Jamula provides AI strategy, custom software, and cloud consulting." | Proposed; category-level truth owner-approved; exact copy review-gated | `public-claims-register.md` |
 | #43-H-002 | Hero / Synthesis | "Together — not as separate projects." | Proposed; unverified | `public-claims-register.md` |
-| #43-H-003 | AI Strategy | AI approach / grounding description | Proposed; unverified; comparative framing requires Sarek | `public-claims-register.md` |
-| #43-H-004 | AI Strategy | "A strategy you can evaluate against something measurable" | Proposed; unverified | `public-claims-register.md` |
+| #43-H-003 | AI Strategy | AI approach / grounding description | Proposed; unverified; no comparative framing | `public-claims-register.md` |
+| #43-H-004 | AI Strategy | "A strategy you can evaluate against something measurable — defined before work starts" | Proposed; unverified | `public-claims-register.md` |
 | #43-H-005 | Custom Software | Custom software positioning | Proposed; unverified | `public-claims-register.md` |
-| #43-H-006 | Cloud Consulting | Microsoft and Azure expertise statement | Proposed; **blocked** — Sarek endorsement-risk review blocking | `public-claims-register.md` |
-| #43-H-007 | Cloud Consulting | Multi-cloud optionality positioning | Proposed; **blocked** — Sarek endorsement-risk review | `public-claims-register.md` |
+| #43-H-006 | Cloud Consulting | Microsoft and Azure expertise statement | Proposed; **blocked** — Sarek endorsement-risk review blocking; employer-conflict prerequisite (#46) | `public-claims-register.md` |
+| #43-H-007 | Cloud Consulting | Multi-cloud optionality positioning | Proposed; **blocked** — Sarek endorsement-risk review; employer-conflict prerequisite (#46) | `public-claims-register.md` |
 | #43-H-008 | Synthesis | Process description ("typically starts with understanding") | Proposed; unverified | `public-claims-register.md` |
-| #43-H-009 | Responsible AI | "Most AI problems are information problems…" | Proposed; unverified; Fact Checker may require reframing | `public-claims-register.md` |
-| #43-H-010 | Responsible AI | Safety-evaluation commitment | Proposed; unverified; Rai review **blocking** | `public-claims-register.md` |
+| #43-H-009 | Responsible AI | "Jamula starts by checking whether incomplete data, unclear objectives, or untested assumptions are the real problem." | Proposed; unverified | `public-claims-register.md` |
+| #43-H-010 | Responsible AI | Safety-evaluation approach; "aim" wording | Proposed; unverified; Rai review **blocking** | `public-claims-register.md` |
 | #43-H-011 | Next Step | CTA / conversation framing | Proposed; unverified; contact mechanism separately gated | `public-claims-register.md` |
 | #43-F-001 | Founder | "Cyrus Jamula founded Jamula." | Proposed; identification approved in principle; exact copy gated | `founder-source-register.md`, `public-claims-register.md` |
 | #43-F-002 | Founder | Technical background description | **Blocked** — no approved wording; source confirmation required | `founder-source-register.md`, `public-claims-register.md` |
@@ -384,6 +388,6 @@ have it.
 
 ---
 
-**Context:** `Refs #43; parent #39`. No section of this draft is approved for
+**Context:** `Refs #43; parent #39; review-condition fixes #46`. No section of this draft is approved for
 publication. All candidate wording requires Fact Checker, Sarek, and Rai gate reviews,
 then Cyrus exact-SHA approval before any use.
