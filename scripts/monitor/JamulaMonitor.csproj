@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <!-- net8.0 LTS — pre-installed on GitHub-hosted ubuntu-latest (ubuntu-24.04).
-         No actions/setup-dotnet required. Support window: through November 2026. -->
-    <TargetFramework>net8.0</TargetFramework>
+    <!-- net10.0 LTS — pre-installed on GitHub-hosted ubuntu-latest (ubuntu-24.04);
+         confirmed present: 10.0.111, 10.0.204, 10.0.303, 10.0.400 (image 20260823).
+         No actions/setup-dotnet required. Active support through November 2028.
+         SDK selection pinned via scripts/monitor/global.json (latestMinor → any 10.x). -->
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

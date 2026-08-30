@@ -1,9 +1,10 @@
 name: Uptime and Apex A-Record Monitor
 
-# PRE-CUTOVER STATE: The schedule trigger is intentionally commented out.
-# This workflow must also remain disabled in repository Settings → Actions → Workflows
-# until the apex A-record cutover is complete.  Both guards together prevent
-# false-alarm failures while jamula.net still resolves to the legacy IP.
+# PRE-CUTOVER STATE: This workflow is disabled in repository Settings → Actions →
+# Workflows ("disabled_manually").  The schedule trigger is present in source so
+# that a single "Enable workflow" click in Settings — after the apex A-record
+# cutover — makes both schedule and workflow_dispatch live immediately, with no
+# follow-up code PR required.
 #
 # GitHub's "disable workflow" flag is a repository setting independent of this YAML
 # file.  Merging this file to main does NOT silently re-enable the workflow; an
@@ -11,17 +12,14 @@ name: Uptime and Apex A-Record Monitor
 #
 # POST-CUTOVER procedure (issue #52 / #37):
 #   1. Perform the apex A-record change to 48.192.33.154.
-#   2. Open a PR that uncomments the schedule block below (one deliberate source
-#      change, reviewed and merged — no untracked silent re-enablement).
-#   3. In repository Settings → Actions → Workflows, click "Enable workflow"
+#   2. In repository Settings → Actions → Workflows, click "Enable workflow"
 #      for this file.
-#   4. Trigger a manual run immediately via workflow_dispatch.
-#   5. Confirm the run is green; do not close issue #37 until it is.
+#   3. Trigger a manual run immediately via workflow_dispatch.
+#   4. Confirm the run is green; do not close issue #37 until it is.
 
 on:
-  # schedule:
-  #   # Every 15 minutes — uncomment in the post-cutover PR described above
-  #   - cron: "*/15 * * * *"
+  schedule:
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -35,7 +33,9 @@ jobs:
   check:
     name: DNS and HTTPS health
     runs-on: ubuntu-latest
-    # net8.0 LTS is pre-installed on ubuntu-latest (ubuntu-24.04); no setup-dotnet needed.
+    # net10.0 LTS pre-installed on ubuntu-latest (ubuntu-24.04); active through Nov 2028.
+    # SDK pinned to .NET 10.x via scripts/monitor/global.json (latestMinor).
+    # All dotnet steps run from scripts/monitor/ so global.json is on the discovery path.
     timeout-minutes: 5
     steps:
       - name: Check out repository
@@ -47,16 +47,19 @@ jobs:
         run: dotnet --version
 
       - name: Build monitor
-        run: dotnet build scripts/monitor/JamulaMonitor.csproj -c Release --nologo
+        working-directory: scripts/monitor
+        run: dotnet build JamulaMonitor.csproj -c Release --nologo
 
       - name: Run canonical-parser self-tests
+        working-directory: scripts/monitor
         run: >-
-          dotnet run --project scripts/monitor/JamulaMonitor.csproj
+          dotnet run --project JamulaMonitor.csproj
           -c Release --no-build -- --self-test
 
       - name: Check DNS apex A record and HTTPS canonical
+        working-directory: scripts/monitor
         run: >-
-          dotnet run --project scripts/monitor/JamulaMonitor.csproj
+          dotnet run --project JamulaMonitor.csproj
           -c Release --no-build
 
       - name: Report success
