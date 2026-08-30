@@ -83,6 +83,11 @@ jobs:
 
           expected_canonical="https://jamula.net/"
 
+          # Exit codes from the parser (never inferred from stdout content,
+          # so a page whose real canonical text happens to look like a
+          # sentinel cannot be misinterpreted): 0=found, 2=missing tag,
+          # 3=tag has no usable href.
+          set +e
           canonical="$(python3 - "$body" <<'PY'
           import re
           import sys
@@ -99,30 +104,30 @@ jobs:
           ]
 
           if not canonical_tags:
-              print("MISSING", end="")
-              sys.exit(0)
+              sys.exit(2)
 
           href_match = re.search(
               r"""href\s*=\s*["']([^"']*)["']""", canonical_tags[0], flags=re.IGNORECASE
           )
           if not href_match:
-              print("MALFORMED", end="")
-              sys.exit(0)
+              sys.exit(3)
 
           print(href_match.group(1), end="")
           PY
           )"
+          canonical_status=$?
+          set -e
 
-          case "$canonical" in
-            MISSING)
-              echo "::error::No <link rel=\"canonical\"> tag found in https://jamula.net/ response body."
-              exit 1
-              ;;
-            MALFORMED)
-              echo "::error::Found a canonical <link> tag on https://jamula.net/ but it has no usable href attribute."
-              exit 1
-              ;;
-          esac
+          if [[ "$canonical_status" -eq 2 ]]; then
+            echo "::error::No <link rel=\"canonical\"> tag found in https://jamula.net/ response body."
+            exit 1
+          elif [[ "$canonical_status" -eq 3 ]]; then
+            echo "::error::Found a canonical <link> tag on https://jamula.net/ but it has no usable href attribute."
+            exit 1
+          elif [[ "$canonical_status" -ne 0 ]]; then
+            echo "::error::Unexpected error (exit ${canonical_status}) while parsing the canonical link on https://jamula.net/."
+            exit 1
+          fi
 
           if [[ "$canonical" != "$expected_canonical" ]]; then
             echo "::error::Canonical mismatch — got '${canonical}', expected '${expected_canonical}'."
