@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- net8.0 LTS — pre-installed on GitHub-hosted ubuntu-latest (ubuntu-24.04).
+         No actions/setup-dotnet required. Support window: through November 2026. -->
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AssemblyName>JamulaMonitor</AssemblyName>
+    <RootNamespace>JamulaMonitor</RootNamespace>
+  </PropertyGroup>
+  <!-- No third-party NuGet packages; BCL only. -->
+</Project>
