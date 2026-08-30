@@ -44,6 +44,7 @@ jobs:
           persist-credentials: false
 
       - name: Verify .NET SDK
+        working-directory: scripts/monitor
         run: dotnet --version
 
       - name: Build monitor

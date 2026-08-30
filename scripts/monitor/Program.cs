@@ -61,13 +61,14 @@ static class CanonicalParser
     private static readonly Regex LinkTag =
         new(@"<link\b[^>]*/?>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
-    // Checks whether a tag carries rel="canonical" (single or double quotes, whitespace-tolerant).
+    // Checks whether a tag carries rel="canonical".  Negative lookbehind (?<![a-zA-Z0-9\-])
+    // prevents matching hyphenated names such as data-rel (where \b would incorrectly match).
     private static readonly Regex RelCanonical =
-        new(@"\brel\s*=\s*([""'])canonical\1", RegexOptions.IgnoreCase);
+        new(@"(?<![a-zA-Z0-9\-])rel\s*=\s*([""'])canonical\1", RegexOptions.IgnoreCase);
 
-    // Extracts the href attribute value (single or double quotes, value captured in group 2).
+    // Extracts the href attribute value.  Same boundary guard as RelCanonical.
     private static readonly Regex HrefAttr =
-        new(@"\bhref\s*=\s*([""'])([^""']*)\1", RegexOptions.IgnoreCase);
+        new(@"(?<![a-zA-Z0-9\-])href\s*=\s*([""'])([^""']*)\1", RegexOptions.IgnoreCase);
 
     /// <summary>
     /// Extracts the canonical URL from the first &lt;link rel="canonical"&gt; tag in
@@ -104,6 +105,10 @@ static class Monitor
             addresses = await Dns.GetHostAddressesAsync(
                 Config.ApexHost, AddressFamily.InterNetwork, ct);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw; // propagates to the top-level handler → exit 3 with timeout diagnostic
+        }
         catch (Exception ex)
         {
             Console.Error.WriteLine(
@@ -111,34 +116,42 @@ static class Monitor
             return 1;
         }
 
-        var ipv4 = addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork);
-        if (ipv4 is null)
+        // Collect all distinct IPv4 A records so that an unexpected address alongside
+        // the approved one is not silently ignored (order-independent comparison).
+        var ipv4Addresses = addresses
+            .Where(a => a.AddressFamily == AddressFamily.InterNetwork)
+            .Select(a => a.ToString())
+            .Distinct()
+            .OrderBy(a => a)
+            .ToList();
+
+        if (ipv4Addresses.Count == 0)
         {
             Console.Error.WriteLine(
                 $"::error::DNS: {Config.ApexHost} returned no IPv4 A record (empty response).");
             return 1;
         }
 
-        string resolved = ipv4.ToString();
-        if (resolved != Config.ApprovedIp)
+        if (ipv4Addresses.Count != 1 || ipv4Addresses[0] != Config.ApprovedIp)
         {
             Console.Error.WriteLine(
-                $"::error::DNS drift: {Config.ApexHost} resolves to {resolved} — "
-                + $"expected approved Azure SWA IP {Config.ApprovedIp}.");
+                $"::error::DNS drift: {Config.ApexHost} resolves to [{string.Join(", ", ipv4Addresses)}] — "
+                + $"expected exactly [{Config.ApprovedIp}].");
             return 2;
         }
 
-        Console.WriteLine($"DNS OK: {Config.ApexHost} → {resolved}");
+        Console.WriteLine($"DNS OK: {Config.ApexHost} → {ipv4Addresses[0]}");
 
         // ── HTTPS check ────────────────────────────────────────────────────
         HttpResponseMessage response;
         string html;
         try
         {
+            // Redirects disabled: the acceptance criterion is that https://jamula.net/
+            // itself returns HTTP 200, not that a redirect chain eventually reaches 200.
             using var handler = new HttpClientHandler
             {
-                AllowAutoRedirect = true,
-                MaxAutomaticRedirections = 5
+                AllowAutoRedirect = false
             };
             using var client = new HttpClient(handler)
             {
@@ -166,7 +179,7 @@ static class Monitor
         {
             Console.Error.WriteLine(
                 $"::error::HTTPS: {Config.ApexUrl} returned HTTP {statusCode} "
-                + $"{response.ReasonPhrase} — expected 200.");
+                + $"{response.ReasonPhrase} — expected 200 (redirects not followed).");
             return 4;
         }
 
@@ -291,8 +304,19 @@ static class SelfTests
             Assert("Reversed attributes — href matches", h == Config.ExpectedCanonical);
         }
 
+        // 7. Hyphenated-attribute guard — data-rel / data-href must not match
+        {
+            const string html = """
+                <html><head>
+                <link data-rel="canonical" data-href="https://jamula.net/">
+                </head></html>
+                """;
+            var (r, _) = CanonicalParser.Extract(html);
+            Assert("Hyphenated-prefix guard — result is Absent", r == CanonicalResult.Absent);
+        }
+
         Console.WriteLine(failures == 0
-            ? "\nAll 6 self-tests passed."
+            ? "\nAll 7 self-tests passed."
             : $"\n{failures} self-test(s) FAILED.");
 
         return failures == 0 ? 0 : 1;
