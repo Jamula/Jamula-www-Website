@@ -1,9 +1,19 @@
 name: Uptime and Apex A-Record Monitor
 
+# NOTE: Pre-cutover state (Jamula/Jamula-www-Website#37 open).
+# The scheduled trigger below is intentionally disabled (commented out) until
+# the jamula.net apex A record is cut over to the approved Azure Static Web
+# Apps IP. Running on a schedule pre-cutover would produce expected,
+# unactionable failures and burn Actions minutes. `workflow_dispatch` remains
+# available so the monitor can be run manually at any time, including the
+# required first live green run immediately after cutover.
+#
+# Post-cutover: uncomment the `schedule:` block below to re-enable the
+# recurring cadence, then require a green manual run before closing #37.
 on:
-  schedule:
-    # Every 15 minutes
-    - cron: "*/15 * * * *"
+  # schedule:
+  #   # Every 15 minutes
+  #   - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -17,6 +27,7 @@ jobs:
   check:
     name: DNS and HTTPS health
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Resolve apex A record
         id: dns
@@ -70,19 +81,55 @@ jobs:
             exit 1
           fi
 
-          canonical="$(
-            grep -oi '<link[^>]*rel=["\x27]canonical["\x27][^>]*>' "$body" \
-            | grep -oi 'href=["\x27][^"'\'']*["\x27]' \
-            | grep -oi '"[^"]*"\|'\''[^'\'']*'\''' \
-            | tr -d '\"'\''
+          expected_canonical="https://jamula.net/"
+
+          canonical="$(python3 - "$body" <<'PY'
+          import re
+          import sys
+
+          path = sys.argv[1]
+          with open(path, "r", encoding="utf-8", errors="replace") as f:
+              html = f.read()
+
+          # Find <link ... rel="canonical" ... > tags (rel may appear before or after href).
+          link_tags = re.findall(r"<link\b[^>]*>", html, flags=re.IGNORECASE)
+          canonical_tags = [
+              tag for tag in link_tags
+              if re.search(r"""rel\s*=\s*["']canonical["']""", tag, flags=re.IGNORECASE)
+          ]
+
+          if not canonical_tags:
+              print("MISSING", end="")
+              sys.exit(0)
+
+          href_match = re.search(
+              r"""href\s*=\s*["']([^"']*)["']""", canonical_tags[0], flags=re.IGNORECASE
+          )
+          if not href_match:
+              print("MALFORMED", end="")
+              sys.exit(0)
+
+          print(href_match.group(1), end="")
+          PY
           )"
 
-          if [[ "$canonical" != "https://jamula.net/" ]]; then
-            echo "::error::Canonical mismatch — got '${canonical}', expected 'https://jamula.net/'."
+          case "$canonical" in
+            MISSING)
+              echo "::error::No <link rel=\"canonical\"> tag found in https://jamula.net/ response body."
+              exit 1
+              ;;
+            MALFORMED)
+              echo "::error::Found a canonical <link> tag on https://jamula.net/ but it has no usable href attribute."
+              exit 1
+              ;;
+          esac
+
+          if [[ "$canonical" != "$expected_canonical" ]]; then
+            echo "::error::Canonical mismatch — got '${canonical}', expected '${expected_canonical}'."
             exit 1
           fi
 
-          echo "HTTPS OK: HTTP 200, canonical=https://jamula.net/"
+          echo "HTTPS OK: HTTP 200, canonical=${expected_canonical}"
 
       - name: Report success
         if: success()
