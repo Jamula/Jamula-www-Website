@@ -1,0 +1,95 @@
+name: Uptime and Apex A-Record Monitor
+
+on:
+  schedule:
+    # Every 15 minutes
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime-apex-monitor
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: DNS and HTTPS health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve apex A record
+        id: dns
+        shell: bash
+        env:
+          APPROVED_IP: "48.192.33.154"
+        run: |
+          set -euo pipefail
+
+          resolved="$(
+            dig +short +time=5 +tries=2 A jamula.net | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1
+          )"
+
+          if [[ -z "$resolved" ]]; then
+            echo "::error::jamula.net A record did not resolve."
+            exit 1
+          fi
+
+          echo "resolved_ip=${resolved}" >> "$GITHUB_OUTPUT"
+
+          if [[ "$resolved" != "$APPROVED_IP" ]]; then
+            echo "::error::jamula.net resolves to ${resolved} — expected approved Azure SWA IP ${APPROVED_IP}."
+            exit 1
+          fi
+
+          echo "DNS OK: jamula.net → ${resolved}"
+
+      - name: Fetch apex and verify canonical
+        id: https
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          headers="$(mktemp)"
+          body="$(mktemp)"
+          trap 'rm -f "$headers" "$body"' EXIT
+
+          http_code="$(
+            curl \
+              --silent --show-error \
+              --proto '=https' --tlsv1.2 \
+              --max-time 15 \
+              --dump-header "$headers" \
+              --output "$body" \
+              --write-out '%{http_code}' \
+              "https://jamula.net/"
+          )"
+
+          if [[ "$http_code" != "200" ]]; then
+            echo "::error::https://jamula.net/ returned HTTP ${http_code} (expected 200)."
+            exit 1
+          fi
+
+          canonical="$(
+            grep -oi '<link[^>]*rel=["\x27]canonical["\x27][^>]*>' "$body" \
+            | grep -oi 'href=["\x27][^"'\'']*["\x27]' \
+            | grep -oi '"[^"]*"\|'\''[^'\'']*'\''' \
+            | tr -d '\"'\''
+          )"
+
+          if [[ "$canonical" != "https://jamula.net/" ]]; then
+            echo "::error::Canonical mismatch — got '${canonical}', expected 'https://jamula.net/'."
+            exit 1
+          fi
+
+          echo "HTTPS OK: HTTP 200, canonical=https://jamula.net/"
+
+      - name: Report success
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo "### ✅ Apex monitor passed"
+            echo "- jamula.net A → \`${{ steps.dns.outputs.resolved_ip }}\`"
+            echo "- https://jamula.net/ → HTTP 200, canonical verified"
+          } >> "$GITHUB_STEP_SUMMARY"
