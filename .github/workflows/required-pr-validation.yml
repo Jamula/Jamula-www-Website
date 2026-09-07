@@ -32,13 +32,21 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          changed_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)www/')"
-          if [[ -n "$changed_files" ]]; then
+          website_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)www/')"
+          monitor_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)scripts/monitor/')"
+          if [[ -n "$website_files" ]]; then
             echo "website=true" >> "$GITHUB_OUTPUT"
             echo "Website validation required."
           else
             echo "website=false" >> "$GITHUB_OUTPUT"
             echo "No website changes; npm validation is not required."
+          fi
+          if [[ -n "$monitor_files" ]]; then
+            echo "monitor=true" >> "$GITHUB_OUTPUT"
+            echo "Monitor validation required."
+          else
+            echo "monitor=false" >> "$GITHUB_OUTPUT"
+            echo "No monitor changes; .NET validation is not required."
           fi
 
       - name: Set up Node.js
@@ -81,3 +89,18 @@ jobs:
       - name: Build static website
         if: steps.changes.outputs.website == 'true'
         run: npm exec -- astro build
+
+      - name: Verify .NET SDK
+        if: steps.changes.outputs.monitor == 'true'
+        working-directory: scripts/monitor
+        run: dotnet --version
+
+      - name: Build monitor
+        if: steps.changes.outputs.monitor == 'true'
+        working-directory: scripts/monitor
+        run: dotnet build JamulaMonitor.csproj --configuration Release --nologo
+
+      - name: Run monitor self-tests
+        if: steps.changes.outputs.monitor == 'true'
+        working-directory: scripts/monitor
+        run: dotnet run --project JamulaMonitor.csproj --configuration Release --no-build -- --self-test

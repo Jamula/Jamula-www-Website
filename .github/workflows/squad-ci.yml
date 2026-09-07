@@ -1,5 +1,4 @@
 name: Squad CI
-# Project type was not detected — configure build/test commands below
 
 on:
   pull_request:
@@ -15,14 +14,34 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Build and test
-        run: |
-          # TODO: Project type was not detected — add your build/test commands here
-          # Go:            go test ./...
-          # Python:        pip install -r requirements.txt && pytest
-          # .NET:          dotnet test
-          # Java (Maven):  mvn test
-          # Java (Gradle): ./gradlew test
-          echo "No build commands configured — update squad-ci.yml"
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.15.0
+          cache: npm
+          cache-dependency-path: www/package-lock.json
+
+      - name: Install npm 12
+        run: npm install --global npm@12.0.2
+
+      - name: Install website dependencies
+        working-directory: www
+        run: npm ci
+
+      - name: Check website
+        working-directory: www
+        run: npm run check
+
+      - name: Build website
+        working-directory: www
+        run: npm run build
+
+      - name: Build monitor
+        working-directory: scripts/monitor
+        run: dotnet build JamulaMonitor.csproj --configuration Release --nologo
+
+      - name: Run monitor self-tests
+        working-directory: scripts/monitor
+        run: dotnet run --project JamulaMonitor.csproj --configuration Release --no-build -- --self-test
