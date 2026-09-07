@@ -156,7 +156,7 @@ cd ../worktrees/{issue-number}
 
 Closes #{issue-number}
 
-Co-authored-by: Copilot <configured-noreply-address>
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 ```
 
 **Commit types:** `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `style`, `build`, `ci`

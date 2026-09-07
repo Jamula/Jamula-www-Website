@@ -43,11 +43,11 @@ Spawned agents have read access to the entire repository, including `.env` files
 |--------------|----------|-------------------------------|
 | API Keys | `OPENAI_API_KEY=sk-proj-...`, `GITHUB_TOKEN=ghp_...` | `[A-Z_]+(?:KEY|TOKEN|SECRET)=[^\s]+` |
 | Passwords | `DB_PASSWORD=super_secret_123`, `password: "..."` | `(?:PASSWORD|PASS|PWD)[:=]\s*["']?[^\s"']+` |
-| Connection Strings | `<database-connection-string>`, `Server=...;Password=...` | `(?:postgres|mysql|mongodb)://[^@]+@|(?:Server|Host)=.*(?:Password|Pwd)=` |
+| Connection Strings | `postgres://user:pass@host:5432/db`, `Server=...;Password=...` | `(?:postgres|mysql|mongodb)://[^@]+@|(?:Server|Host)=.*(?:Password|Pwd)=` |
 | JWT Tokens | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` | `eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+` |
 | Private Keys | `-----BEGIN PRIVATE KEY-----`, `-----BEGIN RSA PRIVATE KEY-----` | `-----BEGIN [A-Z ]+PRIVATE KEY-----` |
 | AWS Credentials | `AKIA...`, `aws_secret_access_key=...` | `AKIA[0-9A-Z]{16}|aws_secret_access_key=[^\s]+` |
-| Email Addresses | `<redacted-email>` (PII violation per team decision) | `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}` |
+| Email Addresses | `user@example.com` (PII violation per team decision) | `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}` |
 
 **What to write instead:**
 - Placeholder values: `DATABASE_URL=<set in .env>`
@@ -69,7 +69,7 @@ Spawned agents have read access to the entire repository, including `.env` files
      🚨 SECRET DETECTED — commit blocked
      
      File: .squad/decisions/inbox/river-db-config.md
-     Pattern: DATABASE_URL=<database-connection-string>
+     Pattern: DATABASE_URL=postgres://user:password@localhost:5432/prod
      
      This file contains credentials and MUST NOT be committed.
      Please remove the secret, replace with placeholder, and try again.
@@ -118,7 +118,7 @@ Spawned agents have read access to the entire repository, including `.env` files
 Agent: "What environment variables does this app need?"
 → Reads `.env.example`:
     OPENAI_API_KEY=sk-...
-    DATABASE_URL=<database-connection-string>
+    DATABASE_URL=postgres://user:pass@localhost:5432/db
     REDIS_URL=redis://localhost:6379
 
 → Writes to .squad/decisions/inbox/river-env-setup.md:
@@ -135,10 +135,10 @@ Agent: "What environment variables does this app need?"
 
 ```
 Agent: (reads .env)
-    DATABASE_URL=<database-connection-string>
+    DATABASE_URL=postgres://admin:super_secret_pw@prod.example.com:5432/appdb
 
 → Writes to .squad/decisions/inbox/river-db-schema.md:
-    "Database connection: <database-connection-string>"
+    "Database connection: postgres://admin:super_secret_pw@prod.example.com:5432/appdb"
     
 🚨 VIOLATION: Live credential written to committed file
 ```
