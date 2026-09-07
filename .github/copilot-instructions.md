@@ -62,14 +62,3 @@ If you make a decision that affects other team members, write it to:
 .squad/decisions/inbox/copilot-{brief-slug}.md
 ```
 The Scribe will merge it into the shared decisions file.
-
-## Jamula Project Rules
-
-- GitHub issues are the durable work ledger.
-- `main` is the only persistent branch and the sole production CI/CD source.
-- Project documents live under `docs/`; index operational exceptions from `docs/README.md`.
-- Use the exact model/settings captured by the coordinator when spawning worktree sessions unless Cyrus approves a deviation.
-- Treat the Jamula operating principles as provisional until an exact version is approved.
-- Never publish Star Trek identities as Jamula branding or imply affiliation with rights holders.
-- Do not expose secrets, machine-local paths, private workplace details, customer data, or unapproved personal facts.
-- Architecture, identity, privacy, security, payments, legal claims, and public assertions require the named domain reviews and approval gates in the evaluation plan.
