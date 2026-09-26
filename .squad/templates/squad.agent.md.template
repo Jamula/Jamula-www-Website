@@ -27,13 +27,13 @@ You are **Squad (Coordinator)** — the orchestrator for this project's AI team.
 
 ### State & Team Root Resolution (before mode check)
 
-Before deciding Init vs Team mode, resolve the project root and the state backend separately:
+Before deciding Init vs Team mode, resolve the team root and mutable state separately:
 
-1. **Resolve project root** — use `git rev-parse --show-toplevel`.
-2. **Read `.squad/config.json`** from that project root, if it exists.
-3. **Remote/satellite mode** — if `teamRoot` is present, use it as the selected project root. It may point to a repository/worktree root or directly to its `.squad/` directory; in the latter case, normalize `TEAM_ROOT` to the containing repository/worktree root.
-4. **External state** — if `stateLocation` is `"external"`, resolve `{platform_appdata}/squad/projects/{projectKey}/` for runtime state tools. Do not use the external state directory as `TEAM_ROOT`; static `.squad/` files remain under the selected project root.
-5. **Neither** — use the current repository/worktree root as `TEAM_ROOT`.
+1. **Resolve the current root** — use `git rev-parse --show-toplevel`, then read its `.squad/config.json` if present.
+2. **Remote/satellite mode** — if `teamRoot` is set, use that selected root. It may point to a repository/worktree root or directly to its `.squad/` directory; in the latter case, normalize `TEAM_ROOT` to the containing repository/worktree root.
+3. **Worktree-local mode** — if no `teamRoot` is set and the current root contains `.squad/` or legacy `.ai-team/`, use the current root as `TEAM_ROOT`.
+4. **Main-checkout fallback** — if the current root contains neither team directory, run `git worktree list --porcelain` and use the first `worktree` root (the main checkout) when it contains `.squad/` or `.ai-team/`. Read that selected root's `.squad/config.json` if present. If no worktree contains a team directory, use the current root for Init Mode.
+5. **External state** — if the selected config has `stateLocation` set to `"external"`, resolve `{platform_appdata}/squad/projects/{projectKey}/` for runtime state tools. Do not use the external state directory as `TEAM_ROOT`; static `.squad/` files remain under the selected repository/worktree root.
 
 `TEAM_ROOT` is always the repository/worktree root containing the selected `.squad/` directory (or legacy `.ai-team/` directory), never the team directory itself. All `.squad/` paths are resolved from `TEAM_ROOT`.
 
@@ -561,7 +561,7 @@ To enable full parallelism, shared writes use a drop-box pattern that eliminates
 
 ### Worktree Awareness
 
-Resolve `TEAM_ROOT` before routing work. All `.squad/` paths are relative to that root, and every spawned agent must receive the resolved `TEAM_ROOT` value rather than discovering it independently.
+Resolve `TEAM_ROOT` using the session-start procedure above before routing work. If the current worktree has no `.squad/` or `.ai-team/`, use its main-checkout fallback rather than initializing a duplicate team in the empty worktree. All `.squad/` paths are relative to `TEAM_ROOT`, and every spawned agent must receive that resolved value rather than discovering it independently.
 
 Use worktree-local state by default for concurrent work; allow explicit overrides when the user wants main-checkout or externalized state.
 

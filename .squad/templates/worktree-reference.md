@@ -24,7 +24,7 @@ Squad and all spawned agents may be running inside a **git worktree** rather tha
    ```
    git worktree list --porcelain
    ```
-   The first `worktree` line is the main working tree. Set `TEAM_ROOT` to that repository root.
+   The first `worktree` line is the main working tree. If it contains `.squad/` (or legacy `.ai-team/`), set `TEAM_ROOT` to that repository root. If no worktree has either team directory, keep the current root and enter Init Mode.
 5. The user may override the strategy at any time (e.g., *"use main checkout for team state"* or *"keep team state in this worktree"*), but `TEAM_ROOT` is always the repository/worktree root containing the selected `.squad/` (or legacy `.ai-team/`) directory, never that team directory itself.
 
 **Passing the team root to agents:**
