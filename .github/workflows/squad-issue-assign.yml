@@ -28,11 +28,14 @@ jobs:
 
       - name: Identify assigned member and trigger work
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b #v7
+        env:
+          COPILOT_AUTO_ASSIGN: ${{ steps.copilot_policy.outputs.enabled }}
         with:
           script: |
             const fs = require('fs');
             const issue = context.payload.issue;
             const label = context.payload.label.name;
+            const copilotAutoAssign = process.env.COPILOT_AUTO_ASSIGN === 'true';
 
             // Extract member name from label (e.g., "squad:ripley" → "ripley")
             const memberName = label.replace('squad:', '').toLowerCase();
@@ -92,10 +95,16 @@ jobs:
                 '',
                 `**Issue:** #${issue.number} — ${issue.title}`,
                 '',
-                `@copilot has been assigned and will pick this up automatically.`,
+                copilotAutoAssign
+                  ? `Automatic assignment to @copilot is enabled; if assignment succeeds, the coding agent will pick this up automatically.`
+                  : `Automatic assignment to @copilot is disabled by repository policy. Start a Copilot session to work on this issue.`,
                 '',
-                `> The coding agent will create a \`copilot/*\` branch and open a draft PR.`,
-                `> Review the PR as you would any team member's work.`,
+                ...(copilotAutoAssign
+                  ? [
+                      `> If assigned, the coding agent will create a \`copilot/*\` branch and open a draft PR.`,
+                      `> Review the PR as you would any team member's work.`,
+                    ]
+                  : []),
               ].join('\n');
             } else {
               comment = [
