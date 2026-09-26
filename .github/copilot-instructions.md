@@ -61,4 +61,4 @@ If you make a decision that affects other team members, write it to:
 ```
 .squad/decisions/inbox/copilot-{brief-slug}.md
 ```
-The Scribe will merge it into the shared decisions file.
+The Coordinator alone decides whether the proposal is accepted. Scribe may persist it into the shared decisions file only when the Coordinator explicitly approves and delegates that entry in the Scribe spawn manifest.

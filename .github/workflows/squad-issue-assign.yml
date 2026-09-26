@@ -28,14 +28,18 @@ jobs:
 
       - name: Identify assigned member and trigger work
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b #v7
+        env:
+          COPILOT_AUTO_ASSIGN: ${{ steps.copilot_policy.outputs.enabled }}
         with:
           script: |
             const fs = require('fs');
             const issue = context.payload.issue;
             const label = context.payload.label.name;
+            const copilotAutoAssign = process.env.COPILOT_AUTO_ASSIGN === 'true';
 
             // Extract member name from label (e.g., "squad:ripley" → "ripley")
             const memberName = label.replace('squad:', '').toLowerCase();
+            function slugify(t) { return t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 
             const teamFile = '.squad/team.md';
             if (!fs.existsSync(teamFile)) {
@@ -45,8 +49,6 @@ jobs:
 
             const content = fs.readFileSync(teamFile, 'utf8');
             const lines = content.split('\n');
-            const copilotAutoAssign = content.includes('<!-- copilot-auto-assign: true -->');
-            const slugify = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
             // Check if this is a coding agent assignment
             const isCopilotAssignment = memberName === 'copilot';
@@ -88,25 +90,22 @@ jobs:
             // Post assignment acknowledgment
             let comment;
             if (isCopilotAssignment) {
-              comment = copilotAutoAssign
-                ? [
-                    `### 🤖 Routed to @copilot (Coding Agent)`,
-                    '',
-                    `**Issue:** #${issue.number} — ${issue.title}`,
-                    '',
-                    `@copilot has been assigned and will pick this up automatically.`,
-                    '',
-                    `> The coding agent will create a \`copilot/*\` branch and open a draft PR.`,
-                    `> Review the PR as you would any team member's work.`,
-                  ].join('\n')
-                : [
-                    `### 📋 Copilot route recorded`,
-                    '',
-                    `**Issue:** #${issue.number} — ${issue.title}`,
-                    '',
-                    `Automatic Copilot assignment is disabled in \`.squad/team.md\`.`,
-                    `Cyrus must approve enabling it before work can start automatically.`,
-                  ].join('\n');
+              comment = [
+                `### 🤖 Routed to @copilot (Coding Agent)`,
+                '',
+                `**Issue:** #${issue.number} — ${issue.title}`,
+                '',
+                copilotAutoAssign
+                  ? `Automatic assignment to @copilot is enabled; if assignment succeeds, the coding agent will pick this up automatically.`
+                  : `Automatic assignment to @copilot is disabled by repository policy. Start a Copilot session to work on this issue.`,
+                '',
+                ...(copilotAutoAssign
+                  ? [
+                      `> If assigned, the coding agent will create a \`copilot/*\` branch and open a draft PR.`,
+                      `> Review the PR as you would any team member's work.`,
+                    ]
+                  : []),
+              ].join('\n');
             } else {
               comment = [
                 `### 📋 Assigned to ${assignedMember.name} (${assignedMember.role})`,
@@ -132,7 +131,7 @@ jobs:
 
       # Separate step: assign @copilot using PAT (required for coding agent)
       - name: Assign @copilot coding agent
-        if: github.event.label.name == 'squad:copilot' && steps.copilot_policy.outputs.enabled == 'true'
+        if: steps.copilot_policy.outputs.enabled == 'true' && github.event.label.name == 'squad:copilot'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b #v7
         with:
           github-token: ${{ secrets.COPILOT_ASSIGN_TOKEN }}

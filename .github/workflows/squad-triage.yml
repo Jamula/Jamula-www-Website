@@ -52,7 +52,6 @@ jobs:
             let notSuitableKeywords = [];
 
             if (hasCopilot) {
-              // Extract capability tiers from team.md
               const goodFitMatch = content.match(/<!--\s*copilot-good-fit:\s*([^>]+)-->/i);
               const needsReviewMatch = content.match(/<!--\s*copilot-needs-review:\s*([^>]+)-->/i);
               const notSuitableMatch = content.match(/<!--\s*copilot-not-suitable:\s*([^>]+)-->/i);
@@ -95,6 +94,16 @@ jobs:
               }
             }
 
+            const routingFile = '.squad/routing.md';
+            let routingContent = '';
+            if (fs.existsSync(routingFile)) {
+              routingContent = fs.readFileSync(routingFile, 'utf8');
+            }
+            const routeKeywords = {};
+            for (const match of routingContent.matchAll(/<!--\s*route:([a-z0-9-]+)=([^>]+)-->/gi)) {
+              routeKeywords[match[1]] = match[2].split(',').map(keyword => keyword.trim().toLowerCase());
+            }
+
             // Find the Lead
             const lead = members.find(m =>
               m.role.toLowerCase().includes('lead') ||
@@ -108,15 +117,6 @@ jobs:
             }
 
             function slugify(t) { return t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
-
-            const routingFile = '.squad/routing.md';
-            const routeKeywords = {};
-            if (fs.existsSync(routingFile)) {
-              const routingContent = fs.readFileSync(routingFile, 'utf8');
-              for (const match of routingContent.matchAll(/<!--\s*route:([a-z0-9-]+)=([^>]+)-->/gi)) {
-                routeKeywords[match[1]] = match[2].split(',').map(keyword => keyword.trim().toLowerCase());
-              }
-            }
 
             // Build triage context
             const memberList = members.map(m =>
