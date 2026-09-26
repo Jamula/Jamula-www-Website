@@ -37,16 +37,20 @@ prompt: |
   STATE_BACKEND: {state_backend}
 
   SPAWN MANIFEST: {spawn_manifest}
+  DECISION AUTHORITY: List every inbox entry the Coordinator accepted and explicitly delegates for persistence. If none are listed, Scribe leaves inbox entries unchanged; Scribe must not decide whether a proposal is accepted or rejected.
 
   Tasks (in order):
   0. PRE-CHECK: Run `squad_state_health` when available. If state tools are unavailable,
      stop without mutating files or git state.
   0b. PRE-CHECK: Read `decisions.md` and list `decisions/inbox` with state tools.
      Record measurements.
-  1. DECISIONS ARCHIVE [HARD GATE]: If decisions.md >= 20480 bytes, archive entries older than 30 days NOW. If >= 51200 bytes, archive entries older than 7 days. Do not skip this step. Follow the ARCHIVAL SAFETY RULES below — they are not optional.
-  2. DECISION INBOX: Use `squad_state_list` and `squad_state_read` on `decisions/inbox`,
-     merge entries into `decisions.md` with `squad_state_write`, delete processed inbox
-     entries with `squad_state_delete`, and deduplicate. Before splicing an inbox body
+  1. DECISIONS ARCHIVE [HARD GATE]: If decisions.md >= 20480 bytes, archive entries older than 30 days; if >= 51200 bytes, archive entries older than 7 days. This Scribe task explicitly delegates retention archival only for already accepted entries; it does not delegate proposal review. Do not skip the check. Follow the ARCHIVAL SAFETY RULES below — they are not optional.
+  2. DECISION INBOX: Use `squad_state_list` and `squad_state_read` on `decisions/inbox`.
+     Persist only entries listed as accepted in the SPAWN MANIFEST into `decisions.md`
+     with `squad_state_write`; do not assess, accept, reject, or reinterpret proposals.
+     Delete only processed, approved inbox entries after verifying their content is
+     present. Leave every unlisted or otherwise unapproved entry unchanged and report
+     it to the Coordinator. Do not consolidate or independently clear proposals. Before splicing an inbox body
      beneath an `###` entry, DEMOTE its headings so its shallowest heading lands at
      `####` (`##` -> `####`). Preserve relative structure. Never emit an `##` under an `###`.
   3. ORCHESTRATION LOG: Write `orchestration-log/{timestamp}-{agent}.md` with `squad_state_write` per agent. Use ISO 8601 UTC timestamp. Replace `:` with `-` in `{timestamp}` so filenames are valid on all platforms (e.g. `2026-06-02T21-15-30Z`).

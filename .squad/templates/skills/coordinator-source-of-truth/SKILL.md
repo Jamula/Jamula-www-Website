@@ -18,7 +18,7 @@ Files below marked as **"Derived / append-only"** are **mutable state** — agen
 | File | Status | Who May Write | Who May Read |
 |------|--------|---------------|--------------|
 | `.github/agents/squad.agent.md` | **Authoritative governance.** All roles, handoffs, gates, and enforcement rules. | Repo maintainer (human) | Squad (Coordinator) |
-| `.squad/decisions.md` | **Authoritative decision ledger.** Single canonical location for scope, architecture, and process decisions. | Squad (Coordinator) — append only | All agents |
+| `.squad/decisions.md` | **Authoritative decision ledger.** Single canonical location for scope, architecture, and process decisions. | Squad (Coordinator); Scribe only when the Coordinator's spawn manifest explicitly delegates persistence of specified accepted entries or retention archival of already accepted entries | All agents |
 | `.squad/team.md` | **Authoritative roster.** Current team composition. | Squad (Coordinator) | All agents |
 | `.squad/routing.md` | **Authoritative routing.** Work assignment rules. | Squad (Coordinator) | Squad (Coordinator) |
 | `.squad/ceremonies.md` | **Authoritative ceremony config.** Definitions, triggers, and participants for team ceremonies. | Squad (Coordinator) | Squad (Coordinator), Facilitator agent (read-only at ceremony time) |
@@ -42,4 +42,4 @@ Files below marked as **"Derived / append-only"** are **mutable state** — agen
 1. **If `squad.agent.md` and any other file conflict, `squad.agent.md` wins.** It is the only file with hard governance authority.
 2. **Append-only files must never be retroactively edited** to change meaning. They are diagnostic and audit-trail material. Corrections go in a new entry that references the prior one.
 3. **Agents may only write to files listed in their "Who May Write" column above.** Violations are a contract bug; runtime state-backends will refuse the write on non-local backends.
-4. **Non-coordinator agents may propose decisions** in their responses, but only Squad (Coordinator) records accepted decisions in `.squad/decisions.md`.
+4. **Only Squad (Coordinator) decides whether proposals are accepted or rejected.** The Coordinator may explicitly delegate persistence of specified accepted entries to Scribe in the Scribe spawn manifest. Scribe must not assess, accept, reject, reinterpret, or independently clear proposals. Retention archival of already accepted entries is allowed only when the Scribe task explicitly delegates that step.

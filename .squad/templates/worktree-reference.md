@@ -11,26 +11,24 @@ Squad and all spawned agents may be running inside a **git worktree** rather tha
 | **worktree-local** | Current worktree root | Branch-local — each worktree has its own `.squad/` state | Feature branches that need isolated decisions and history |
 | **main-checkout** | Main working tree root | Shared — all worktrees read/write the main checkout's `.squad/` | Single source of truth for memories, decisions, and logs across all branches |
 
-**How the Coordinator resolves the team root (on every session start):**
+**How the Coordinator resolves `TEAM_ROOT` and mutable state (on every session start):**
 
-0. **Check config.json overrides first** — read `.squad/config.json` in the current directory (or at the git root):
-   - If `teamRoot` is set → Team root = that path. **STOP — do not walk further.**
-   - If `stateLocation` is `"external"` → Resolve external AppData path. Team root = external path. **STOP.**
-   - Otherwise → continue to step 1.
-1. **Check CWD first** — does `.squad/` exist in the current working directory?
-   - **Yes** → Team root = CWD. This handles monorepos where `.squad/` lives in a subfolder.
-2. If not, run `git rev-parse --show-toplevel` to get the current worktree root.
-3. Check if `.squad/` exists at that root (fall back to `.ai-team/` for repos that haven't migrated yet).
-   - **Yes** → use **worktree-local** strategy. Team root = current worktree root.
-   - **No** → use **main-checkout** strategy. Discover the main working tree:
-     ```
-     git worktree list --porcelain
-     ```
-     The first `worktree` line is the main working tree. Team root = that path.
-4. The user may override the strategy at any time (e.g., *"use main checkout for team state"* or *"keep team state in this worktree"*).
+0. Run `git rev-parse --show-toplevel` to get the current repository/worktree root, then read `.squad/config.json` from there if it exists.
+1. If `teamRoot` is set, use that selected satellite root:
+   - If it points directly to a `.squad/` directory, normalize `TEAM_ROOT` to that directory's parent.
+   - Otherwise, it must point to a repository/worktree root containing `.squad/` (or legacy `.ai-team/`).
+   - **STOP — do not replace `TEAM_ROOT` with the external state directory.**
+2. If `stateLocation` is `"external"`, resolve `{platform_appdata}/squad/projects/{projectKey}/` for mutable runtime state. This is the external state location, not `TEAM_ROOT`; static `.squad/` files remain under the selected repository/worktree root.
+3. If no `teamRoot` is set, use the current repository/worktree root when it contains `.squad/` (or legacy `.ai-team/`).
+4. If the current worktree has no team directory, use **main-checkout** strategy and discover the main working tree:
+   ```
+   git worktree list --porcelain
+   ```
+   The first `worktree` line is the main working tree. Set `TEAM_ROOT` to that repository root.
+5. The user may override the strategy at any time (e.g., *"use main checkout for team state"* or *"keep team state in this worktree"*), but `TEAM_ROOT` is always the repository/worktree root containing the selected `.squad/` (or legacy `.ai-team/`) directory, never that team directory itself.
 
 **Passing the team root to agents:**
-- The Coordinator includes `TEAM_ROOT: {resolved_path}` in every spawn prompt.
+- The Coordinator includes `TEAM_ROOT: {repository_or_worktree_root}` in every spawn prompt.
 - Agents resolve ALL `.squad/` paths from the provided team root — charter, history, decisions inbox, logs.
 - Agents never discover the team root themselves. They trust the value from the Coordinator.
 

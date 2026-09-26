@@ -236,7 +236,7 @@ Create a decision file at `.squad/decisions/inbox/<your-agent-name>-mesh-setup.m
 **Why:** <user's stated reason for setting up the mesh, or "Enable cross-machine squad coordination">
 ```
 
-Write this file. The Scribe will merge it into the main decisions file later.
+Write this proposal to the inbox. The Coordinator alone decides whether to accept it; Scribe may persist it into the main decisions file only when the Coordinator explicitly approves and delegates that entry in the Scribe spawn manifest.
 
 ### Step 6: STOP
 

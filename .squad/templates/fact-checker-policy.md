@@ -88,7 +88,7 @@ All Fact Checker findings (verification verdicts + DA briefs) are logged to `.sq
 - Which verdict was issued (or which DA brief was produced)
 - Whether the team accepted the finding
 
-Decisions that affect other agents go to `.squad/decisions/inbox/fact-checker-{slug}.md` for Scribe to merge into `.squad/decisions.md`.
+Decisions that affect other agents go to `.squad/decisions/inbox/fact-checker-{slug}.md` for Coordinator review. The Coordinator alone decides whether to accept a proposal; Scribe may persist it into `.squad/decisions.md` only when the Coordinator explicitly approves and delegates that entry in the Scribe spawn manifest.
 
 ---
 
