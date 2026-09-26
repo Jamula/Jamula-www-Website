@@ -15,18 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 #v4
 
-      - name: Read Copilot auto-assignment policy
-        id: copilot_policy
-        shell: bash
-        run: |
-          if grep -q '<!-- copilot-auto-assign: true -->' .squad/team.md; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Triage issue via Lead agent
-        id: triage_issue
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b #v7
         with:
           script: |
@@ -53,9 +42,9 @@ jobs:
 
             if (hasCopilot) {
               // Extract capability tiers from team.md
-              const goodFitMatch = content.match(/<!--\s*copilot-good-fit:\s*([^>]+)-->/i);
-              const needsReviewMatch = content.match(/<!--\s*copilot-needs-review:\s*([^>]+)-->/i);
-              const notSuitableMatch = content.match(/<!--\s*copilot-not-suitable:\s*([^>]+)-->/i);
+              const goodFitMatch = content.match(/🟢\s*Good fit[^:]*:\s*(.+)/i);
+              const needsReviewMatch = content.match(/🟡\s*Needs review[^:]*:\s*(.+)/i);
+              const notSuitableMatch = content.match(/🔴\s*Not suitable[^:]*:\s*(.+)/i);
 
               if (goodFitMatch) {
                 goodFitKeywords = goodFitMatch[1].toLowerCase().split(',').map(s => s.trim());
@@ -95,6 +84,12 @@ jobs:
               }
             }
 
+            const routingFile = '.squad/routing.md';
+            let routingContent = '';
+            if (fs.existsSync(routingFile)) {
+              routingContent = fs.readFileSync(routingFile, 'utf8');
+            }
+
             // Find the Lead
             const lead = members.find(m =>
               m.role.toLowerCase().includes('lead') ||
@@ -109,15 +104,6 @@ jobs:
 
             function slugify(t) { return t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 
-            const routingFile = '.squad/routing.md';
-            const routeKeywords = {};
-            if (fs.existsSync(routingFile)) {
-              const routingContent = fs.readFileSync(routingFile, 'utf8');
-              for (const match of routingContent.matchAll(/<!--\s*route:([a-z0-9-]+)=([^>]+)-->/gi)) {
-                routeKeywords[match[1]] = match[2].split(',').map(keyword => keyword.trim().toLowerCase());
-              }
-            }
-
             // Build triage context
             const memberList = members.map(m =>
               `- **${m.name}** (${m.role}) → label: \`squad:${slugify(m.name)}\``
@@ -131,7 +117,7 @@ jobs:
             let copilotTier = null;
 
             // First, evaluate @copilot fit if enabled
-            if (hasCopilot && copilotAutoAssign) {
+            if (hasCopilot) {
               const isNotSuitable = notSuitableKeywords.some(kw => issueText.includes(kw));
               const isGoodFit = !isNotSuitable && goodFitKeywords.some(kw => issueText.includes(kw));
               const isNeedsReview = !isNotSuitable && !isGoodFit && needsReviewKeywords.some(kw => issueText.includes(kw));
@@ -152,25 +138,41 @@ jobs:
 
             // If not routed to @copilot, use keyword-based routing
             if (!assignedMember) {
-              const keywordMatches = (text, keyword) => {
-                const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
-                return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i').test(text);
-              };
-              let bestRoute = null;
-
               for (const member of members) {
-                const memberSlug = slugify(member.name);
-                const keywords = routeKeywords[memberSlug] || [];
-                const matches = keywords.filter(keyword => keywordMatches(issueText, keyword));
-                const score = matches.reduce((total, keyword) => total + keyword.length, 0);
-                if (score > 0 && (!bestRoute || score > bestRoute.score)) {
-                  bestRoute = { member, matches, score };
+                const role = member.role.toLowerCase();
+                if ((role.includes('frontend') || role.includes('ui')) &&
+                    (issueText.includes('ui') || issueText.includes('frontend') ||
+                     issueText.includes('css') || issueText.includes('component') ||
+                     issueText.includes('button') || issueText.includes('page') ||
+                     issueText.includes('layout') || issueText.includes('design'))) {
+                  assignedMember = member;
+                  triageReason = 'Issue relates to frontend/UI work';
+                  break;
                 }
-              }
-
-              if (bestRoute) {
-                assignedMember = bestRoute.member;
-                triageReason = `Issue matches ${assignedMember.name}'s configured domain: ${bestRoute.matches.join(', ')}`;
+                if ((role.includes('backend') || role.includes('api') || role.includes('server')) &&
+                    (issueText.includes('api') || issueText.includes('backend') ||
+                     issueText.includes('database') || issueText.includes('endpoint') ||
+                     issueText.includes('server') || issueText.includes('auth'))) {
+                  assignedMember = member;
+                  triageReason = 'Issue relates to backend/API work';
+                  break;
+                }
+                if ((role.includes('test') || role.includes('qa') || role.includes('quality')) &&
+                    (issueText.includes('test') || issueText.includes('bug') ||
+                     issueText.includes('fix') || issueText.includes('regression') ||
+                     issueText.includes('coverage'))) {
+                  assignedMember = member;
+                  triageReason = 'Issue relates to testing/quality work';
+                  break;
+                }
+                if ((role.includes('devops') || role.includes('infra') || role.includes('ops')) &&
+                    (issueText.includes('deploy') || issueText.includes('ci') ||
+                     issueText.includes('pipeline') || issueText.includes('docker') ||
+                     issueText.includes('infrastructure'))) {
+                  assignedMember = member;
+                  triageReason = 'Issue relates to DevOps/infrastructure work';
+                  break;
+                }
               }
             }
 
@@ -198,6 +200,20 @@ jobs:
               issue_number: issue.number,
               labels: ['go:needs-research']
             });
+
+            // Auto-assign @copilot if enabled
+            if (isCopilot && copilotAutoAssign) {
+              try {
+                await github.rest.issues.addAssignees({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  assignees: ['copilot']
+                });
+              } catch (err) {
+                core.warning(`Could not auto-assign @copilot: ${err.message}`);
+              }
+            }
 
             // Build copilot evaluation note
             let copilotNote = '';
@@ -235,33 +251,4 @@ jobs:
               body: comment
             });
 
-            core.setOutput('is_copilot', isCopilot ? 'true' : 'false');
             core.info(`Triaged issue #${issue.number} → ${assignedMember.name} (${assignLabel})`);
-
-      - name: Assign approved Copilot coding agent
-        if: steps.copilot_policy.outputs.enabled == 'true' && steps.triage_issue.outputs.is_copilot == 'true'
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b #v7
-        with:
-          github-token: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const issue_number = context.payload.issue.number;
-            const { data: repoData } = await github.rest.repos.get({ owner, repo });
-
-            await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees', {
-              owner,
-              repo,
-              issue_number,
-              assignees: ['copilot-swe-agent[bot]'],
-              agent_assignment: {
-                target_repo: `${owner}/${repo}`,
-                base_branch: repoData.default_branch,
-                custom_instructions: 'Read .squad/team.md, .squad/routing.md, and the assigned charter before work.',
-                custom_agent: '',
-                model: ''
-              },
-              headers: {
-                'X-GitHub-Api-Version': '2022-11-28'
-              }
-            });
