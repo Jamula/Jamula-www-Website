@@ -70,6 +70,13 @@ jobs:
             ':(top).github/workflows/azure-static-web-apps.yml'; then
             echo "No deployable website changes remain in this pull request."
             echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- \
+            ':(top)www/' \
+            ':(top).github/workflows/azure-static-web-apps.yml' \
+            ':(exclude,top)www/package.json' \
+            ':(exclude,top)www/package-lock.json'; then
+            echo "Only website dependency manifests changed; build validation is sufficient."
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
           else
             echo "should_deploy=true" >> "$GITHUB_OUTPUT"
           fi
