@@ -119,10 +119,10 @@ Required fail-safe behavior:
 
 - The only canonical public origin is `https://jamula.net`.
 - Every indexable Jamula.net page MUST emit one absolute, self-referential canonical URL in the original HTML and use that same URL in internal links and the sitemap. Redirect, canonical, and sitemap signals MUST NOT conflict [S1].
-- `https://jamula.com/{path}?{query}` MUST return a permanent server-side **301 or 308** to `https://jamula.net/{same-path}?{same-safe-query}`. Both domains require valid HTTPS certificates.
-- HTTP, `www`, case/trailing-slash, and known legacy variants MUST converge to the single approved Jamula.net URL in one redirect where infrastructure permits and never more than two. There MUST be no loops, open redirects, protocol downgrade, blanket redirect of missing pages to home, or Jamula.com `200` duplicate.
+- The approved direct-serving policy in [Two Free Azure Static Web Apps](../architecture/two-free-static-apps.md) supersedes the former Jamula.com-to-Jamula.net redirect requirement. HTTPS requests to `jamula.com` and `www.jamula.com` serve supported pages directly with `200`; their absolute canonical URLs point to the corresponding Jamula.net pages. The `.com` hostnames are not separate canonical origins. Both domains require valid HTTPS certificates.
+- HTTP requests, including `www` variants, MUST redirect by permanent server-side **301 or 308** to HTTPS on the same hostname. Approved case/trailing-slash and legacy normalization MUST NOT redirect across hostnames. There MUST be no loops, open redirects, protocol downgrade, or blanket redirect of missing pages to home.
 - Valid query parameters are preserved exactly unless an approved privacy/security normalization rule removes known tracking parameters; tests record that rule. Path encoding, Unicode, fragments handled by the user agent, 404/410 behavior, and dangerous external-looking values receive explicit cases.
-- Permanent server-side redirects are a strong canonical signal and Google's recommended mechanism for permanent moves [S2]. Redirect behavior MUST be tested from multiple regions/networks after DNS/certificate cutover; failure pauses launch rather than changing the canonical domain silently.
+- Jamula.net remains the only origin used by internal links, structured data, and the sitemap; all corresponding Jamula.com responses retain Jamula.net canonical metadata. Redirect behavior MUST be tested from multiple regions/networks after DNS/certificate cutover; serving, DNS, or certificate failure pauses launch and invokes rollback rather than changing the canonical domain silently.
 
 ### 5.2 Crawl and index control
 

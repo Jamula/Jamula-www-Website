@@ -3,7 +3,8 @@
 Repository for Jamula, Inc.'s public website and phased customer experience.
 
 - Canonical domain: Jamula.net
-- Redirect domain: Jamula.com
+- Additional direct-serving domain: Jamula.com
+- Hosting: two Free Azure Static Web Apps, each serving its apex and www hostnames with managed HTTPS
 - Persistent branch and CI/CD source: `main`
 - Current phase: Squad bootstrap and platform evaluation
 
