@@ -409,6 +409,7 @@ jobs:
       always()
       && github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login != 'dependabot[bot]'
       && (
         github.event.action == 'closed'
         || needs.prepare.outputs.should_deploy == 'false'
