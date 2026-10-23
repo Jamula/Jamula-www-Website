@@ -79,6 +79,7 @@ jobs:
             ':(top)www/package-lock.json' \
             && git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- \
               ':(top)www/' \
+              ':(top).github/workflows/azure-static-web-apps.yml' \
               ':(exclude,top)www/package.json' \
               ':(exclude,top)www/package-lock.json'; then
             echo "Only website dependency manifests changed; build validation is sufficient."
