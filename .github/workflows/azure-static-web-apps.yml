@@ -39,6 +39,7 @@ jobs:
       )
     runs-on: ubuntu-latest
     outputs:
+      should_build: ${{ steps.gate.outputs.should_build }}
       should_deploy: ${{ steps.gate.outputs.should_deploy }}
     steps:
       - name: Check out exact revision
@@ -60,31 +61,38 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
             latest_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
             if [[ "$latest_main" == "$GITHUB_SHA" ]]; then
+              echo "should_build=true" >> "$GITHUB_OUTPUT"
               echo "should_deploy=true" >> "$GITHUB_OUTPUT"
             else
               echo "Skipping stale production revision $GITHUB_SHA; main is $latest_main."
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
               echo "should_deploy=false" >> "$GITHUB_OUTPUT"
             fi
           elif git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- \
             ':(top)www/' \
             ':(top).github/workflows/azure-static-web-apps.yml'; then
             echo "No deployable website changes remain in this pull request."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
             echo "should_deploy=false" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- \
-            ':(top)www/' \
-            ':(top).github/workflows/azure-static-web-apps.yml' \
-            ':(exclude,top)www/package.json' \
-            ':(exclude,top)www/package-lock.json'; then
+          elif ! git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- \
+            ':(top)www/package.json' \
+            ':(top)www/package-lock.json' \
+            && git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- \
+              ':(top)www/' \
+              ':(exclude,top)www/package.json' \
+              ':(exclude,top)www/package-lock.json'; then
             echo "Only website dependency manifests changed; build validation is sufficient."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
             echo "should_deploy=false" >> "$GITHUB_OUTPUT"
           else
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
             echo "should_deploy=true" >> "$GITHUB_OUTPUT"
           fi
 
   build:
     name: Build verified artifact
     needs: prepare
-    if: needs.prepare.outputs.should_deploy == 'true'
+    if: needs.prepare.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
