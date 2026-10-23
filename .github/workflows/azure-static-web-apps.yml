@@ -54,6 +54,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -65,6 +66,9 @@ jobs:
               echo "Skipping stale production revision $GITHUB_SHA; main is $latest_main."
               echo "should_deploy=false" >> "$GITHUB_OUTPUT"
             fi
+          elif [[ "$PR_AUTHOR" == "dependabot[bot]" ]]; then
+            echo "Skipping Azure preview for Dependabot pull requests; build verification still runs."
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
           elif git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- \
             ':(top)www/' \
             ':(top).github/workflows/azure-static-web-apps.yml'; then
@@ -405,6 +409,7 @@ jobs:
       always()
       && github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login != 'dependabot[bot]'
       && (
         github.event.action == 'closed'
         || needs.prepare.outputs.should_deploy == 'false'
