@@ -10,4 +10,4 @@
 .squad/casting/registry.json -text
 .squad/casting/history.json -text
 .squad/casting/registry-history.commit.json -text
-.squad/casting/legacy-archive-*/** -text
+.squad/casting/legacy-archive-*/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
