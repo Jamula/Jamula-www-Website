@@ -155,9 +155,20 @@ jobs:
   deploy:
     name: Deploy and verify
     needs: [prepare, build]
-    if: needs.prepare.outputs.should_deploy == 'true'
+    if: needs.prepare.outputs.should_deploy == 'true' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    environment: swa-deployment
     steps:
+      - name: Require production deployment token
+        shell: bash
+        env:
+          DEPLOYMENT_TOKEN: ${{ secrets.SWA_NET_DEPLOYMENT_TOKEN }}
+        run: |
+          if [[ -z "$DEPLOYMENT_TOKEN" ]]; then
+            echo "::error::Environment secret swa-deployment/SWA_NET_DEPLOYMENT_TOKEN is unavailable."
+            exit 1
+          fi
+
       - name: Download verified deployment artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -172,7 +183,7 @@ jobs:
         id: deploy
         uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1 (official immutable tag)
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SWA_JAMULA_WEB_PROD }}
+          azure_static_web_apps_api_token: ${{ secrets.SWA_NET_DEPLOYMENT_TOKEN }}
           action: upload
           app_location: www/dist
           output_location: ""
@@ -280,7 +291,18 @@ jobs:
     needs: [prepare, build]
     if: needs.prepare.outputs.should_deploy == 'true' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    environment: swa-deployment
     steps:
+      - name: Require companion deployment token
+        shell: bash
+        env:
+          DEPLOYMENT_TOKEN: ${{ secrets.SWA_COM_DEPLOYMENT_TOKEN }}
+        run: |
+          if [[ -z "$DEPLOYMENT_TOKEN" ]]; then
+            echo "::error::Environment secret swa-deployment/SWA_COM_DEPLOYMENT_TOKEN is unavailable."
+            exit 1
+          fi
+
       - name: Download verified deployment artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -295,7 +317,7 @@ jobs:
         id: deploy
         uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1 (official immutable tag)
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SWA_JAMULA_COM_PROD }}
+          azure_static_web_apps_api_token: ${{ secrets.SWA_COM_DEPLOYMENT_TOKEN }}
           action: upload
           app_location: www/dist
           output_location: ""
@@ -397,23 +419,3 @@ jobs:
             echo "- Configuration: CSP, framing, MIME, referrer, permissions, 404 response"
             echo "- Azure platform: TLS/HSTS$( [[ "$GITHUB_EVENT_NAME" == "pull_request" ]] && printf ', X-Robots-Tag: none' )"
           } >> "$GITHUB_STEP_SUMMARY"
-
-  cleanup-preview:
-    name: Remove obsolete preview
-    needs: prepare
-    if: >-
-      always()
-      && github.event_name == 'pull_request'
-      && github.event.pull_request.head.repo.full_name == github.repository
-      && (
-        github.event.action == 'closed'
-        || needs.prepare.outputs.should_deploy == 'false'
-      )
-    runs-on: ubuntu-latest
-    steps:
-      - name: Close pull request preview
-        uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1 (official immutable tag)
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SWA_JAMULA_WEB_PROD }}
-          action: close
-          app_location: www/dist

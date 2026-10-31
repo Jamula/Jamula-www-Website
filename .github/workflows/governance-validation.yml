@@ -4,33 +4,35 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - '.copilot/**'
-      - '.mcp.json'
-      - '.gitignore'
-      - '.vscode/**'
-      - '.github/**'
-      - '.squad/**'
-      - 'docs/**'
-      - 'scripts/validate_governance.py'
-      - 'LICENSE*'
-      - 'TRADEMARKS.md'
-      - 'CONTRIBUTING.md'
-      - 'THIRD_PARTY_NOTICES.md'
+      - ".copilot/**"
+      - ".mcp.json"
+      - ".gitignore"
+      - ".vscode/**"
+      - ".github/**"
+      - ".squad/**"
+      - "docs/**"
+      - "scripts/validate_governance.py"
+      - "scripts/*preview*.py"
+      - "LICENSE*"
+      - "TRADEMARKS.md"
+      - "CONTRIBUTING.md"
+      - "THIRD_PARTY_NOTICES.md"
   push:
     branches: [main]
     paths:
-      - '.copilot/**'
-      - '.mcp.json'
-      - '.gitignore'
-      - '.vscode/**'
-      - '.github/**'
-      - '.squad/**'
-      - 'docs/**'
-      - 'scripts/validate_governance.py'
-      - 'LICENSE*'
-      - 'TRADEMARKS.md'
-      - 'CONTRIBUTING.md'
-      - 'THIRD_PARTY_NOTICES.md'
+      - ".copilot/**"
+      - ".mcp.json"
+      - ".gitignore"
+      - ".vscode/**"
+      - ".github/**"
+      - ".squad/**"
+      - "docs/**"
+      - "scripts/validate_governance.py"
+      - "scripts/*preview*.py"
+      - "LICENSE*"
+      - "TRADEMARKS.md"
+      - "CONTRIBUTING.md"
+      - "THIRD_PARTY_NOTICES.md"
   workflow_dispatch:
 
 permissions:
@@ -43,3 +45,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Validate governance files
         run: python scripts/validate_governance.py
+      - name: Test trusted preview selection
+        run: node --test .github/scripts/swa-preview.test.cjs
+      - name: Test preview artifact boundary
+        run: python -m unittest discover -s scripts -p 'test_preview*.py'

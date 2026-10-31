@@ -1,0 +1,147 @@
+name: Azure Static Web Apps Preview
+
+on:
+  workflow_run:
+    workflows: ["Azure Static Web Apps"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: swa-preview-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: swa-deployment
+    steps:
+      - name: Check out trusted deployment tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          path: trusted
+
+      - name: Select current preview and download immutable artifact
+        id: gate
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require("node:fs");
+            const crypto = require("node:crypto");
+            const { selectPreview, writePreviewEvent } =
+              require("./trusted/.github/scripts/swa-preview.cjs");
+            const { data: run } = await github.rest.actions.getWorkflowRun({
+              ...context.repo, run_id: context.payload.workflow_run.id,
+            });
+            const selection = await selectPreview(github, context.repo, run);
+            core.setOutput("action", selection.action);
+            if (selection.action === "skip") {
+              await core.summary.addRaw(selection.reason).write();
+              return;
+            }
+            writePreviewEvent(selection, context.payload.repository, ".preview/event.json");
+            core.setOutput("number", selection.pr.number);
+            core.setOutput("sha", selection.sha);
+            core.setOutput("head_ref", selection.pr.head.ref);
+            if (selection.action === "upload") {
+              const archive = await github.rest.actions.downloadArtifact({
+                ...context.repo, artifact_id: selection.artifact.id, archive_format: "zip",
+              });
+              const bytes = Buffer.from(archive.data);
+              if (bytes.length > 100 * 1024 * 1024) {
+                throw new Error("The artifact archive exceeds the size limit.");
+              }
+              const digest = `sha256:${crypto.createHash("sha256").update(bytes).digest("hex")}`;
+              if (digest !== selection.artifact.digest) {
+                throw new Error("The artifact archive digest does not match GitHub metadata.");
+              }
+              fs.writeFileSync(".preview/site.zip", bytes);
+              core.setOutput("digest", digest);
+            }
+
+      - name: Extract only static files and verify trusted configuration
+        if: steps.gate.outputs.action == 'upload'
+        shell: bash
+        run: python trusted/scripts/validate_preview_artifact.py .preview/site.zip www/dist trusted/www/public/staticwebapp.config.json
+
+      - name: Recheck current PR before deployment
+        if: steps.gate.outputs.action != 'skip'
+        id: current
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require("node:fs");
+            const saved = JSON.parse(fs.readFileSync(".preview/event.json", "utf8"));
+            const { data: pr } = await github.rest.pulls.get({
+              ...context.repo, pull_number: saved.number,
+            });
+            const current =
+              pr.head.sha === saved.pull_request.head.sha &&
+              pr.head.repo?.full_name === saved.pull_request.head.repo.full_name &&
+              pr.base.repo?.full_name === `${context.repo.owner}/${context.repo.repo}` &&
+              pr.base.ref === "main" &&
+              pr.base.sha === saved.pull_request.base.sha &&
+              pr.state === saved.pull_request.state;
+            core.setOutput("deploy", current);
+            if (!current) {
+              await core.summary.addRaw("Preview not changed: the PR changed after artifact selection.").write();
+            }
+
+      - name: Require trusted deployment token
+        if: steps.current.outputs.deploy == 'true'
+        shell: bash
+        env:
+          DEPLOYMENT_TOKEN: ${{ secrets.SWA_NET_DEPLOYMENT_TOKEN }}
+        run: |
+          if [[ -z "$DEPLOYMENT_TOKEN" ]]; then
+            echo "::error::Environment secret swa-deployment/SWA_NET_DEPLOYMENT_TOKEN is unavailable to the trusted preview workflow."
+            exit 1
+          fi
+
+      - name: Deploy or close selected PR preview
+        if: steps.current.outputs.deploy == 'true'
+        id: deploy
+        uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
+        env:
+          GITHUB_EVENT_NAME: pull_request
+          GITHUB_EVENT_PATH: /github/workspace/.preview/event.json
+          GITHUB_REF: refs/pull/${{ steps.gate.outputs.number }}/merge
+          GITHUB_HEAD_REF: ${{ steps.gate.outputs.head_ref }}
+          GITHUB_BASE_REF: main
+          GITHUB_SHA: ${{ steps.gate.outputs.sha }}
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.SWA_NET_DEPLOYMENT_TOKEN }}
+          action: ${{ steps.gate.outputs.action }}
+          app_location: www/dist
+          output_location: ""
+          skip_app_build: true
+
+      - name: Verify isolated live preview
+        if: steps.current.outputs.deploy == 'true' && steps.gate.outputs.action == 'upload'
+        shell: bash
+        env:
+          DEPLOYED_URL: ${{ steps.deploy.outputs.static_web_app_url }}
+          PR_NUMBER: ${{ steps.gate.outputs.number }}
+          DEPLOYMENT_SHA: ${{ steps.gate.outputs.sha }}
+          ARTIFACT_DIGEST: ${{ steps.gate.outputs.digest }}
+        run: |
+          set -euo pipefail
+          expected="https://ashy-beach-033c7d01e-${PR_NUMBER}.7.azurestaticapps.net"
+          if [[ "${DEPLOYED_URL%/}" != "$expected" ]]; then
+            echo "::error::The deployment URL is not the selected PR preview."
+            exit 1
+          fi
+          python trusted/scripts/verify_preview_site.py "$DEPLOYED_URL"
+          {
+            echo "### Verified isolated PR preview"
+            echo "- PR: ${PR_NUMBER}"
+            echo "- Revision: \`${DEPLOYMENT_SHA}\`"
+            echo "- Artifact digest: \`${ARTIFACT_DIGEST}\`"
+            echo "- URL: ${DEPLOYED_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"

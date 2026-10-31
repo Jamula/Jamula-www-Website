@@ -1,0 +1,53 @@
+{
+  "agents": {
+    "product-architecture-lead": {
+      "persistent_name": "Jean-Luc Picard",
+      "universe": "Star Trek",
+      "created_at": "2026-08-25T05:08:32Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "experience-design-lead": {
+      "persistent_name": "Jadzia Dax",
+      "universe": "Star Trek",
+      "created_at": "2026-08-25T05:08:32Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "content-multimedia-social-lead": {
+      "persistent_name": "Nyota Uhura",
+      "universe": "Star Trek",
+      "created_at": "2026-08-25T05:08:32Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "full-stack-platform-engineer": {
+      "persistent_name": "Geordi La Forge",
+      "universe": "Star Trek",
+      "created_at": "2026-08-25T05:08:32Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "identity-data-ai-engineer": {
+      "persistent_name": "Seven of Nine",
+      "universe": "Star Trek",
+      "created_at": "2026-08-25T05:08:32Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "quality-reliability-engineer": {
+      "persistent_name": "Miles O'Brien",
+      "universe": "Star Trek",
+      "created_at": "2026-08-25T05:08:32Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "legal-regulatory-corporate-advisor": {
+      "persistent_name": "Sarek",
+      "universe": "Star Trek",
+      "created_at": "2026-08-25T05:08:32Z",
+      "legacy_named": false,
+      "status": "active"
+    }
+  }
+}

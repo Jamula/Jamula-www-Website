@@ -1,3 +1,4 @@
+<!-- squad:copilot-instructions:start -->
 # Copilot Coding Agent — Squad Instructions
 
 You are working on a project that uses **Squad**, an AI team framework. When picking up issues autonomously, follow these guidelines.
@@ -62,3 +63,4 @@ If you make a decision that affects other team members, write it to:
 .squad/decisions/inbox/copilot-{brief-slug}.md
 ```
 The Coordinator alone decides whether the proposal is accepted. Scribe may persist it into the shared decisions file only when the Coordinator explicitly approves and delegates that entry in the Scribe spawn manifest.
+<!-- squad:copilot-instructions:end -->
