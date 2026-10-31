@@ -10,7 +10,7 @@
 <!-- route:miles-obrien=test,security,reliability,performance,incident,backup,restore,quality -->
 <!-- route:sarek=legal,license,trademark,contract,tax,compliance,terms,insurance,regulator -->
 
-| Work Type | Author | Required reviewers |
+| Work Type | Owner | Required reviewers |
 |-----------|--------|--------------------|
 | Product scope, priorities, ADR synthesis, cost tradeoffs | Jean-Luc Picard | Fact Checker; relevant domain owner; Cyrus for gates |
 | UX, brand, information architecture, accessibility, SEO | Jadzia Dax | Miles O'Brien; Nyota Uhura |
@@ -19,6 +19,13 @@
 | Identity, CRM data, privacy, portal, storage connectors, AI | Seven of Nine | Miles O'Brien; Sarek; Rai |
 | Threat modeling, testing, performance, reliability, release readiness | Miles O'Brien | Relevant author; Fact Checker |
 | Washington/federal/global legal issue spotting, IP, contracts, licensing | Sarek | Fact Checker; qualified professional when gated |
+
+## Support Responsibilities
+
+Support identities are not specialist routing destinations. The Coordinator invokes them under their charters and the same approval gates.
+
+| Work Type | Owner | Required reviewers |
+|-----------|-------|--------------------|
 | Session logging and decision consolidation | Scribe | Coordinator |
 | Work queue, dependency and cleanup monitoring | Ralph | Coordinator |
 | Responsible AI, ethics, social/environmental impact | Rai | Sarek; Fact Checker |

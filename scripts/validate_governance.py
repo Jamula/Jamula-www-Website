@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -191,7 +192,7 @@ def validate_workflow_policy() -> None:
         fail("Manual label synchronization must check out the default branch")
     if "labels:\n  - squad" not in issue_form:
         fail("Squad issue form must apply the authoritative triage label")
-    if "@bradygaster/squad-cli@0.12.0" not in mcp or "@insider" in mcp:
+    if "@bradygaster/squad-cli@1.1.0" not in mcp or "@insider" in mcp:
         fail("Squad state MCP must use the reviewed pinned package version")
 
 
@@ -213,6 +214,66 @@ def validate_gitignore() -> None:
         fail("Safe .env.example templates must remain trackable")
 
 
+def validate_deployment_boundary() -> None:
+    build = (ROOT / ".github/workflows/azure-static-web-apps.yml").read_text(encoding="utf-8")
+    preview = (ROOT / ".github/workflows/azure-static-web-apps-preview.yml").read_text(
+        encoding="utf-8"
+    )
+    jobs = dict(
+        re.findall(
+            r"^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)",
+            build.split("jobs:\n", 1)[1],
+            flags=re.MULTILINE | re.DOTALL,
+        )
+    )
+    for name in ("prepare", "build"):
+        if name not in jobs or "secrets." in jobs[name] or "environment:" in jobs[name]:
+            fail(f"The PR {name} job must not access a deployment secret or environment")
+    for name in ("deploy", "deploy-com"):
+        job = jobs.get(name, "")
+        if "github.event_name == 'push'" not in job or "environment: swa-deployment" not in job:
+            fail(f"{name} must require a production push and the main-only environment")
+    if "workflow_run:" not in preview or "\n  pull_request:" in preview:
+        fail("Preview deployment must run as a trusted workflow_run")
+    if "environment: swa-deployment" not in preview or "ref: ${{ github.workflow_sha }}" not in preview:
+        fail("Preview deployment must use main-only secrets and trusted deployment tools")
+    if "npm ci" in preview or "npm install" in preview:
+        fail("The trusted preview workflow must never execute PR dependency scripts")
+    if "AZURE_STATIC_WEB_APPS_API_TOKEN_SWA_JAMULA_" in build + preview:
+        fail("Deployment workflows must not fall back to old repository-level token names")
+    if "SWA_NET_DEPLOYMENT_TOKEN" not in build + preview or "SWA_COM_DEPLOYMENT_TOKEN" not in build:
+        fail("Deployment workflows must use the environment-scoped token names")
+
+
+def validate_casting_transaction() -> None:
+    casting = ROOT / ".squad/casting"
+    manifest = json.loads((casting / "registry-history.commit.json").read_text(encoding="utf-8"))
+    for name in ("registry", "history"):
+        content = (casting / f"{name}.json").read_bytes()
+        if hashlib.sha256(content).hexdigest() != manifest[f"{name}_sha256"]:
+            fail(f"Casting {name} bytes do not match the managed transaction manifest")
+        document = json.loads(content)
+        if document.get("transaction_id") != manifest["transaction_id"]:
+            fail(f"Casting {name} does not belong to the current transaction")
+        revision_field = "revision" if name == "registry" else "registry_revision"
+        if document.get(revision_field) != manifest["registry_revision"]:
+            fail(f"Casting {name} has a mismatched transaction revision")
+    attributes = subprocess.run(
+        [
+            "git", "check-attr", "text", "--",
+            ".squad/casting/registry.json",
+            ".squad/casting/history.json",
+            ".squad/casting/registry-history.commit.json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    if len(attributes) != 3 or any(not line.endswith(": text: unset") for line in attributes):
+        fail("Managed casting JSON must disable Git newline conversion to preserve its hashes")
+
+
 def main() -> None:
     validate_json()
     validate_roster()
@@ -222,6 +283,8 @@ def main() -> None:
     validate_no_machine_paths()
     validate_workflow_policy()
     validate_gitignore()
+    validate_deployment_boundary()
+    validate_casting_transaction()
     print("Governance validation passed.")
 
 

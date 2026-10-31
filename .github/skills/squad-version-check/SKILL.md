@@ -4,13 +4,13 @@ description: "Internals of how @bradygaster/squad-cli stamps its version, how `s
 allowedTools: []
 confidence: medium
 domain: squad-internals
-source: "Discovered by Data; validated in bradygaster/squad#1173 recon (2026-05-26)."
+source: "validated in bradygaster/squad#1173 recon (2026-05-26)."
 ---
 
 # SKILL: Squad CLI Internals — Version Stamping & Upgrade Mechanics
 
 **Confidence:** medium
-**Discovered by:** Data
+**Discovered by:** repository investigation
 **Date:** 2026-05-26
 **Validated in:** Issue #1173 recon (bradygaster/squad)
 
@@ -69,7 +69,7 @@ Reads the stamped version back from `squad.agent.md`:
 ### What is PRESERVED:
 - `team.md`, `routing.md`, `decisions.md`, `ceremonies.md` (user-owned)
 - `agents/*/history.md` (individual agent memory)
-- `.squad/config.json` — **never touched**; `stateBackend` survives intact
+- `.squad/config.json` — preserved unless `--state-backend` explicitly requests migration
 - User-added files not in TEMPLATE_MANIFEST
 
 ### Self-upgrade path (`selfUpgradeCli()`):
@@ -97,7 +97,7 @@ Other optional fields added by the coordinator at runtime:
 - `defaultModel` — global model override for all agent spawns
 - `agentModelOverrides.{agentName}` — per-agent model override
 
-The file is read-only from the upgrade path's perspective. Only the coordinator writes to it (for model preferences).
+The ordinary upgrade preserves this file. `upgrade --state-backend` changes it and installs sync hooks. In CLI 1.1.0, combining `--dry-run` with `--state-backend` still performs the backend migration; do not treat that combination as read-only. Preview file updates with `upgrade --dry-run` alone, then run the explicitly authorized backend migration. After a backend change, restart the session and verify the runtime state bridge reports the configured provider before writing mutable state.
 
 ---
 

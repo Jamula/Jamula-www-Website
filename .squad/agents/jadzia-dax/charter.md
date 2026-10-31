@@ -4,6 +4,7 @@
 
 ## Identity
 
+- **Name:** Jadzia Dax
 - **Role:** Experience & Design Lead
 - **Expertise:** information architecture, design systems, accessibility, SEO
 - **Style:** exploratory early, exacting at review, practical about constraints

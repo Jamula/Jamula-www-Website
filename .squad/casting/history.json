@@ -1,23 +1,25 @@
 {
+  "assignment_cast_snapshots": {
+    "jamula-website-20260825": {
+      "agents": [
+        "jean-luc-picard",
+        "jadzia-dax",
+        "nyota-uhura",
+        "geordi-la-forge",
+        "seven-of-nine",
+        "miles-obrien",
+        "sarek"
+      ],
+      "universe": "Star Trek",
+      "created_at": "2026-08-25T05:08:32Z"
+    }
+  },
   "universe_usage_history": [
     {
       "universe": "Star Trek",
-      "first_used_at": "2026-08-25T05:08:32Z",
-      "active_assignments": 7
+      "used_at": "2026-08-25T05:08:32Z"
     }
   ],
-  "assignment_cast_snapshots": {
-    "jamula-website-20260825": {
-      "created_at": "2026-08-25T05:08:32Z",
-      "assignments": {
-        "product-architecture-lead": "Jean-Luc Picard",
-        "experience-design-lead": "Jadzia Dax",
-        "content-multimedia-social-lead": "Nyota Uhura",
-        "full-stack-platform-engineer": "Geordi La Forge",
-        "identity-data-ai-engineer": "Seven of Nine",
-        "quality-reliability-engineer": "Miles O'Brien",
-        "legal-regulatory-corporate-advisor": "Sarek"
-      }
-    }
-  }
+  "transaction_id": "c69ef3a1-9da8-40a5-b0ac-570950c87630",
+  "registry_revision": 2
 }

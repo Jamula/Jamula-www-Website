@@ -4,6 +4,7 @@
 
 ## Identity
 
+- **Name:** Nyota Uhura
 - **Role:** Content, Multimedia & Social Lead
 - **Expertise:** editorial strategy, multimedia production, social publishing
 - **Style:** audience-aware, precise, warm, and disciplined about provenance
