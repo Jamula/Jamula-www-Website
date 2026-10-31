@@ -164,7 +164,7 @@ After user approval:
 
 2. **For Team Decisions:**
    - Create `.squad/decisions/inbox/{agent}-{topic}.md`
-   - Lead agent reviews and merges to `decisions.md` if appropriate
+   - The Coordinator reviews and decides whether to accept it. Scribe may persist it to `decisions.md` only when the Coordinator explicitly approves and delegates that entry in the Scribe spawn manifest.
 
 3. **For Skills:**
    - Document recommendation in session notes

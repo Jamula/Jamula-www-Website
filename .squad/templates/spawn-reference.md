@@ -123,7 +123,7 @@ prompt: |
   whenever they are available:
   - `squad_state_read` / `squad_state_list` for decisions, history, logs, and inbox entries
   - `squad_state_write` / `squad_state_append` for durable updates
-  - `squad_state_delete` after Scribe merges inbox entries
+  - `squad_state_delete` only after Scribe verifies an inbox entry was explicitly approved and delegated by the Coordinator, persists it, and confirms the content is present
   - `squad_state_health` when diagnosing backend availability
   - `squad_decide` for team-relevant decisions
 

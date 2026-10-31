@@ -42,7 +42,7 @@
 Before starting work, run `git rev-parse --show-toplevel` to find the repo root, or use the `TEAM ROOT` provided in the spawn prompt. All `.squad/` paths must be resolved relative to this root — do not assume CWD is the repo root (you may be in a worktree or subdirectory).
 
 Before starting work, read `.squad/decisions.md` for team decisions that affect me.
-After making a decision others should know, write it to `.squad/decisions/inbox/{my-name}-{brief-slug}.md` — the Scribe will merge it.
+After making a decision others should know, submit it as a proposal to `.squad/decisions/inbox/{my-name}-{brief-slug}.md`. Only the Coordinator decides whether it is accepted. Scribe may persist it to `.squad/decisions.md` only when the Coordinator explicitly approves and delegates that entry in the Scribe spawn manifest.
 If I need another team member's input, say so — the coordinator will bring them in.
 
 ## Voice

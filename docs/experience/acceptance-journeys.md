@@ -275,12 +275,12 @@ Run separately for **OneDrive, Google Drive, and Box**. A passing connector cann
 
 **Pass**
 
-- Every supported noncanonical variant reaches the exact approved `https://jamula.net` target by 301/308 in one redirect where possible, never more than two.
-- Jamula.com never serves a duplicate `200`; HTTPS certificates are valid before redirect.
+- The approved direct-serving policy in [Two Free Azure Static Web Apps](../architecture/two-free-static-apps.md) supersedes the former Jamula.com-to-Jamula.net redirect requirement: HTTPS requests to all four approved hostnames serve supported pages with `200`, valid TLS, and no cross-host redirect.
+- HTTP requests redirect by 301/308 to HTTPS on the same hostname; approved path/query normalization also never redirects across hostnames.
+- Jamula.com responses are not a separate canonical origin: canonical HTML on both `.com` hostnames points to the corresponding `https://jamula.net` URL. Jamula.net pages remain self-canonical; internal links, structured data, and sitemap use Jamula.net URLs.
 - Safe path/query is preserved under the approved normalization rule; no open redirect, loop, downgrade, or blanket home redirect exists.
-- Canonical HTML, internal links, structured data, and sitemap agree.
-- Missing resources remain meaningful 404/410 responses on Jamula.net.
-- DNS/certificate/redirect failure invokes pause-and-remediate rollback; it never silently changes the canonical domain.
+- Missing resources remain meaningful 404/410 responses on the requested hostname.
+- DNS, certificate, or serving failure invokes pause-and-remediate rollback; it never silently changes the canonical domain or redirects `.com` traffic to `.net`.
 
 ### J-12 — Crawl and validate representative templates (Phase 1 onward)
 
