@@ -1,6 +1,6 @@
 # Project Context
 
-- **Project:** u-cyrusjamula-ubiquitous-spork
+- **Project:** u-cyrusjamula-symmetrical-sniffle
 - **Created:** 2026-11-01
 
 ## Core Context
