@@ -1,8 +1,45 @@
 {
   "schema": "squad-agent-provenance/v1",
   "schema_version": 1,
-  "revision": 1,
-  "generated_at": "1970-01-01T00:00:00.000Z",
-  "agents": {},
-  "transaction_id": "86947254-337d-4bbb-a0f6-18f229ec2ac2"
+  "revision": 5,
+  "generated_at": "2026-11-01T23:45:56.602Z",
+  "agents": {
+    "seven": {
+      "display_name": "Seven",
+      "persistent_name": "Seven",
+      "role": "Lead / Architect",
+      "universe": "cli-cast",
+      "status": "active",
+      "created_at": "2026-11-01T23:44:54.902Z",
+      "updated_at": "2026-11-01T23:44:54.902Z"
+    },
+    "spock": {
+      "display_name": "Spock",
+      "persistent_name": "Spock",
+      "role": "Full-Stack Developer",
+      "universe": "cli-cast",
+      "status": "active",
+      "created_at": "2026-11-01T23:45:41.809Z",
+      "updated_at": "2026-11-01T23:45:41.809Z"
+    },
+    "data": {
+      "display_name": "Data",
+      "persistent_name": "Data",
+      "role": "Code Reviewer",
+      "universe": "cli-cast",
+      "status": "active",
+      "created_at": "2026-11-01T23:45:56.053Z",
+      "updated_at": "2026-11-01T23:45:56.053Z"
+    },
+    "uhura": {
+      "display_name": "Uhura",
+      "persistent_name": "Uhura",
+      "role": "Technical Writer",
+      "universe": "cli-cast",
+      "status": "active",
+      "created_at": "2026-11-01T23:45:56.602Z",
+      "updated_at": "2026-11-01T23:45:56.602Z"
+    }
+  },
+  "transaction_id": "37bd2850-c32e-415e-8515-74aecf351d96"
 }
