@@ -46,7 +46,7 @@ the built world. This brief holds only what belongs to this route.
   page-wide circuit-board decoration.
 - **Offering categories (category-level product truth, PRODUCT.md):** AI strategy,
   custom software, and cloud consulting, delivered together. Exact public wording is
-  still editorial and review-gated (Fact Checker, Sarek, Rai, Cyrus).
+  still editorial and review-gated (Fact Checker, Legal researcher, Responsible AI reviewer, Cyrus).
 - **Deliberately absent (must not be invented):** testimonials, case studies,
   customer outcomes, certifications, awards, vendor partnership/endorsement claims,
   quantified performance/reliability claims, pricing, or founder facts.
@@ -106,7 +106,7 @@ structure first, so it survives with motion disabled.
 - Final public wording for the offering categories and any claim — review-gated and
   owner-approved; none is approved for publication yet.
 - A self-hosted display/text typeface whose character fits the letterpress-editorial
-  voice, with tracked licensing/provenance (Uhura for copy/media, Sarek for rights).
+  voice, with tracked licensing/provenance (Content lead for copy/media, Legal researcher for rights).
 - An accessible contact mechanism/route — not built yet and not yet specified.
 
 ## Unresolved decisions

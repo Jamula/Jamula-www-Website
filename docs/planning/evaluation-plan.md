@@ -1,4 +1,9 @@
-# Jamula Website Evaluation and Squad Bootstrap Plan
+# Jamula Website Evaluation Plan
+
+**Maintenance note:** Framework bootstrap instructions have been retired. This
+plan retains the website evaluation scope and historical PR 1/PR 2 phase names;
+functional roles describe responsibilities, not installed agents or approved
+assignments. Recorded decisions, reviews, and approvals remain version-bound.
 
 ## Problem and approach
 
@@ -8,7 +13,7 @@ Jamula, Inc. needs a modern public website for Jamula.com and Jamula.net, a secu
 
 This work will produce exactly two top-level delivery pull requests. Child workstream PRs are integration mechanics for PR 2 and do not replace or add top-level delivery PRs:
 
-1. A portable, project-specific Squad bootstrap with the approved Star Trek roster.
+1. Project governance, documentation, licensing, and reusable domain guidance.
 2. A research-backed website decision package for review before any website implementation begins.
 
 Both top-level PRs target `main`; this project does not use a `dev` branch.
@@ -17,27 +22,14 @@ Both top-level PRs target `main`; this project does not use a `dev` branch.
 
 No production website code will be added during the evaluation phase. Narrow, disposable spikes are allowed for high-risk assumptions such as OAuth verification and token handling, Entra External ID behavior, and email deliverability. Retain sanitized reproducibility packages (procedure, versions, configuration schema, hashes, redacted measurements, and results), but delete credentials, test data, cloud resources, and unapproved production code.
 
-## Approved Squad roster
-
-| Member | Role | Scope |
-|---|---|---|
-| Jean-Luc Picard | Product & Architecture Lead | Business goals, scope, architecture decisions, cost tradeoffs, and final reviews |
-| Jadzia Dax | Experience & Design Lead | Brand, information architecture, visual systems, sophisticated interaction design, accessibility, SEO, and design quality |
-| Nyota Uhura | Content, Multimedia & Social Lead | Editorial strategy, website copy, case studies, image/audio/video workflows, social campaigns, channel adaptation, publishing cadence, and content analytics |
-| Geordi La Forge | Full-Stack & Platform Engineer | Advanced web application engineering, CMS/turn-key platform evaluation, APIs, integrations, CI/CD, observability, and portable deployment |
-| Seven of Nine | Identity, Data & AI Engineer | Authentication, customer portal, storage connectors, CRM data, privacy, and Phase 3 customer AI |
-| Miles O'Brien | Quality & Reliability Engineer | Test strategy, security checks, performance, accessibility validation, and release readiness |
-| Sarek | Legal, Regulatory & Corporate Advisor | Washington State and federal small-business requirements, privacy, contracts, IP/trademarks, website terms, and legal-review checklists |
-| Scribe | Silent memory role | Decisions, memory, and session logs |
-| Ralph | Monitor role | Work queue, backlog health, and keep-alive |
-| Rai | Background safety role | Responsible AI, content safety, privacy, and credential awareness |
-| Fact Checker | Verification role | Source verification, cost and limit validation, and Devil's Advocate review |
+## Responsibility and professional boundaries
 
 Cyrus retains final approval over role boundaries, backlog ownership, and all architectural decisions.
 
-Star Trek names are internal Squad identities only. They must not appear in public website content, customer-facing product surfaces, marketing, or Jamula branding.
-
-Sarek provides research, issue spotting, compliance checklists, and questions for professionals. Sarek is not a lawyer, CPA, or licensed professional and must not present output as legal or tax advice. Any launch-critical legal, tax, employment, privacy, contract, or regulatory conclusion must be marked for review by appropriately licensed counsel or an accountant.
+The legal research role provides research, issue spotting, compliance checklists,
+and questions for professionals, not legal or tax advice. Any launch-critical
+legal, tax, employment, privacy, contract, or regulatory conclusion must be marked
+for review by appropriately licensed counsel or an accountant.
 
 ## Jamula operating principles
 
@@ -67,35 +59,29 @@ Application rules:
 - Maintain a public-claims register with claim text, status (`aspiration` or `achieved`), scope/baseline, metric, evidence source, owner, approval, review cadence, expiry date, and correction/removal action.
 - Vendor/platform evaluation includes energy/resource efficiency, sustainability transparency, accessibility/inclusion, labor/social concerns where verifiable, data ethics, and exit impact without treating vendor marketing as proof.
 - Architecture favors efficient delivery such as static generation where suitable, optimized media, caching, right-sized infrastructure, token/compute budgets, retention minimization, and deletion of unused resources.
-- Rai reviews responsible-AI/social-impact risks; Sarek reviews claim/regulatory exposure; Fact Checker verifies evidence; Dax and Uhura ensure public language is understandable and not performative.
+- Responsible AI reviewer reviews responsible-AI/social-impact risks; Legal researcher reviews claim/regulatory exposure; Fact Checker verifies evidence; Experience lead and Content lead ensure public language is understandable and not performative.
 - Create an internal operating-principles document and a shorter public values draft. Both remain explicitly provisional in PR 1 and become authoritative only after a separate recorded wording approval from Cyrus.
 
-## Agent and skill capability audit
+## Reusable project guidance
 
-The repository currently has a usable Squad coordinator and strong generic process skills, but it is not yet ready for this project:
-
-- Present: coordinator/init/response/source-of-truth, collaboration, routing, error recovery, iterative retrieval, reviewer protocol, secret handling, session recovery, testing discipline, tiered memory, and git workflow skills.
-- Present: built-in charters for Scribe, Ralph, Rai, and Fact Checker.
-- Missing: the seven approved cast-agent charters and histories.
-- Missing: project-specific guidance for product decisions, web/platform evaluation, UX/accessibility/SEO, identity/privacy/security, OAuth storage connectors, legal/compliance research, and vendor/cost fact checking.
-- The sole `.github\agents\squad.agent.md` coordinator is appropriate; cast members should be defined through Squad team/charter state rather than duplicating seven separate coordinator agents.
-
-PR 1 will add concise project-local skills, referenced by the relevant charters:
+Project-local skills under `.github\skills\` provide domain guidance independently
+of any agent framework. Use them for the relevant work; they do not install agents,
+create background monitors, or assign issue ownership.
 
 | Skill | Primary users | Scope |
 |---|---|---|
-| `jamula-product-context` | Picard, all agents | Business goals, phase boundaries, audience, cost posture, Microsoft preference, multi-cloud portability, and approval gates |
-| `architecture-options-and-adrs` | Picard, Geordi, Seven | Comparable evaluation method, reversible ADRs, source quality, portability, and decision triggers |
-| `web-experience-accessibility-seo` | Dax, Miles | Content architecture, design/brand constraints, WCAG 2.2 AA, SEO, structured data, Core Web Vitals, and performance budgets |
-| `content-multimedia-social-publishing` | Uhura, Dax, Sarek, Rai | Editorial planning, channel-specific copy, image/audio/video production, captions/transcripts/alt text, content rights, approvals, social publishing, reuse, moderation, and analytics |
-| `cms-and-turnkey-platform-evaluation` | Geordi, Picard, Dax, Uhura | Wix Studio, WordPress.com, managed/self-hosted WordPress, Webflow/Squarespace comparators, extensibility, portal/integration fit, total ownership cost, security/maintenance, migration, and lock-in |
-| `secure-customer-portal` | Seven, Miles | Identity, RBAC, tenant isolation, sessions, audit, secrets, OWASP ASVS, incident response, and file-handling controls |
-| `privacy-data-governance` | Seven, Sarek, Rai | Global data inventory, lawful basis/consent, retention, DSAR, processors, cross-border transfers, telemetry redaction, and legal-review boundaries |
-| `oauth-storage-connectors` | Seven, Geordi, Miles | OneDrive/Google Drive/Box scopes, verification, token custody, rotation/revocation, tenant isolation, spikes, and provider-independent abstractions |
-| `cloud-hosting-and-cost-evaluation` | Geordi, Picard, Fact Checker | Free-tier/commercial-use analysis, Azure portability, DNS/email, CI/CD, observability, overages, budgets, and kill switches |
-| `legal-compliance-research` | Sarek, Fact Checker | Official-source Washington/federal issue spotting, effective dates, applicability assumptions, legal/CPA escalation, licensing, contracts, and no-legal-advice guardrails |
+| `jamula-product-context` | Product lead, all agents | Business goals, phase boundaries, audience, cost posture, Microsoft preference, multi-cloud portability, and approval gates |
+| `architecture-options-and-adrs` | Product lead, Platform engineer, Identity/data engineer | Comparable evaluation method, reversible ADRs, source quality, portability, and decision triggers |
+| `web-experience-accessibility-seo` | Experience lead, Quality/reliability engineer | Content architecture, design/brand constraints, WCAG 2.2 AA, SEO, structured data, Core Web Vitals, and performance budgets |
+| `content-multimedia-social-publishing` | Content lead, Experience lead, Legal researcher, Responsible AI reviewer | Editorial planning, channel-specific copy, image/audio/video production, captions/transcripts/alt text, content rights, approvals, social publishing, reuse, moderation, and analytics |
+| `cms-and-turnkey-platform-evaluation` | Platform engineer, Product lead, Experience lead, Content lead | Wix Studio, WordPress.com, managed/self-hosted WordPress, Webflow/Squarespace comparators, extensibility, portal/integration fit, total ownership cost, security/maintenance, migration, and lock-in |
+| `secure-customer-portal` | Identity/data engineer, Quality/reliability engineer | Identity, RBAC, tenant isolation, sessions, audit, secrets, OWASP ASVS, incident response, and file-handling controls |
+| `privacy-data-governance` | Identity/data engineer, Legal researcher, Responsible AI reviewer | Global data inventory, lawful basis/consent, retention, DSAR, processors, cross-border transfers, telemetry redaction, and legal-review boundaries |
+| `oauth-storage-connectors` | Identity/data engineer, Platform engineer, Quality/reliability engineer | OneDrive/Google Drive/Box scopes, verification, token custody, rotation/revocation, tenant isolation, spikes, and provider-independent abstractions |
+| `cloud-hosting-and-cost-evaluation` | Platform engineer, Product lead, Fact Checker | Free-tier/commercial-use analysis, Azure portability, DNS/email, CI/CD, observability, overages, budgets, and kill switches |
+| `legal-compliance-research` | Legal researcher, Fact Checker | Official-source Washington/federal issue spotting, effective dates, applicability assumptions, legal/CPA escalation, licensing, contracts, and no-legal-advice guardrails |
 | `source-and-claim-verification` | Fact Checker, all agents | Official-source hierarchy, dated pricing/limit checks, contradiction handling, uncertainty labels, and citation quality |
-| `payments-and-billing-evaluation` | Seven, Geordi, Miles, Sarek, Picard | Hosted checkout, invoices, deposits, recurring retainers/subscriptions, processor comparison, PCI scope reduction, webhooks, disputes/refunds, tax/accounting boundaries, and Phase 4 migration seams |
+| `payments-and-billing-evaluation` | Identity/data engineer, Platform engineer, Quality/reliability engineer, Legal researcher, Product lead | Hosted checkout, invoices, deposits, recurring retainers/subscriptions, processor comparison, PCI scope reduction, webhooks, disputes/refunds, tax/accounting boundaries, and Phase 4 migration seams |
 | `jamula-operating-principles` | All agents | Customer outcomes, ownership, learning, evidence, responsible speed, quality, trust, respectful dissent, resourcefulness, people development, social responsibility, environmental stewardship, and measurable accountability |
 
 External skills are optional accelerators, not trust authorities:
@@ -103,7 +89,7 @@ External skills are optional accelerators, not trust authorities:
 - Add Microsoft's official `Cloud Solution Architect` skill from `microsoft/skills` after reviewing and pinning commit `6a2bf7b76bb2f3a24ebe18c95d6fce9ca6417326`. Copy the complete skill directory, including its `references\` content, preserve Microsoft's MIT license/copyright notice, and record source/revision in the third-party notice and `docs\README.md`.
 - Agent Finder returned Microsoft's `Microsoft Foundry` skill as a possible Phase 3 customer-AI accelerator; document it as a future candidate but do not install it during PR 1.
 - Agent Finder returned third-party legal plugins, but relevance scores are not trust or safety ratings. They must not be installed or relied on without provenance, license, security, maintenance, and legal-scope review.
-- No external skill may override project policy, official-source verification, Sarek's no-legal-advice boundary, or licensed-counsel review.
+- No external skill may override project policy, official-source verification, Legal researcher's no-legal-advice boundary, or licensed-counsel review.
 - Prefer audited project-local skills when an external resource is broad, unmaintained, legally ambiguous, or unnecessary.
 
 ## Documentation location and structure
@@ -138,22 +124,24 @@ Planned structure:
 | `docs\content\public-claims-register.md` | Environmental, ethical, social, accessibility, and other public claims with evidence/expiry |
 | `docs\planning\work-ownership.md` | Issue dependency DAG, RACI, exclusive path ownership, and merge order |
 | `docs\decisions\approvals.md` | SHA/artifact-version-bound approvals, conditions, outcomes, rejections, and rework |
-| `docs\roadmap\` | Phased roadmap, dependency map, and Squad-ready backlog |
+| `docs\roadmap\` | Phased roadmap, dependency map, and implementation-ready backlog |
 
-Repository/platform-required files may remain outside `docs\` when their standard location is operationally required, including `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES`, `.github\`, `.squad\`, and machine-readable security/configuration files. Their rationale and ownership will be indexed from `docs\README.md`.
+Repository/platform-required files may remain outside `docs\` when their standard location is operationally required, including `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES`, `.github\`, and machine-readable security/configuration files. Their rationale and ownership will be indexed from `docs\README.md`.
 
 ## Execution and collaboration protocol
 
 ### Start clean
 
-- Before editing repository files, capture the branch, HEAD, upstream, `git status`, tracked diff, tracked/untracked/ignored-file inventories, and content hashes for all in-scope work; create a named stash that includes tracked and untracked bootstrap files; record the stash SHA; fetch the remote; and synchronize the verified dedicated branch with `origin/main`.
-- If the branch is shared or already has an open PR, do not rewrite it; create a fresh branch from `origin/main` and restore the named stash there.
-- Restore with `stash apply`, verify tracked/untracked paths and content hashes, and stop for explicit resolution if synchronization or stash application conflicts. Drop the exact recorded stash only after verification, commit, push, and confirmation that every original path is durable. Do not overwrite or drop existing work.
+- Before editing repository files, inspect the branch, HEAD, upstream, `git status`,
+  and in-scope tracked/untracked changes. Preserve unrelated and uncommitted work.
+- Use an isolated issue/worktree branch based on `main` unless an explicit
+  dependency requires stacking. Do not rewrite a shared branch or open PR.
+- Resolve conflicting workspace changes explicitly before proceeding.
 - Record the resulting base commit in the first tracking issue and PR.
 
 ### GitHub issues are the work ledger
 
-- Create a GitHub issue before beginning each independently owned unit of work, including the Squad bootstrap.
+- Create a GitHub issue before beginning each independently owned unit of work.
 - Use one parent evaluation issue plus linked child issues for research workstreams, spikes, integration, fact checking, and final decision synthesis.
 - Every issue must contain scope, non-goals, owner, expected artifact paths, acceptance criteria, dependencies, privacy/security considerations, and the closing PR.
 - PR 1 may use `Closes #...` because it targets the default branch.
@@ -164,24 +152,26 @@ Repository/platform-required files may remain outside `docs\` when their standar
 
 ### Parallel worktree sessions
 
-- Use isolated worktree-backed project sessions for independent Squad issues whenever the work can proceed safely in parallel.
+- Use isolated worktree-backed project sessions for independent issues whenever the work can proceed safely in parallel.
 - Start each sub-agent from the current integration base, never from another agent's unmerged work unless the dependency is explicit.
 - Snapshot the coordinator's actual model, reasoning effort, context tier, mode, and agent setting immediately before spawning worktree sessions, and pass those settings explicitly where the session API supports them. The current expected model is `gpt-5.6-sol`, but the execution-time snapshot is authoritative.
 - Do not substitute a different model or supported parameter silently. Any required deviation must be presented to and approved by Cyrus before the affected session starts.
-- Give each agent a complete prompt with its issue, TEAM ROOT, output ownership, dependency inputs, privacy/security constraints, and decision-recording path.
+- Give each contributor a complete assignment with its issue, repository/worktree path, output ownership, dependency inputs, privacy/security constraints, and decision-recording path.
 - Before spawning, approve `docs\planning\work-ownership.md` with the issue dependency DAG, exclusive author path ownership, reviewers/verifiers/approver, merge order, and RACI. Agents may review shared concerns but only the named author edits an artifact.
-- Shared decisions go through `.squad\decisions\inbox\` and are consolidated by Scribe. Promote accepted decisions into indexed ADRs or another canonical `docs\` artifact.
+- Record decision proposals in indexed ADRs or another canonical `docs\` artifact.
+  Record only explicitly approved outcomes in `docs\decisions\approvals.md`;
+  a recorder cannot approve a proposal on the approver's behalf.
 - Run independent workstreams in parallel, but keep architecture synthesis and final recommendations behind their declared dependencies.
 
 ### PR readiness, approvals, integration, and cleanup
 
 - After PR 1 merges, fetch updated `origin/main`.
-- Create the named evaluation integration branch `squad/{parent-issue}-website-platform-evaluation` from updated `origin/main` and verify the PR 1 merge SHA is an ancestor before spawning children.
+- Create a short-lived evaluation integration branch from updated `origin/main` and verify the PR 1 merge SHA is an ancestor before starting child workstreams.
 - Start child issue branches/worktree sessions from that integration branch and target child PRs back to it.
 - Use Agent Merge for readiness of any eligible child or top-level PR when available, including review comments, required checks, and conflicts.
 - Agent Merge may prepare a PR but must never merge it directly; the app or authorized human performs the merge.
 - Agent Merge follows only its run's authorized actions, treats required checks as gates, does not poll or remediate optional checks unless explicitly requested, and cannot bypass recorded approvals.
-- PR 2 is the second top-level delivery from `squad/{parent-issue}-website-platform-evaluation` to `main`.
+- PR 2 is the second top-level delivery from the evaluation integration branch to `main`.
 - Keep each top-level PR in draft state and disable merge automation until Cyrus records approval for the exact reviewed head SHA in `docs\decisions\approvals.md`. Any new commit invalidates that approval and requires re-review/re-approval.
 - After SHA-bound approval, repository automation may merge when required reviews/checks and branch protections are satisfied.
 - After a child PR is merged and its result is incorporated, archive the corresponding project session so its worktree is removed. Remove merged remote branches when safe.
@@ -191,70 +181,26 @@ Repository/platform-required files may remain outside `docs\` when their standar
 
 - Pull requests run required validation and may create ephemeral preview environments, but never deploy production.
 - A merge to protected `main` is the only source event for production CI/CD. There is no persistent `dev`, staging branch, or branch-based promotion chain.
-- Use protected GitHub environments, least-privilege OIDC, path filters, and explicit deployment gates so documentation/Squad-only changes do not invoke website deployment before an application exists.
+- Use protected GitHub environments, least-privilege OIDC, path filters, and explicit deployment gates so documentation-only changes do not invoke website deployment before an application exists.
 - Keep environment-specific configuration and secrets outside source control; deploy the same immutable build artifact through required checks rather than rebuilding from a different branch.
 - Record deployment SHA, artifact digest, configuration version, migrations, health checks, and rollback target for every production release.
 - Require post-deploy smoke/health checks and automatic or operator-approved rollback to the last known-good `main` artifact when release criteria fail.
 - Use tags/releases for durable production history where useful, but tags do not replace `main` as the deployment source.
 
-## PR 1: Initialize the Star Trek Squad
+## PR 1: Project governance baseline
 
-### Changes
+The baseline consists of the documentation index and evaluation plan, provisional
+operating principles, project-local domain skills, contribution policy, license
+scope, provenance inventory, third-party notices, and trademark guidance. Keep
+these useful project artifacts; no framework installation, casting registry,
+agent charter, history backend, MCP server, or framework-specific workflow is
+required.
 
-- Create a GitHub tracking issue for the Squad bootstrap before modifying the generated files.
-- Complete the currently generated but empty Squad roster and routing configuration.
-- Replace placeholder project context with Jamula, Inc., Jamula.com/Jamula.net, the website mission, and Cyrus Jamula as project owner.
-- Add project-specific charters and initial histories for the seven cast agents.
-- Add and wire the project-local skills from the capability audit, keeping each skill focused and avoiding duplicated instructions across charters.
-- Add the approved Jamula operating-principles skill, internal principles document, and public-values draft workflow.
-- Add the reviewed, commit-pinned Microsoft `Cloud Solution Architect` skill and all referenced files with intact MIT attribution.
-- Initialize casting registry/history for the approved persistent Star Trek names.
-- Keep the four built-in roles intact: Scribe, Ralph, Rai, and Fact Checker.
-- Configure routing for product/architecture, experience/design, content/multimedia/social, full-stack/platform, identity/data/AI, quality/reliability, and legal/regulatory/corporate work.
-- Preserve append-only merge rules and the applicable Squad GitHub workflows.
-- Harden workflow supply-chain behavior: least-privilege permissions, immutable action pins, no long-lived cloud credentials, and explicit review of write-capable automation.
-- Preserve the upstream MIT license and copyright notice for generated Squad CLI/template material rather than implicitly relicensing those files under Jamula's Apache-2.0 license. Record the installed package version and source in a standard third-party notice.
-- Review generated files before staging:
-  - exclude machine-local paths and settings;
-  - exclude example-only MCP configuration that is not required;
-  - retain only portable configuration needed by contributors and automation;
-  - scan staged content for secrets, credentials, email addresses, and local-only identifiers.
-- Correct the project name currently inherited from the generated worktree name.
-- Add `docs\README.md` and the approved plan at `docs\planning\evaluation-plan.md` without adding evaluation conclusions to PR 1.
-- Before adding mixed content, add root `LICENSE_SCOPE.md`, `TRADEMARKS.md`, `CONTRIBUTING.md`, and `THIRD_PARTY_NOTICES.md`; add `docs\legal\license-inventory.md` with path-level licensing/provenance and reserved-content markers.
-- Record each redistributed third-party source path, upstream repository, exact revision/version, license/copyright text, local modifications, and destination path; validate required notices in CI.
-- Add a Star Trek non-affiliation/trademark statement, avoid logos/quotes/likenesses/public marketing use, and require Sarek plus qualified counsel review before merge.
-- Use canonical Squad paths: `.squad\team.md`, `.squad\routing.md`, `.squad\ceremonies.md`, `.squad\casting\`, and `.squad\agents\{name}\charter.md`. Initialize history through the configured two-layer state backend rather than committing ignored `.squad\agents\*\history.md` files to `main`.
-- Store project-local skills at `.github\skills\{skill}\SKILL.md`; store the pinned Microsoft skill at `.github\skills\cloud-solution-architect\` with all references; use `THIRD_PARTY_NOTICES.md` as the canonical attribution file.
-
-### Delivery and branch model
-
-- Fetch `origin` and safely synchronize the verified dedicated PR 1 branch with `origin/main` before making edits.
-- Reuse the current branch only if every existing commit is verified in scope, it has no unrelated upstream/open PR, and its base is updated safely. Otherwise create a fresh dedicated branch from `origin/main` and restore only the verified bootstrap work.
-- Commit the sanitized Squad bootstrap on the verified dedicated branch.
-- Open PR 1 against `main`.
-- Pause for Cyrus to review and merge PR 1.
-- After merge, start the evaluation integration branch from updated `main`.
-
-### PR 1 acceptance criteria
-
-- The complete eleven-member roster is present under the exact `## Members` heading required by Squad workflows.
-- Routing names and labels match the approved roster.
-- Every cast agent has a project-specific charter and initial context.
-- Every cast agent references the project-local skills required for its domain, and every planned evaluation workstream has an accountable agent with the necessary guidance.
-- Installed external skills, if any, have documented source, version/ref, license, trust review, and reason for inclusion.
-- The Microsoft Cloud Solution Architect skill resolves every relative reference locally and is pinned to the reviewed upstream commit rather than a floating branch.
-- Every cast charter references the Jamula operating principles, and issue/ADR templates capture the required customer, trust, environmental/social, cost, dissent, owner, and outcome fields.
-- No committed file contains an absolute user-machine path, live credential, or private workplace detail.
-- Workflow YAML is syntactically valid and references files that exist.
-- Workflows use minimal permissions, pinned actions, and no new long-lived cloud secret.
-- Repository workflows enforce the main-only model: PR validation/previews, production deployment only from protected `main`, and path filters preventing documentation-only deployment.
-- Upstream Squad material has complete MIT attribution and remains clearly distinguishable from Jamula-authored Apache-2.0 code.
-- The bootstrap issue is linked and closed by the PR.
-- `docs\README.md` indexes the approved plan and explains where future project documents belong.
-- The PR contains only Squad bootstrap/governance changes plus the approved plan, documentation index, and operating-principles drafts.
-- The path-level license inventory, Apache scope, reserved-content markers, contribution policy, complete third-party notices, trademark/non-affiliation notice, and professional-review disposition are present before mixed content is merged.
-- Operating-principles documents and charter references are clearly marked provisional until a separate exact-version approval is recorded.
+Preserve source/revision/license attribution for redistributed guidance. Keep
+workflow permissions minimal, actions pinned, secrets out of source, and
+production deployments restricted to protected `main`. Mixed content requires
+the license inventory and appropriate professional review. Provisional wording
+and exact PR-head approval remain separate gates.
 
 ## PR 2: Website decision package
 
@@ -468,7 +414,7 @@ Separate decisions for registrar, authoritative DNS, canonical domain/redirects,
 - Draft legal-page outlines from reputable templates, clearly label them as not legal advice, and require legal review before launch.
 - Require rights/provenance records for photographs, illustrations, music, fonts, video, testimonials, customer logos, case studies, screenshots, syndicated social content, and AI-assisted media.
 - Require captions/transcripts, alt text, accessible players, consent/model releases where applicable, platform disclosure rules, moderation/escalation, and a correction/takedown process.
-- Maintain `docs\content\public-claims-register.md`; Uhura authors, Fact Checker verifies evidence, Sarek reviews regulatory exposure, Rai reviews social/RAI impact, and Cyrus approves publication.
+- Maintain `docs\content\public-claims-register.md`; Content lead authors, Fact Checker verifies evidence, Legal researcher reviews regulatory exposure, Responsible AI reviewer reviews social/RAI impact, and Cyrus approves publication.
 
 ### Phase 4 payment guardrails
 
@@ -479,11 +425,11 @@ Separate decisions for registrar, authoritative DNS, canonical domain/redirects,
 - Keep payment identity and authorization tenant-aware; do not expose one customer's invoices, subscriptions, or receipts to another customer.
 - Define system-of-record boundaries among the payment processor, CRM, accounting system, bank, and Jamula portal. Avoid making the website the financial ledger.
 - Document processor fees, fixed/percentage charges, international/FX costs, ACH fees, dispute/refund fees, payout delays, reserve/hold risk, tax tooling, and subscription-revenue costs in the growth model.
-- Route sales-tax, business-and-occupation tax, revenue recognition, invoicing, automatic-renewal, refund/cancellation, sanctions/KYC, and accounting-treatment questions to Sarek for issue spotting and then to licensed counsel/CPA as applicable.
+- Route sales-tax, business-and-occupation tax, revenue recognition, invoicing, automatic-renewal, refund/cancellation, sanctions/KYC, and accounting-treatment questions to Legal researcher for issue spotting and then to licensed counsel/CPA as applicable.
 - Add clickwrap/contract-assent evidence, pricing/renewal disclosures, channel-specific payment/communication rules, tax registration/nexus questions, and phase-specific cyber/E&O/payment insurance review.
 - Treat the Stripe MCP result from Agent Finder only as a future operational integration candidate. Do not install or connect it until Stripe is selected, provenance/permissions are reviewed, test mode is enforced, and the user explicitly approves connection.
 
-Sarek will maintain a dated issue-spotting checklist covering at least:
+Legal researcher will maintain a dated issue-spotting checklist covering at least:
 
 - Washington entity registration and annual-report status, Department of Revenue/business licensing, registered-agent obligations, and applicable City of Kirkland/King County licensing or home-business requirements.
 - Federal entity/EIN and reporting obligations, with current FinCEN/Corporate Transparency Act status verified rather than assumed.
@@ -502,7 +448,7 @@ Sarek will maintain a dated issue-spotting checklist covering at least:
 
 Every checklist item will contain the current official source, effective/verification date, applicability assumptions, owner, required evidence, and a disposition of `applicable`, `not applicable`, `needs counsel`, `needs CPA`, or `needs user decision`.
 
-Every required professional review is recorded in `docs\legal\professional-review-register.md` with reviewer identity/qualification, jurisdiction, scope, artifact version, conditions, expiry, re-review triggers, and disposition. An AI/Squad review never satisfies a licensed-professional gate.
+Every required professional review is recorded in `docs\legal\professional-review-register.md` with reviewer identity/qualification, jurisdiction, scope, artifact version, conditions, expiry, re-review triggers, and disposition. An AI review never satisfies a licensed-professional gate.
 
 ### 9. Repository license and intellectual-property policy
 
@@ -512,10 +458,9 @@ Every required professional review is recorded in `docs\legal\professional-revie
 - Add the appropriate repository notices, directory-level proprietary markers, and trademark guidance before brand/content assets are introduced.
 - Create the initial path-level license inventory in PR 1 before mixed content is merged, then maintain it throughout PR 2. Map Jamula-authored Apache-2.0 paths, upstream MIT/vendor paths and complete notices, reserved-content paths, trademarks, provenance, modifications, and unknown items requiring review.
 - Preserve rights already granted under prior commits; license-scope changes govern future contributions/content and must not claim to revoke permissions already granted.
-- Preserve all third-party licenses and generate/maintain dependency and asset attribution where required. The currently generated Squad CLI/template material reports MIT licensing and therefore requires its upstream copyright/license notice even though the repository's Jamula-authored code is Apache-2.0.
+- Preserve all third-party licenses and generate/maintain dependency and asset attribution where required. Historical attribution remains in `THIRD_PARTY_NOTICES.md`; it does not require reinstalling removed tooling.
 - Treat the current Apache license as suitable for code but incomplete for a mixed code/content business website until the scope and trademark notices are added.
 - Require legal review of the final license-scope wording; this plan is an engineering recommendation, not legal advice.
-- Treat Star Trek names as referential internal theming only, include a non-affiliation/trademark notice, avoid logos/quotes/likenesses/public marketing use, and require documented counsel clearance before PR 1 merge.
 
 ### 10. Evaluation workstreams and proposed ownership
 
@@ -523,25 +468,25 @@ The following ownership is proposed and must be approved by Cyrus before issues 
 
 | Owner | Evaluation issue |
 |---|---|
-| Jean-Luc Picard | Business requirements, decision criteria, cost-model integration, ADR synthesis, and final recommendation |
-| Jadzia Dax | Brand system, information architecture, sophisticated UX/interaction design, accessibility, SEO, design quality, and visual acceptance criteria |
-| Nyota Uhura | Editorial/content strategy, site copy, founder/case-study drafts, multimedia pipeline, social-channel plan, publishing governance, and content analytics |
-| Geordi La Forge | Custom frameworks, Wix/WordPress/turn-key platforms, hosting, DNS/CDN/email, CI/CD, observability, performance, portability, and email-deliverability spike |
-| Seven of Nine | Global privacy/data lifecycle, Phase 2 CRM data, Phase 3 identity/RBAC/customer portal/OneDrive/Google Drive/Box/customer-AI spikes, and Phase 4 payment data boundaries |
-| Miles O'Brien | Independent threat model, security architecture, reliability/SLOs, supply-chain controls, and acceptance-test strategy |
-| Sarek | Washington and federal legal/regulatory research, business compliance checklist, contracts/privacy/legal-page requirements, IP/trademark/license scope, and professional-review questions |
+| Product lead | Business requirements, decision criteria, cost-model integration, ADR synthesis, and final recommendation |
+| Experience lead | Brand system, information architecture, sophisticated UX/interaction design, accessibility, SEO, design quality, and visual acceptance criteria |
+| Content lead | Editorial/content strategy, site copy, founder/case-study drafts, multimedia pipeline, social-channel plan, publishing governance, and content analytics |
+| Platform engineer | Custom frameworks, Wix/WordPress/turn-key platforms, hosting, DNS/CDN/email, CI/CD, observability, performance, portability, and email-deliverability spike |
+| Identity/data engineer | Global privacy/data lifecycle, Phase 2 CRM data, Phase 3 identity/RBAC/customer portal/OneDrive/Google Drive/Box/customer-AI spikes, and Phase 4 payment data boundaries |
+| Quality/reliability engineer | Independent threat model, security architecture, reliability/SLOs, supply-chain controls, and acceptance-test strategy |
+| Legal researcher | Washington and federal legal/regulatory research, business compliance checklist, contracts/privacy/legal-page requirements, IP/trademark/license scope, and professional-review questions |
 | Fact Checker | Cross-workstream citation, pricing, licensing, security-claim, and contradiction verification |
-| Scribe | Decision consolidation and cross-agent context |
-| Ralph | Issue/dependency monitoring and stalled-work detection |
-| Rai | Privacy, responsible-AI, content-safety, and credential review |
+| Decision recorder | Decision consolidation and cross-agent context |
+| Work monitor | Issue/dependency monitoring and stalled-work detection |
+| Responsible AI reviewer | Privacy, responsible-AI, content-safety, and credential review |
 
-### 11. Roadmap and Squad-ready backlog
+### 11. Roadmap and implementation-ready backlog
 
 - Produce a phased roadmap with dependencies, decision gates, and measurable exit criteria rather than date estimates.
 - Produce `docs\roadmap\phase-gates.md` with prerequisites, minimum launch scope, measurable exit thresholds, preview/partial/GA states, permitted deferrals, disclosure requirements, approval authority, and blocked downstream work for every phase.
 - Track evaluation and implementation work in GitHub issues so ownership, dependencies, decisions, and completion survive session cleanup.
 - Draft implementation epics/issues as repository documents with acceptance criteria, security/accessibility requirements, and dependencies; do not create GitHub implementation issues during PR 2.
-- Propose an owner from the approved Star Trek roster for every epic.
+- Propose a responsible functional role and an explicitly approved issue owner for every epic.
 - Present the complete implementation ownership matrix to Cyrus for approval before creating implementation issues or assigning implementation work.
 - Do not begin website implementation until Cyrus approves the recommendation and assignment matrix.
 
@@ -586,15 +531,15 @@ Retain sanitized reproducibility records with procedure/commands, configuration 
 
 1. Approve this execution plan.
 2. Approve the proposed evaluation issue DAG, RACI, path ownership, and merge order.
-3. Approve PR 1's exact head SHA, license scope, third-party notices, Star Trek non-affiliation/trademark disposition, and provisional principles state; repository automation may merge only after this record exists.
-4. Approve the exact operating-principles wording before it becomes authoritative for Squad work.
+3. Approve PR 1's exact head SHA, license scope, third-party notices, trademark disposition, and provisional principles state; repository automation may merge only after this record exists.
+4. Approve the exact operating-principles wording before it becomes authoritative for project work.
 5. Approve the vendor scoring rubric, numeric reference workloads, evidence penalties, risk ceiling, connector-spike accounts/tenants/consent authority, and spending limits.
 6. Review the researched shortlist, spike/blocked packets, global privacy/security baseline, phase gates, and preliminary cost model before ADRs are finalized.
 7. Approve founder-profile, public-values/claims, and legal-template wording.
-8. Review Sarek's global, Washington, federal, and Kirkland compliance checklist and decide which items require counsel, CPA, broker, or other professional engagement.
+8. Review Legal researcher's global, Washington, federal, and Kirkland compliance checklist and decide which items require counsel, CPA, broker, or other professional engagement.
 9. Approve the maintained repository license inventory, scope, trademark policy, content rights, and professional-review dispositions.
 10. Approve the final stack and ADRs.
-11. Approve the implementation Squad ownership matrix and draft backlog before implementation issues are created.
+11. Approve the implementation ownership matrix and draft backlog before implementation issues are created.
 12. Approve PR 2's exact head SHA and all conditions; repository automation may merge to `main` only after this record exists.
 
 Every gate records prerequisites, accountable approver, exact artifact version/hash and PR head SHA, acceptance criteria, allowed outcomes (`approved`, `approved with conditions`, `rejected`, `needs rework`, `pending professional review`), conditions/expiry, and downstream work blocked until resolution.

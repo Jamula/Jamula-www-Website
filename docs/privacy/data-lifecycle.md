@@ -1,7 +1,7 @@
 # Customer-platform data lifecycle
 
 **Decision context:** Refs #3; child #6
-**Owner:** Seven of Nine
+**Owner:** Identity/data engineer
 **Status:** design requirement, not executed evidence or legal advice
 **Updated:** 2026-08-25 Cycle 3; legal applicability remains professionally unresolved
 
@@ -145,4 +145,4 @@ Only an approved legal owner can open a scoped hold with matter ID, data/subject
 
 ## Approval dependencies
 
-Cyrus approves product purposes, served/targeted markets and vendors; Sarek and qualified professionals decide jurisdiction/legal conclusions. GDPR and UK applicability remain pending counsel while Jamula's voluntary internal controls remain required. Miles approves threat, incident, backup and test evidence; Rai reviews AI impact; Fact Checker revalidates sources and claims. No live customer data or connector/payment/AI activation is authorized by this design.
+Cyrus approves product purposes, served/targeted markets and vendors; Legal researcher and qualified professionals decide jurisdiction/legal conclusions. GDPR and UK applicability remain pending counsel while Jamula's voluntary internal controls remain required. Quality/reliability engineer approves threat, incident, backup and test evidence; Responsible AI reviewer reviews AI impact; Fact Checker revalidates sources and claims. No live customer data or connector/payment/AI activation is authorized by this design.

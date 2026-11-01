@@ -1,8 +1,8 @@
 # Accessibility, SEO, and performance gates
 
 **Work context:** Refs #3; child #5
-**Owner:** Jadzia Dax, Experience & Design Lead
-**Required reviewers:** Miles O'Brien, Nyota Uhura, Fact Checker
+**Owner:** Experience lead, Experience & Design Lead
+**Required reviewers:** Quality/reliability engineer, Content lead, Fact Checker
 **Status:** Evaluation baseline and future-test specification; no completed audit or conformance claim
 **Source verification date:** 2026-08-24
 

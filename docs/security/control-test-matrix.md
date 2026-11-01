@@ -4,7 +4,7 @@
 
 **Context:** Refs #3; child #7
 
-**Revision owner:** Geordi La Forge, Platform Engineering (independent N-08 token-custody remediation; prior authors locked out)
+**Revision owner:** Platform engineer, Platform Engineering (independent N-08 token-custody remediation; prior authors locked out)
 
 **Required review:** Identity/Data/AI, Platform, Fact Checker; Cyrus approves exceptions and phase gates
 
@@ -85,7 +85,7 @@ Broad ASVS chapter references must be expanded into a complete applicability wor
 
 | Gate | Required evidence before release |
 |---|---|
-| Phase 1 public launch | SEC-01/02/03/17-22/24/25 passing against immutable RC; canonical Dax performance table passes; DNS/domain/email controls reviewed; P1 funded owner/alternate/hours, incident and restore exercises; no open Critical/High |
+| Phase 1 public launch | SEC-01/02/03/17-22/24/25 passing against immutable RC; canonical Experience lead performance table passes; DNS/domain/email controls reviewed; P1 funded owner/alternate/hours, incident and restore exercises; no open Critical/High |
 | Phase 2 CRM/scheduling | Phase 1 remains passing; SEC-04-06/17/18/22/24 for workforce/vendor flows; P2 funded owner/alternate/weekend checks; processor access/export/rollback and accessible fallback verified |
 | Phase 3 preview | SEC-04-20 including SEC-15A, SEC-22/24 passing for identity/portal and every exposed connector; versioned AI card and compensated participation pass; cross-tenant/AI canaries have zero unexpected allows/leaks; funded 24x7 coverage proven; unavailable provider disclosed with blocked packet |
 | Phase 3 GA | OneDrive, Google Drive and Box each pass the same gate; revocation/deletion and restore exercises; funded P3 coverage remains proven; approved production evidence period and SLO review |

@@ -1,7 +1,7 @@
 # Phase 4 hosted payments evaluation
 
 **Decision context:** Refs #3; child #6
-**Independent correction revision owner:** Geordi La Forge; Seven of Nine, Miles O'Brien, Sarek and Nyota Uhura are locked out from this rejected revision
+**Independent correction revision owner:** Platform engineer; Identity/data engineer, Quality/reliability engineer, Legal researcher and Content lead are locked out from this rejected revision
 **Status:** independently remediated documented research and processor-neutral architecture only; this revision is not approval, a vendor decision, professional advice, or new evidence, and no account, processor, MCP, credential, checkout, invoice, webhook, payment or charge was created
 **Source register last verified:** 2026-08-24; remediation revised 2026-08-25 without re-verifying or adding evidence
 
@@ -9,7 +9,7 @@
 
 Preserve a processor-neutral facade and require a **full-page provider-hosted redirect** for consulting invoices, deposits/milestones and recurring retainers. The retained **unranked documentation candidate set** is Stripe, Square, PayPal and accounting-system hosted invoice flows. The currently captured official material differs in depth, so it cannot support a comparative conclusion. No provider is preferred or chosen; every retained candidate must pass the same gates below before any future decision. Braintree is an unverified research lead outside that set, not a retained candidate.
 
-This is not a vendor approval. Cyrus has not approved a processor, terms, spend or live test mode. Sarek and qualified counsel/CPA review PCI, tax/nexus/B&O, revenue recognition, invoice requirements, recurring assent/renewal, cancellation/refund, sanctions/KYC, insurance and records. The acquirer/payment brands or a QSA confirm the applicable PCI SAQ.
+This is not a vendor approval. Cyrus has not approved a processor, terms, spend or live test mode. Legal researcher and qualified counsel/CPA review PCI, tax/nexus/B&O, revenue recognition, invoice requirements, recurring assent/renewal, cancellation/refund, sanctions/KYC, insurance and records. The acquirer/payment brands or a QSA confirm the applicable PCI SAQ.
 
 ## Non-negotiable design
 
@@ -81,7 +81,7 @@ The sole numerical workload authority is [`RWL-2026-08-25.3`, Phase 4 hosted-pay
 
 Accounting seats and licenses are **not workload dimensions or demand assumptions**. For every retained candidate, capture the exact accounting product, edition, seat type/count, integration/add-on license, contract term, region/currency, tax treatment, quote date and written quote or checkout evidence as separate unapproved quote inputs. The candidate packet owner must update those inputs whenever product, contract, region, seat need or quote changes; an absent input remains unpriced and blocks cost comparison.
 
-For each retained candidate's provider packet, Geordi calculates:
+For each retained candidate's provider packet, Platform engineer calculates:
 
 `monthly processor cost = Σ(method percentage × method volume) + Σ(method fixed fee × transaction count) + billing/invoice/platform fees + FX/international + disputes/refunds + payout + tax/accounting integration`
 
@@ -149,9 +149,9 @@ Keep internal tenant/customer/invoice/contract IDs independent of provider IDs. 
 ## Gates and next actions
 
 1. Cyrus may approve the exact workload dictionary `RWL-2026-08-25.3`, flows, any future processor decision, accounting authority, spend/test accounts and exact live-spike prerequisites only after the symmetric gates are satisfied; none is approved here.
-2. Geordi produces date-stamped cost ranges and adapter/hosting effort using the formula above.
-3. Miles threat-models and witnesses the future tests.
-4. Sarek plus counsel/CPA/QSA/acquirer determine contracts, PCI SAQ, taxes/B&O/nexus, accounting/revenue recognition, KYC/sanctions, auto-renewal, cancellation/refund, records and insurance.
-5. Rai reviews fairness, accessibility, harmful/dark-pattern and customer-support impacts.
+2. Platform engineer produces date-stamped cost ranges and adapter/hosting effort using the formula above.
+3. Quality/reliability engineer threat-models and witnesses the future tests.
+4. Legal researcher plus counsel/CPA/QSA/acquirer determine contracts, PCI SAQ, taxes/B&O/nexus, accounting/revenue recognition, KYC/sanctions, auto-renewal, cancellation/refund, records and insurance.
+5. Responsible AI reviewer reviews fairness, accessibility, harmful/dark-pattern and customer-support impacts.
 6. Fact Checker revalidates fees, product status, terms, payout/reserve/dispute and official sources.
 7. Only after approval, create a separate remediation/spike issue with test-mode resources and teardown. This document authorizes none.

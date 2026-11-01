@@ -1,12 +1,12 @@
 # Customer platform options
 
 **Decision context:** Refs #3; child #6
-**Owner:** Seven of Nine
-**Independent correction revision owner:** Geordi La Forge; Seven of Nine, Miles O'Brien, Sarek and Nyota Uhura are locked out from this rejected revision
+**Owner:** Identity/data engineer
+**Independent correction revision owner:** Platform engineer; Identity/data engineer, Quality/reliability engineer, Legal researcher and Content lead are locked out from this rejected revision
 **Updated:** 2026-08-25 Cycle 3; claim-specific source dates remain in the source register
 **Evidence class:** documented research only. No tenant, account, license, connector, identity provider, model, or payment processor was configured.
 
-## Recommendation for Picard synthesis
+## Recommendation for Product lead synthesis
 
 Use replaceable phase boundaries rather than one suite:
 
@@ -124,9 +124,9 @@ Microsoft states that prompts/completions/embeddings for models sold by Azure ar
 ## Decision gates and actions
 
 1. **Cyrus:** approve exact workload dictionary `RWL-2026-08-25.3`, any later CRM/scheduling selection, identity direction, allowed regions, and a zero-live-action evaluation posture.
-2. **Geordi:** use only R0/L1/A1/G1 from `RWL-2026-08-25.3` and calculate customer-platform full-roadmap reserves separately from public-site TCO after dated checkout evidence; include labor, coverage, verification, messaging, storage, egress, AI and payment sensitivity.
-3. **Miles:** threat-model and later test identity, IDOR, connector, webhook, AI and payment boundaries.
-4. **Sarek / qualified professionals:** review privacy bases, DPAs/transfers, records/retention, AI disclosures, PCI validation, tax/accounting, auto-renewal, refunds and contract assent.
-5. **Rai:** review customer-AI purpose, transparency, harmful-content handling, human escalation, accessibility and disproportionate impact.
+2. **Platform engineer:** use only R0/L1/A1/G1 from `RWL-2026-08-25.3` and calculate customer-platform full-roadmap reserves separately from public-site TCO after dated checkout evidence; include labor, coverage, verification, messaging, storage, egress, AI and payment sensitivity.
+3. **Quality/reliability engineer:** threat-model and later test identity, IDOR, connector, webhook, AI and payment boundaries.
+4. **Legal researcher / qualified professionals:** review privacy bases, DPAs/transfers, records/retention, AI disclosures, PCI validation, tax/accounting, auto-renewal, refunds and contract assent.
+5. **Responsible AI reviewer:** review customer-AI purpose, transparency, harmful-content handling, human escalation, accessibility and disproportionate impact.
 6. **Fact Checker:** re-open every dynamic or partially verified source immediately before ADR approval.
 7. Create provider-specific implementation/remediation issues only after #6 is incorporated; each must inherit the future tests in the connector packets. Do not claim availability before evidence passes.

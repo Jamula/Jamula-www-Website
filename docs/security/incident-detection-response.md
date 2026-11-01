@@ -4,7 +4,7 @@
 
 **Context:** Refs #3; child #7
 
-**Revision owner:** Seven of Nine, Identity, Data & AI Engineering (cycle 2 independent remediation; original author locked out)
+**Revision owner:** Identity/data engineer, Identity, Data & AI Engineering (cycle 2 independent remediation; original author locked out)
 
 **Required review:** Platform, Identity/Data/AI, Legal/Privacy, Communications, Fact Checker; Cyrus approves operational ownership
 
@@ -28,7 +28,7 @@ Named people, alternates and reachable channels must be approved before launch; 
 | Identity/Data/AI Lead | Sessions, membership, OAuth connectors, files, derivatives, AI and tenant scope | Revokes tokens/access; assesses data paths and deletion propagation |
 | Privacy/Legal Lead | Data/breach assessment, insurer/counsel/regulator/customer clock tracking | Qualified counsel decides legal notification obligations; engineering does not infer deadlines |
 | Communications Lead | Internal, customer, public and partner messages | Publishes only approved, evidence-scoped wording |
-| Scribe/Evidence Custodian | UTC timeline, decisions, hashes, custody and action register | Restricts evidence; never copies secrets/raw customer content into tickets |
+| Decision recorder/Evidence Custodian | UTC timeline, decisions, hashes, custody and action register | Restricts evidence; never copies secrets/raw customer content into tickets |
 | Executive Approver | Business decisions, risk, external statements and recovery priorities | Cyrus or documented alternate |
 
 At least two people must be able to assume IC and platform/identity containment roles. A responder must not approve their own break-glass access or evidence destruction.
@@ -45,7 +45,7 @@ This table is authoritative for human coverage and control cadence in the securi
 | **P4 payments** | P3 24x7 coverage with payment/accounting escalation and fraud/processor contact | P3 plus hosted-payment disable switch, webhook verification, amount/tenant invariant, duplicate/replay defense and daily processor/accounting/bank reconciliation | Payment and accounting primary/alternate; processor escalation; monthly mismatch/webhook exercise | **+12 h/month (52 cumulative):** daily payment/reconciliation exception review 5; weekly fraud/webhook review 4; monthly exercise/key/access review 3 |
 | **P5 public AI candidate** | At least P3 coverage; expand contracted capacity for public abuse/denial-of-wallet before exposure | P3 plus public-corpus isolation, abuse/moderation/rate/spend controls and public-AI kill switch | AI safety and customer-support primary/alternate; approved abuse-volume model | **+10 h/month (62 cumulative if P4 is also live):** evaluation/abuse review 6; feedback/correction review 2; monthly kill-switch/model drill 2 |
 
-Active-labor estimates are planning floors, not quotes and not standby coverage-hours. They exclude actual incident response, remediation, major upgrades, annual professional review and vendor fees. Geordi must cost employee/contractor rates, on-call premium/SOC subscription and growth sensitivity. If named people cannot sustainably cover the hours, reduce the live phase/surface or contract coverage; do not convert exhaustion into risk acceptance.
+Active-labor estimates are planning floors, not quotes and not standby coverage-hours. They exclude actual incident response, remediation, major upgrades, annual professional review and vendor fees. Platform engineer must cost employee/contractor rates, on-call premium/SOC subscription and growth sensitivity. If named people cannot sustainably cover the hours, reduce the live phase/surface or contract coverage; do not convert exhaustion into risk acceptance.
 
 Each launch record names primary, alternate, coverage time zone/calendar, reachable paging paths, access level, maximum handoff delay, contracted SLA if used, monthly funded hours, last exercise and executive owner. A phase cannot advertise or contract to a response objective faster/broader than this evidence.
 
@@ -121,7 +121,7 @@ Every detection has a runbook link, query/config version, mapped threat/control,
 
 **Resolution:** Include incident window, affected scope, customer action, remediation and monitoring; separate confirmed facts from estimates. Privacy/Legal approves breach/privacy language. If an earlier statement becomes wrong, correct it promptly and preserve both versions.
 
-No document here states a universal breach-notification deadline. Jurisdiction, contracts, insurer terms and facts vary; Sarek/qualified counsel must maintain and invoke the applicable clock register.
+No document here states a universal breach-notification deadline. Jurisdiction, contracts, insurer terms and facts vary; Legal researcher/qualified counsel must maintain and invoke the applicable clock register.
 
 ## Exercises and measurable gates
 

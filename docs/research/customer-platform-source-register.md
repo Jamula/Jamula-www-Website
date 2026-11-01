@@ -1,7 +1,7 @@
 # Customer platform source register
 
 **Decision context:** Refs #3; child #6
-**Owner:** Seven of Nine
+**Owner:** Identity/data engineer
 **Verification date:** 2026-08-25 for Cycle 3 changes; each row retains its claim-specific access date
 **Rule:** “Verified” means the cited official page directly supported the narrow recorded claim when accessed. It does not approve a vendor, prove production behavior, or replace contract/professional review. Dynamic pricing must be rechecked at procurement and ADR approval.
 

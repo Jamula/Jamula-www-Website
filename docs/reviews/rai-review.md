@@ -1,6 +1,6 @@
 # Responsible AI and content-safety pre-ship review
 
-**Reviewer:** Rai, Responsible AI & Social Impact Reviewer
+**Reviewer:** Responsible AI reviewer, Responsible AI & Social Impact Reviewer
 
 **Review date:** 2026-08-25
 
@@ -14,7 +14,7 @@
 
 **Finding count:** 4 — 1 Critical, 2 High, 1 Medium.
 
-The package would place unapproved founder personal/workplace-source metadata into a repository the architecture identifies as public. A `do not publish` label does not prevent repository publication. The rejected artifacts are locked: their original authors must not revise them. Independent revision owners are assigned below, and Rai must re-review the resulting exact diff before the package is presented or shipped.
+The package would place unapproved founder personal/workplace-source metadata into a repository the architecture identifies as public. A `do not publish` label does not prevent repository publication. The rejected artifacts are locked: their original authors must not revise them. Independent revision owners are assigned below, and Responsible AI reviewer must re-review the resulting exact diff before the package is presented or shipped.
 
 ## Findings
 
@@ -39,7 +39,7 @@ The package would place unapproved founder personal/workplace-source metadata in
 
 **HOW:** Replace public-repository copies with non-identifying placeholders. Keep the private-source register, source-existence metadata, employer cross-match, and unapproved URLs in an access-controlled register outside the public repository. Add only Cyrus-selected exact facts/links after explicit recorded approval, minimization, expiry/correction controls, and required privacy/employer/trademark/professional review.
 
-**Strict-lockout revision owner:** **Sarek**, not original author Nyota Uhura. Picard may integrate only after Sarek's independent revision, Fact Checker verification, Cyrus's exact-wording approval, and Rai re-review.
+**Strict-lockout revision owner:** **Legal researcher**, not original author Content lead. Product lead may integrate only after Legal researcher's independent revision, Fact Checker verification, Cyrus's exact-wording approval, and Responsible AI reviewer re-review.
 
 ### RAI-02 — Editorial rejection routing conflicts with strict reviewer lockout
 
@@ -52,7 +52,7 @@ The package would place unapproved founder personal/workplace-source metadata in
 **Exact evidence**
 
 - `docs/content/editorial-workflow.md:25` says, “Any failed gate returns to the author.”
-- `docs/content/editorial-workflow.md:64-75` assigns independent review authority, including Rai for fairness, harmful framing, responsible AI, and content safety.
+- `docs/content/editorial-workflow.md:64-75` assigns independent review authority, including Responsible AI reviewer for fairness, harmful framing, responsible AI, and content safety.
 
 **WHAT:** The workflow routes every failed gate back to the original author, including a rejecting Responsible AI/content-safety review.
 
@@ -60,7 +60,7 @@ The package would place unapproved founder personal/workplace-source metadata in
 
 **HOW:** Distinguish ordinary editorial revision from formal rejection. A Red/rejecting reviewer decision must lock the original author out, record the rejection and exact diff, assign a different qualified revision owner, preserve reviewer independence, and require re-review before Cyrus approval. Do not let schedule, quota, or author ownership override the lock.
 
-**Strict-lockout revision owner:** **Dax**, not original author Nyota Uhura. Rai re-reviews the exact corrected workflow.
+**Strict-lockout revision owner:** **Experience lead**, not original author Content lead. Responsible AI reviewer re-reviews the exact corrected workflow.
 
 ### RAI-03 — Public-AI release gates omit explicit rights, transparency, fairness, and participation evidence
 
@@ -79,9 +79,9 @@ The package would place unapproved founder personal/workplace-source metadata in
 
 **WHY:** Isolation and abuse testing are necessary but do not establish that a public AI experience is fair, understandable, rights-safe, accessible, or socially acceptable. A reviewer name in a gate is not a substitute for defined evidence and acceptance thresholds.
 
-**HOW:** Add hard, non-waivable public-AI evidence requirements: approved corpus manifest and rights/removal trail; conspicuous AI/limitations/data-use disclosure; harm taxonomy and red-team plan; predeclared quality, harmful-output, refusal, citation, locale, and accessibility thresholds; compensated participation by representative/affected users; accessible escalation, feedback, appeal, correction, and shutdown paths; model/change re-evaluation; documented Rai, Dax, Sarek, Miles, Fact Checker, and Cyrus dispositions. Do not infer sensitive traits merely to measure fairness; use consented, minimized evaluation methods.
+**HOW:** Add hard, non-waivable public-AI evidence requirements: approved corpus manifest and rights/removal trail; conspicuous AI/limitations/data-use disclosure; harm taxonomy and red-team plan; predeclared quality, harmful-output, refusal, citation, locale, and accessibility thresholds; compensated participation by representative/affected users; accessible escalation, feedback, appeal, correction, and shutdown paths; model/change re-evaluation; documented Responsible AI reviewer, Experience lead, Legal researcher, Quality/reliability engineer, Fact Checker, and Cyrus dispositions. Do not infer sensitive traits merely to measure fairness; use consented, minimized evaluation methods.
 
-**Strict-lockout revision owner:** **Miles O'Brien**, not original author Picard. Rai re-reviews the exact revised gates.
+**Strict-lockout revision owner:** **Quality/reliability engineer**, not original author Product lead. Responsible AI reviewer re-reviews the exact revised gates.
 
 ### RAI-04 — Customer-AI success criteria do not measure answer safety, equitable quality, or stakeholder outcomes
 
@@ -104,7 +104,7 @@ The package would place unapproved founder personal/workplace-source metadata in
 
 **HOW:** Before Phase 3 preview, define versioned evaluation cards and release thresholds for grounded correctness/citation entailment, unsupported assertions, harmful content, appropriate refusal, escalation, representative languages/source types, and accessibility. Require compensated participation by disabled and representative customer users, or a documented release blocker—not “when feasible.” Record subgroup/locale limitations without inferring or retaining sensitive attributes unnecessarily; monitor regressions and provide tenant-visible feedback/correction/escalation.
 
-**Strict-lockout revision owner:** **Seven of Nine**, not original author Miles O'Brien. Rai re-reviews the exact revised strategy.
+**Strict-lockout revision owner:** **Identity/data engineer**, not original author Quality/reliability engineer. Responsible AI reviewer re-reviews the exact revised strategy.
 
 ## Controls confirmed
 
@@ -114,12 +114,12 @@ These controls are present and must not be weakened during remediation:
 - **Public AI remains separate and optional.** `docs/roadmap/phase-gates.md:12` and `docs/security/control-test-matrix.md:78` require a separate public corpus, independent exclusion of customer/private corpora, no actions/egress, Phase 3 production evidence, and a separate approval.
 - **Blocked connector evidence remains blocked.** `docs/spikes/connectors/onedrive.md:1-12`, `google-drive.md:1-12`, and `box.md:1-12` accurately state that credentials/resources were prohibited and no live mechanism was run. Preview/GA remain blocked at `:57-58`.
 - **Unsupported public claims remain unapproved.** `docs/content/public-claims-register.md:7-8` marks the general positioning unverified and the Microsoft-preferred/multi-cloud wording blocked, with publication approval `No`. No customer outcome, Microsoft endorsement, accessibility-conformance, or environmental/sustainability achievement is approved.
-- **Professional gates remain pending.** `docs/legal/professional-review-register.md:7-16` consistently records pending professional review; this Rai review does not satisfy or replace any such gate.
+- **Professional gates remain pending.** `docs/legal/professional-review-register.md:7-16` consistently records pending professional review; this Responsible AI reviewer review does not satisfy or replace any such gate.
 - **Credential/secret scan:** No raw private key, API key, OAuth token, password, personal email address, or telephone number was observed in the reviewed Markdown. The founder metadata in RAI-01 is the identified personal/private-source exposure and must be removed before repository publication.
 
 ## Re-review condition
 
-Red remains in force until all four findings are independently revised under lockout, the public-repository founder material is minimized or moved to access-controlled storage, the exact diff passes Rai re-review, and Cyrus records the required approval. This review does not authorize public claims, founder wording, customer/public AI, connector availability, environmental/sustainability claims, or professional/legal conclusions.
+Red remains in force until all four findings are independently revised under lockout, the public-repository founder material is minimized or moved to access-controlled storage, the exact diff passes Responsible AI reviewer re-review, and Cyrus records the required approval. This review does not authorize public claims, founder wording, customer/public AI, connector availability, environmental/sustainability claims, or professional/legal conclusions.
 
 ## Remediation re-review — 2026-08-25
 
@@ -150,7 +150,7 @@ This Green verdict supersedes the prior Red only for the exact artifact versions
 - `docs/content/founder-profile-draft.md:13-23` requires exact Cyrus approval and an access-controlled external source register, prohibits copying private-source/identity/workplace/source-URL metadata into this repository, and permits only the neutral placeholder until approval.
 - `docs/content/founder-source-register.md:1-12` is a public-repository stub containing no founder facts, source links, or source descriptions; publication remains blocked.
 - `docs/content/founder-source-register.md:14` retains only the abstract approval/evidence fields required for a future controlled record.
-- `docs/artifacts-manifest.md:31-32` records Sarek—not locked-out original author Nyota Uhura—as the independent RAI-01 revision owner.
+- `docs/artifacts-manifest.md:31-32` records Legal researcher—not locked-out original author Content lead—as the independent RAI-01 revision owner.
 
 **Status:** **Resolved.** A full documentation scan found no LinkedIn personal-profile URL or Cyrus personal GitHub profile URL. The preserved rejection history above names only the risk categories necessary to explain the prior decision; the remediated domain artifacts expose no profile URL, source identity/content, employer identity, cross-match, contact detail, or approved founder fact.
 
@@ -158,9 +158,9 @@ This Green verdict supersedes the prior Red only for the exact artifact versions
 
 **Evidence**
 
-- `docs/content/editorial-workflow.md:3-9` records independent revision ownership by Jadzia Dax, locks Nyota Uhura out of authoring/advising/co-authoring, preserves independent review, and reserves final approval to Cyrus.
+- `docs/content/editorial-workflow.md:3-9` records independent revision ownership by Experience lead, locks Content lead out of authoring/advising/co-authoring, preserves independent review, and reserves final approval to Cyrus.
 - `docs/content/editorial-workflow.md:28-42` distinguishes ordinary feedback from formal Red/reject; requires a recorded rejected revision/diff, artifact-specific author lockout, a different qualified owner, independent revision, exact-diff re-review, and a third owner or Cyrus escalation after another rejection.
-- `docs/artifacts-manifest.md:30` records Jadzia Dax as the RAI-02 revision owner and Rai re-review as pending at the inspected baseline.
+- `docs/artifacts-manifest.md:30` records Experience lead as the RAI-02 revision owner and Responsible AI reviewer re-review as pending at the inspected baseline.
 
 **Status:** **Resolved.** The workflow now implements strict lockout and prohibits schedule, familiarity, nominal ownership, advising, pairing, or self-approval from bypassing it.
 
@@ -168,11 +168,11 @@ This Green verdict supersedes the prior Red only for the exact artifact versions
 
 **Evidence**
 
-- `docs/roadmap/phase-gates.md:12` makes every P5-AI-01 through P5-AI-12 gate non-waivable and requires separate recorded Rai, Dax, Sarek, Miles, Fact Checker, and Cyrus dispositions.
+- `docs/roadmap/phase-gates.md:12` makes every P5-AI-01 through P5-AI-12 gate non-waivable and requires separate recorded Responsible AI reviewer, Experience lead, Legal researcher, Quality/reliability engineer, Fact Checker, and Cyrus dispositions.
 - `docs/roadmap/phase-gates.md:16-33` now requires public/customer corpus isolation; item-level rights/provenance/removal; plain-language AI/data-use disclosure; intended/prohibited use controls; representational, allocation, locale, privacy, and safety harm testing; frozen evaluation; consented and compensated representative/disabled-user participation; accessible feedback, appeal, correction, human support and operator shutdown; privacy-preserving fairness measurement; change re-evaluation; monitoring; and independent approval.
 - `docs/roadmap/phase-gates.md:35-48` sets per-locale grounded-quality, harmful-output, refusal, citation, language, accessibility, and zero-tolerance boundary thresholds.
 - `docs/roadmap/implementation-backlog.md:22` binds optional public AI to all twelve gates, and `:26-40` decomposes rights, transparency, fairness/harm, participation, accessibility, appeal/correction, privacy, monitoring, shutdown, and independent go/no-go evidence without authorizing implementation.
-- `docs/artifacts-manifest.md:76-77` records Miles O'Brien—not locked-out original author Picard—as the independent RAI-03 revision owner.
+- `docs/artifacts-manifest.md:76-77` records Quality/reliability engineer—not locked-out original author Product lead—as the independent RAI-03 revision owner.
 
 **Status:** **Resolved.** Public AI remains optional and absent unless every rights, transparency, fairness, accessibility, participation, contestability, correction, operations, and shutdown gate passes.
 
@@ -184,7 +184,7 @@ This Green verdict supersedes the prior Red only for the exact artifact versions
 - `docs/security/quality-strategy.md:61-77` requires immutable, versioned evaluation cards with purpose/use boundaries, languages/locales, representative source types, rights/provenance, per-stratum results, compensated participation, accessibility technologies, known limitations, and change-triggered reruns.
 - `docs/security/quality-strategy.md:79-94` sets non-waivable thresholds: grounded correctness ≥95% overall/≥90% per stratum; citation entailment ≥98% overall/≥95% per stratum; unsupported material assertions ≤1% and zero for high-impact claims; zero Critical/High harmful outputs; bounded lower-severity harm and over-refusal; required no-answer/human escalation; independent per-language/source passing; zero Critical/High accessibility defects and ≥90% critical-task completion per participant/access cohort; regression limits; and tenant-visible correction.
 - `docs/security/quality-strategy.md:96-102` requires at least eight compensated representative customer users per Phase 3 preview/GA card, including at least four disabled users across named access needs, representation of every supported launch language and material source type, consent/minimization, and a release block if participation cannot safely occur.
-- `docs/security/quality-strategy.md:7` and `docs/artifacts-manifest.md:52` record Seven of Nine—not locked-out original author Miles O'Brien—as the independent RAI-04 revision owner.
+- `docs/security/quality-strategy.md:7` and `docs/artifacts-manifest.md:52` record Identity/data engineer—not locked-out original author Quality/reliability engineer—as the independent RAI-04 revision owner.
 
 **Status:** **Resolved.** Customer-AI release evidence now includes measurable correctness, citation, unsupported-assertion, safety/refusal, locale/source, accessibility, correction, and compensated-user thresholds in addition to tenant isolation/read-only invariants.
 
@@ -197,4 +197,4 @@ This Green verdict supersedes the prior Red only for the exact artifact versions
 
 ### Final disposition
 
-No RAI finding remains Red, so no new revision owner is required. The prior strict lockouts are satisfied for this revision cycle by the independently attributed versions above. The package may proceed past the Rai gate only after the other named reviewers complete their own dispositions and Cyrus approves the exact SHA; all professional and public-claim gates remain separate and pending.
+No RAI finding remains Red, so no new revision owner is required. The prior strict lockouts are satisfied for this revision cycle by the independently attributed versions above. The package may proceed past the Responsible AI reviewer gate only after the other named reviewers complete their own dispositions and Cyrus approves the exact SHA; all professional and public-claim gates remain separate and pending.

@@ -27,7 +27,7 @@ Claim-level status is one of: `verified narrow official claim`, `vendor-document
 
 ## Register and coordinator actions
 
-Exact pending entries are maintained in `professional-review-register.md` for privacy, marketing/accessibility, IP/trademark/open source, contracts, payments counsel, tax/CPA, acquirer/QSA and insurance broker. Picard must:
+Exact pending entries are maintained in `professional-review-register.md` for privacy, marketing/accessibility, IP/trademark/open source, contracts, payments counsel, tax/CPA, acquirer/QSA and insurance broker. Product lead must:
 
 1. obtain Cyrus decisions for markets, data, channels, workforce and public AI;
 2. commission each named professional independently and bind decisions to exact artifact hashes/PR SHA;

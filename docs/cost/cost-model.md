@@ -78,7 +78,7 @@ because bundles overlap.
 
 ## Authoritative recurring active-control labor
 
-Seven's
+Identity/data engineer's
 [`incident-detection-response.md`](../security/incident-detection-response.md)
 phase operating table is authoritative. The former R0 4-12, L1 15-47, A1 17-55
 and G1 30-90 h/month assumptions, plus the former Phase 2/3/4 ranges, are

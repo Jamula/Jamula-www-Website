@@ -5,7 +5,7 @@ All sections require independent gate reviews and Cyrus exact-SHA approval befor
 is published, implemented in code, or used in any channel.
 
 **Issue:** #43 (parent #39); review-condition fixes in #46
-**Owner:** Nyota Uhura
+**Owner:** Content lead
 **Visual direction:** The Standing Statement — letterpress-inspired editorial narrative;
 three offerings split and recombine.
 **Base SHA:** `b3c405d39ce6b6dfc3d5d4d50588060ea63688a3`; review-fix base `de96810a01ad09d040666eff3012b67e42c9c720`
@@ -15,8 +15,8 @@ three offerings split and recombine.
 | Gate | Reviewer | Scope |
 |---|---|---|
 | Claims and source fidelity | Fact Checker | Every factual statement; verify or flag for reframing |
-| Legal, endorsement, employer, privacy | Sarek | Blocking: Microsoft/Azure framing, founder copy, contact mechanism, any comparative claim |
-| Responsible-AI framing | Rai | Sections 6, 7; all AI approach language; confirm no overstatement or understatement |
+| Legal, endorsement, employer, privacy | Legal researcher | Blocking: Microsoft/Azure framing, founder copy, contact mechanism, any comparative claim |
+| Responsible-AI framing | Responsible AI reviewer | Sections 6, 7; all AI approach language; confirm no overstatement or understatement |
 | Exact-version approval | Cyrus | Final wording, channels, conditions, and expiry — no copy publishes without this |
 
 **Intentionally excluded (must not be added without a complete approved claims-register
@@ -99,7 +99,7 @@ Status: proposed; not approved.
 - `[BLOCKED: Customer outcome or case study — requires approved claims-register entry,
   customer permission, and Cyrus approval before any use]`
 - `[BLOCKED: Any AI-performance or accuracy metric — requires controlled baseline, Fact
-  Checker verification, Sarek review, Rai review, and Cyrus approval]`
+  Checker verification, Legal researcher review, Responsible AI reviewer review, and Cyrus approval]`
 
 ---
 
@@ -136,7 +136,7 @@ Status: proposed; not approved.
 *Blocked slots:*
 - `[BLOCKED: Technology choices, named frameworks, or specific platform integrations —
   require Fact Checker verification and Cyrus approval before publication]`
-- `[BLOCKED: Customer or project references — require customer permission, Sarek rights
+- `[BLOCKED: Customer or project references — require customer permission, Legal researcher rights
   review, and Cyrus approval]`
 
 ---
@@ -156,9 +156,9 @@ Cloud infrastructure done well is invisible — it doesn't slow software down, i
 surprise you on a bill, and it doesn't create problems when you need to move.
 
 `[REVIEW-GATED #43-H-006: "Jamula brings deep Microsoft and Azure expertise to client work."
-— This wording must be reviewed by Sarek (endorsement/trademark risk, BLOCKING) and Fact
+— This wording must be reviewed by Legal researcher (endorsement/trademark risk, BLOCKING) and Fact
 Checker (capability baseline) before publication. It must convey Jamula's own capability
-only, never Microsoft endorsement, partnership, or affiliation. Sarek must approve the exact
+only, never Microsoft endorsement, partnership, or affiliation. Legal researcher must approve the exact
 wording. Do not use placeholder text in place of the approved sentence.
 — ADDITIONAL PREREQUISITE (#46): Before publication clearance of this sentence, Cyrus must
 disclose any current or recent Microsoft employment, contractor, or advisory relationship to
@@ -167,7 +167,7 @@ repository.]`
 
 That expertise exists to give organizations optionality, not lock them into one vendor.
 `[REVIEW-GATED #43-H-007: "We work on Microsoft and Azure because that's where we're deepest
-— but we build in ways that preserve your ability to move." — Blocked pending Sarek
+— but we build in ways that preserve your ability to move." — Blocked pending Legal researcher
 endorsement-risk review and Fact Checker wording review. Current multi-cloud claims-register
 entry is also blocked. Do not publish until both gates clear.
 — ADDITIONAL PREREQUISITE (#46): Before publication clearance of this sentence, Cyrus must
@@ -187,10 +187,10 @@ repository.]`
 
 *Blocked slots:*
 - `[BLOCKED: Multi-cloud capability claim — public-claims-register entry blocked; requires
-  Sarek and Fact Checker review of exact wording before any use]`
+  Legal researcher and Fact Checker review of exact wording before any use]`
 - `[BLOCKED: Security, compliance, or reliability claim — requires controlled evidence, Fact
-  Checker, Sarek, and Cyrus gates]`
-- `[BLOCKED: Any Microsoft trademark use beyond stating capability — Sarek review mandatory]`
+  Checker, Legal researcher, and Cyrus gates]`
+- `[BLOCKED: Any Microsoft trademark use beyond stating capability — Legal researcher review mandatory]`
 
 ---
 
@@ -230,7 +230,7 @@ Status: proposed; not approved.
 ## Section 6 — How We Approach AI
 
 > *Responsible-AI approach section. Describes mechanism, not value claim. Intentionally
-> avoids "Jamula's AI is responsible" (a values/outcome claim). Rai must confirm this
+> avoids "Jamula's AI is responsible" (a values/outcome claim). Responsible AI reviewer must confirm this
 > framing is accurate and does not overstate or understate any safety commitment.*
 
 ### Candidate wording
@@ -249,15 +249,15 @@ one.
 
 We don't claim AI is safe by default, and we don't claim any particular AI implementation is
 safe until we can evaluate it against something measurable. We aim to make the evaluation
-criteria clear and to tell you what we find. `[REVIEWER NOTE #43-H-010: Rai
-review is blocking for this paragraph. Rai must confirm this accurately represents Jamula's
+criteria clear and to tell you what we find. `[REVIEWER NOTE #43-H-010: Responsible AI reviewer
+review is blocking for this paragraph. Responsible AI reviewer must confirm this accurately represents Jamula's
 approach and carries no unintended implication — e.g., it should not suggest Jamula provides
 safety certification or that any evaluation exhaustively proves safety.]`
 
 ---
 
 *Claim cross-reference:* `#43-H-009` (Fact Checker may require reframing),
-`#43-H-010` (Rai blocking review).
+`#43-H-010` (Responsible AI reviewer blocking review).
 Status: proposed; not approved.
 
 *Blocked slots:*
@@ -286,8 +286,8 @@ Cyrus Jamula founded Jamula.
 `[BLOCKED #43-F-002: Technical background description. No approved wording exists. Source
 lead (LinkedIn public profile) recorded in founder-source-register.md; exact URL to be
 confirmed by Cyrus. Exact claim must be drafted after source confirmation and must pass
-Fact Checker (source verification), Sarek (privacy/employer/endorsement review), Rai
-(framing review), Dax (presentation/accessibility), and Cyrus exact-wording approval.
+Fact Checker (source verification), Legal researcher (privacy/employer/endorsement review), Responsible AI reviewer
+(framing review), Experience lead (presentation/accessibility), and Cyrus exact-wording approval.
 Do not substitute inferred, guessed, or third-party-speculative wording. Do not describe
 Cyrus's employer, title, community/religious affiliations, addresses, client names, private
 contacts, or unverified credentials.]`
@@ -327,7 +327,7 @@ else is better suited.
 
 **Contact path:**
 `[BLOCKED: Contact email address, form action URL, or contact mechanism — not defined in
-this draft. Requires Sarek (privacy and contact-data review), Dax (accessible form/link
+this draft. Requires Legal researcher (privacy and contact-data review), Experience lead (accessible form/link
 implementation), and Cyrus approval before any contact mechanism is added. Do not add a
 placeholder email address or guessed contact path.]`
 
@@ -352,11 +352,11 @@ Status: proposed; not approved.
 | #43-H-003 | AI Strategy | AI approach / grounding description | Proposed; unverified; no comparative framing | `public-claims-register.md` |
 | #43-H-004 | AI Strategy | "A strategy you can evaluate against something measurable — defined before work starts" | Proposed; unverified | `public-claims-register.md` |
 | #43-H-005 | Custom Software | Custom software positioning | Proposed; unverified | `public-claims-register.md` |
-| #43-H-006 | Cloud Consulting | Microsoft and Azure expertise statement | Proposed; **blocked** — Sarek endorsement-risk review blocking; employer-conflict prerequisite (#46) | `public-claims-register.md` |
-| #43-H-007 | Cloud Consulting | Multi-cloud optionality positioning | Proposed; **blocked** — Sarek endorsement-risk review; employer-conflict prerequisite (#46) | `public-claims-register.md` |
+| #43-H-006 | Cloud Consulting | Microsoft and Azure expertise statement | Proposed; **blocked** — Legal researcher endorsement-risk review blocking; employer-conflict prerequisite (#46) | `public-claims-register.md` |
+| #43-H-007 | Cloud Consulting | Multi-cloud optionality positioning | Proposed; **blocked** — Legal researcher endorsement-risk review; employer-conflict prerequisite (#46) | `public-claims-register.md` |
 | #43-H-008 | Synthesis | Process description ("typically starts with understanding") | Proposed; unverified | `public-claims-register.md` |
 | #43-H-009 | Responsible AI | "Jamula starts by checking whether incomplete data, unclear objectives, or untested assumptions are the real problem." | Proposed; unverified | `public-claims-register.md` |
-| #43-H-010 | Responsible AI | Safety-evaluation approach; "aim" wording | Proposed; unverified; Rai review **blocking** | `public-claims-register.md` |
+| #43-H-010 | Responsible AI | Safety-evaluation approach; "aim" wording | Proposed; unverified; Responsible AI reviewer review **blocking** | `public-claims-register.md` |
 | #43-H-011 | Next Step | CTA / conversation framing | Proposed; unverified; contact mechanism separately gated | `public-claims-register.md` |
 | #43-F-001 | Founder | "Cyrus Jamula founded Jamula." | Proposed; identification approved in principle; exact copy gated | `founder-source-register.md`, `public-claims-register.md` |
 | #43-F-002 | Founder | Technical background description | **Blocked** — no approved wording; source confirmation required | `founder-source-register.md`, `public-claims-register.md` |
@@ -375,7 +375,7 @@ Status: proposed; not approved.
 - "Leverage," "synergy," "best-in-class," "game-changing."
 - "Guaranteed," "always," "never fails," "proven."
 - Microsoft or Azure as the subject of a marketing claim (they are only the subject of
-  a capability description, and only after Sarek clears the wording).
+  a capability description, and only after Legal researcher clears the wording).
 
 **Section length target:**
 Each section should be readable in under 30 seconds. A paragraph that is not saying
@@ -389,5 +389,5 @@ have it.
 ---
 
 **Context:** `Refs #43; parent #39; review-condition fixes #46`. No section of this draft is approved for
-publication. All candidate wording requires Fact Checker, Sarek, and Rai gate reviews,
+publication. All candidate wording requires Fact Checker, Legal researcher, and Responsible AI reviewer gate reviews,
 then Cyrus exact-SHA approval before any use.

@@ -1,8 +1,8 @@
 # OneDrive / SharePoint connector — blocked/deferred packet
 
 **Decision context:** Refs #3; child #6
-**Owner:** Seven of Nine
-**Required reviewers:** Miles O'Brien, Sarek, Rai, Fact Checker; Cyrus approval for any live action
+**Owner:** Identity/data engineer
+**Required reviewers:** Quality/reliability engineer, Legal researcher, Responsible AI reviewer, Fact Checker; Cyrus approval for any live action
 **Evidence class:** documented research only
 **Status:** blocked/deferred
 **Updated:** 2026-08-25 Cycle 3; no live mechanism evidence
@@ -33,7 +33,7 @@ These statements do not prove consumer/workforce coverage, picker configuration,
 ## Proposed minimum design
 
 - Begin with delegated user authorization and read-only operations. Request only the scope demonstrated necessary for the selected-resource design; reject `Files.ReadWrite*`, `Sites.ReadWrite*`, application-wide file/site permissions and directory/admin scopes.
-- Preference order: a verified per-item/folder Selected grant; otherwise a bounded delegated `Files.Read` token only with explicit Cyrus/Miles/Sarek risk acceptance, prominent disclosure of technical reach and application-layer allowlist that denies unselected IDs. A picker alone is not a security boundary.
+- Preference order: a verified per-item/folder Selected grant; otherwise a bounded delegated `Files.Read` token only with explicit Cyrus/Quality/reliability engineer/Legal researcher risk acceptance, prominent disclosure of technical reach and application-layer allowlist that denies unselected IDs. A picker alone is not a security boundary.
 - Bind `(issuer, Microsoft subject, Graph account/tenant, drive, item)` to Jamula `(tenant_id, user_id, connection_id)`. Reject tenant/account mismatch and consumer/workforce issuer confusion.
 - Store and refresh long-lived credentials server-side only. File Picker v8 may require a short-lived Microsoft access token in the Microsoft-hosted browser picker context; constrain it to the verified issuer/audience, minimum scope and shortest supported lifetime, keep it only in memory and destroy it after success/cancel/error/navigation. Refresh tokens remain server-only. Use PKCE/state/nonce/exact redirects, atomic rotation and revoke/delete on disconnect/offboarding. Do not use application permissions for customer files.
 - Enforce restrictive CSP `connect-src`/`frame-src`, exact Microsoft HTTPS origins, non-wildcard `postMessage` target origin and sender/source/origin/schema validation. Deny account/tenant/audience/scope mismatch. Do not persist tokens in cookies, local/session storage, IndexedDB, service workers, URLs/history/referrers, DOM, logs or telemetry.
@@ -51,7 +51,7 @@ When passing, consent must state the actual technical scope, selected files/fold
 
 ## Remediation issue recommendation
 
-Create after incorporation: **“Execute approved OneDrive least-privilege connector spike”**, owner Seven of Nine; reviewers Miles, Sarek, Rai, Fact Checker. Attach approved tenant/accounts, registration/publisher status, scopes, terms/DPA, region, vault, spend, teardown and the tests below. Link `Refs #3; child #6`.
+Create after incorporation: **“Execute approved OneDrive least-privilege connector spike”**, owner Identity/data engineer; reviewers Quality/reliability engineer, Legal researcher, Responsible AI reviewer, Fact Checker. Attach approved tenant/accounts, registration/publisher status, scopes, terms/DPA, region, vault, spend, teardown and the tests below. Link `Refs #3; child #6`.
 
 ## Preview / GA disposition
 

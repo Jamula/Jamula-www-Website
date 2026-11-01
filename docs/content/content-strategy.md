@@ -1,8 +1,8 @@
 # Content Strategy
 
 **Status:** Draft operating model; not approved for public use or production publishing
-**Owner:** Nyota Uhura
-**Required reviewers:** Jadzia Dax, Sarek, Rai, Fact Checker
+**Owner:** Content lead
+**Required reviewers:** Experience lead, Legal researcher, Responsible AI reviewer, Fact Checker
 **Final approver:** Cyrus Jamula
 **Scope:** Phase 1 planning only; implementation and publishing are future, separately approved work
 
@@ -14,7 +14,7 @@ Jamula content should help prospective customers understand the problem Jamula c
 - Describe Jamula as technology consulting, custom software, AI-native delivery, Microsoft-preferred, and multi-cloud capable only after Fact Checker confirms the exact public wording and Cyrus approves it.
 - Do not imply Microsoft or any other vendor endorses Jamula.
 - Do not publish internal workplace information, customer-confidential information, personal contact data, invented results, or unapproved founder facts.
-- Environmental, ethical, social, accessibility, customer, AI, and performance claims are blocked until a complete entry in `public-claims-register.md` is verified by Fact Checker, reviewed by Sarek and Rai, and approved by Cyrus.
+- Environmental, ethical, social, accessibility, customer, AI, and performance claims are blocked until a complete entry in `public-claims-register.md` is verified by Fact Checker, reviewed by Legal researcher and Responsible AI reviewer, and approved by Cyrus.
 - A platform metric is an observation, not proof of customer value, accessibility, quality, safety, or business impact.
 - No copy in this document is approved public copy.
 
@@ -61,10 +61,10 @@ Pricing, availability, performance, security, sustainability, compatibility, or 
 |---|---|---|
 | Candidate intake | Business purpose, audience, project owner, proposed public value | No accountable owner |
 | Customer permission | Written authorization for names, logos, quotations, screenshots, results, and channels | Missing, ambiguous, expired, or revoked permission |
-| Confidentiality review | Contract/NDA check; removal of credentials, personal data, customer data, internal architecture, and security-sensitive details | Sarek or customer flags exposure |
+| Confidentiality review | Contract/NDA check; removal of credentials, personal data, customer data, internal architecture, and security-sensitive details | Legal researcher or customer flags exposure |
 | Claim design | Exact claim, baseline, time period, method, sample, limitations, owner, expiry, correction action | Claim-register entry incomplete |
-| Evidence review | Fact Checker verifies source and reproduction; Rai reviews social/ethical framing | Evidence is anecdotal, vendor marketing, or unreproducible |
-| Experience review | Dax reviews structure, accessibility, and visual communication | Critical accessibility barrier |
+| Evidence review | Fact Checker verifies source and reproduction; Responsible AI reviewer reviews social/ethical framing | Evidence is anecdotal, vendor marketing, or unreproducible |
+| Experience review | Experience lead reviews structure, accessibility, and visual communication | Critical accessibility barrier |
 | Approval | Customer approval where required and Cyrus approval of exact version | Any approval missing |
 | Publication/monitoring | Versioned canonical page, channel adaptations, analytics plan, expiry job | No takedown contact or expiry |
 
@@ -76,11 +76,11 @@ Cadences are maximum planning rhythms, not publication commitments. Every item m
 
 | Channel | Audience and purpose | Owner | Review and approval | Cadence | Primary metric | Review / expiry |
 |---|---|---|---|---|---|---|
-| Website (`Jamula.net`) | Prospects, customers, partners; canonical service, trust, contact, and project information | Nyota; page owner named per item | Dax, Sarek, Rai, Fact Checker; Cyrus approves exact public version | Monthly editorial review; publish only when ready | Qualified contact completion rate plus task success; accessibility defect rate as guardrail | Review quarterly; factual/vendor content 90 days; evergreen pages 180 days; remove or reapprove when expired |
-| LinkedIn | Professional audiences; concise insight and canonical-page discovery | Nyota; designated account publisher | Fact Checker for facts, Sarek for disclosures/terms, Rai for impact, Dax for media; Cyrus approves campaigns and sensitive posts | Up to 2 posts/week after launch | Meaningful engagement rate and qualified canonical-site visits, not impressions alone | Review at 30 days; expire/reassess factual posts at 90 days |
-| Medium | Practitioners and decision-makers; durable technical explainers with context and sources | Nyota/editor | Same required reviewers; Cyrus approves publication/article exact version | Up to 2 articles/month | Reads and read ratio, plus qualified canonical referrals | Source check every 90 days; review article every 180 days; correct or unlist stale guidance |
-| WhatsApp | Opted-in prospects/customers; requested updates and human conversation, not broadcast acquisition | Named customer-communications owner; Nyota owns templates | Sarek reviews consent/disclosure; Fact Checker reviews claims; Rai reviews safety; Cyrus approves templates | Event-driven only; no unsolicited cadence | Opt-out rate, response SLO, complaint rate, and resolved conversations | Consent checked before each initiation; templates reviewed quarterly and expire after 90 days without reapproval |
-| GitHub | Developers, partners, and technical evaluators; inspectable public code/docs and project-specific updates | Repository maintainer; Nyota owns showcase copy | Maintainer, Fact Checker, Sarek, Rai; Cyrus approves promotional positioning | Release/project-event driven; monthly stale-content review | Documentation task success, qualified repository referrals, issue response SLO | README/release links reviewed each release and quarterly; version claims expire on the next material change or 90 days |
+| Website (`Jamula.net`) | Prospects, customers, partners; canonical service, trust, contact, and project information | Content lead; page owner named per item | Experience lead, Legal researcher, Responsible AI reviewer, Fact Checker; Cyrus approves exact public version | Monthly editorial review; publish only when ready | Qualified contact completion rate plus task success; accessibility defect rate as guardrail | Review quarterly; factual/vendor content 90 days; evergreen pages 180 days; remove or reapprove when expired |
+| LinkedIn | Professional audiences; concise insight and canonical-page discovery | Content lead; designated account publisher | Fact Checker for facts, Legal researcher for disclosures/terms, Responsible AI reviewer for impact, Experience lead for media; Cyrus approves campaigns and sensitive posts | Up to 2 posts/week after launch | Meaningful engagement rate and qualified canonical-site visits, not impressions alone | Review at 30 days; expire/reassess factual posts at 90 days |
+| Medium | Practitioners and decision-makers; durable technical explainers with context and sources | Content lead/editor | Same required reviewers; Cyrus approves publication/article exact version | Up to 2 articles/month | Reads and read ratio, plus qualified canonical referrals | Source check every 90 days; review article every 180 days; correct or unlist stale guidance |
+| WhatsApp | Opted-in prospects/customers; requested updates and human conversation, not broadcast acquisition | Named customer-communications owner; Content lead owns templates | Legal researcher reviews consent/disclosure; Fact Checker reviews claims; Responsible AI reviewer reviews safety; Cyrus approves templates | Event-driven only; no unsolicited cadence | Opt-out rate, response SLO, complaint rate, and resolved conversations | Consent checked before each initiation; templates reviewed quarterly and expire after 90 days without reapproval |
+| GitHub | Developers, partners, and technical evaluators; inspectable public code/docs and project-specific updates | Repository maintainer; Content lead owns showcase copy | Maintainer, Fact Checker, Legal researcher, Responsible AI reviewer; Cyrus approves promotional positioning | Release/project-event driven; monthly stale-content review | Documentation task success, qualified repository referrals, issue response SLO | README/release links reviewed each release and quarterly; version claims expire on the next material change or 90 days |
 
 ## Measurement and learning
 
@@ -113,11 +113,11 @@ Claim-level retrieval was repeated on **2026-08-25**:
 | Source | Supported use in this strategy | Status |
 |---|---|---|
 | W3C [WCAG 2.2 Quick Reference](https://www.w3.org/WAI/WCAG22/quickref/) and [Making Audio and Video Media Accessible](https://www.w3.org/WAI/media/av/) | Accessibility criteria and accessible-media planning/deliverables | `verified narrow official claim` |
-| LinkedIn [User Agreement](https://www.linkedin.com/legal/user-agreement) and [Professional Community Policies](https://www.linkedin.com/legal/professional-community-policies) | Account/service responsibilities and content/conduct restrictions | `verified narrow official claim`; launch applicability remains for Sarek |
+| LinkedIn [User Agreement](https://www.linkedin.com/legal/user-agreement) and [Professional Community Policies](https://www.linkedin.com/legal/professional-community-policies) | Account/service responsibilities and content/conduct restrictions | `verified narrow official claim`; launch applicability remains for Legal researcher |
 | Medium [Terms](https://policy.medium.com/medium-terms-of-service-9db0094a1e0f), [Rules](https://help.medium.com/hc/en-us/articles/213477928-Medium-Rules), and [Stats](https://help.medium.com/hc/en-us/articles/215108608-Stats) | User/content responsibilities, moderation rules, and named metric definitions | `verified narrow official claim`; metrics/product behavior are `vendor-documented` |
-| WhatsApp [Business Terms](https://www.whatsapp.com/legal/business-terms), [Business Messaging Policy](https://www.whatsapp.com/legal/business-policy/), and [Messaging Guidelines](https://www.whatsapp.com/legal/messaging-guidelines) | Current business-use, opt-in/opt-out, approved-template, escalation, and messaging-policy statements | `verified narrow official claim` for retrieved current text; 2026-09-23 replacement terms are `needs investigation` pending Sarek |
+| WhatsApp [Business Terms](https://www.whatsapp.com/legal/business-terms), [Business Messaging Policy](https://www.whatsapp.com/legal/business-policy/), and [Messaging Guidelines](https://www.whatsapp.com/legal/messaging-guidelines) | Current business-use, opt-in/opt-out, approved-template, escalation, and messaging-policy statements | `verified narrow official claim` for retrieved current text; 2026-09-23 replacement terms are `needs investigation` pending Legal researcher |
 | GitHub [Terms](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service) and [Acceptable Use Policies](https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies) | Account/content responsibility and safety, IP, privacy, authenticity, and conduct restrictions | `verified narrow official claim` |
-| Federal Register API [2023-14795](https://www.federalregister.gov/api/v1/documents/2023-14795.json) and [official GovInfo PDF](https://www.govinfo.gov/content/pkg/FR-2023-07-26/pdf/2023-14795.pdf) | FTC adopted revised Endorsement Guides effective 2023-07-26 | `verified narrow official claim`; exact applicability and disclosure wording require Sarek/counsel |
+| Federal Register API [2023-14795](https://www.federalregister.gov/api/v1/documents/2023-14795.json) and [official GovInfo PDF](https://www.govinfo.gov/content/pkg/FR-2023-07-26/pdf/2023-14795.pdf) | FTC adopted revised Endorsement Guides effective 2023-07-26 | `verified narrow official claim`; exact applicability and disclosure wording require Legal researcher/counsel |
 | FTC [Disclosures 101](https://www.ftc.gov/business-guidance/resources/disclosures-101-social-media-influencers), [AI topic](https://www.ftc.gov/industry/technology/artificial-intelligence), and prior AI-claims blog endpoint | No claim is supported here because automated retrieval returned 403 and FCR-008 also observed stale/404 AI-blog behavior | `access-blocked` / `needs investigation`; do not cite as verified |
 
 These statuses do not approve a public statement. AI, endorsement, performance, customer, accessibility, environmental, or social claims remain subject to the claims register and named reviewers.

@@ -1,8 +1,8 @@
 # Experience acceptance journeys
 
 **Work context:** Refs #3; child #5
-**Owner:** Jadzia Dax, Experience & Design Lead
-**Required reviewers:** Miles O'Brien, Nyota Uhura, Fact Checker
+**Owner:** Experience lead, Experience & Design Lead
+**Required reviewers:** Quality/reliability engineer, Content lead, Fact Checker
 **Status:** Future implementation tests; all results are `not tested` until executed against a versioned candidate
 **Updated:** 2026-08-24
 
@@ -342,7 +342,7 @@ Automation can catch regressions but cannot sign off a journey. Manual evidence 
 | Vendor evidence or test access unavailable | Mark unverified; create blocked/deferred packet and apply phase/fallback gate |
 | All applicable journeys and gates pass on a versioned candidate | Eligible for reviewer verification and Cyrus's phase approval; not by itself a public conformance claim |
 
-## 13. Picard synthesis actions
+## 13. Product lead synthesis actions
 
 For `Refs #3; child #5`, carry these test obligations into the option matrix, ADRs, phase gates, and implementation backlog:
 
@@ -350,5 +350,5 @@ For `Refs #3; child #5`, carry these test obligations into the option matrix, AD
 2. Add J-04 to Phase 2.
 3. Add J-05–J-07 separately for OneDrive, Google Drive, and Box to Phase 3.
 4. Add J-08 to Phase 4.
-5. Require Miles to own independent release verification, Fact Checker to verify claims/sources, Uhura to review content/media usability, and Cyrus to approve any public claim.
+5. Require Quality/reliability engineer to own independent release verification, Fact Checker to verify claims/sources, Content lead to review content/media usability, and Cyrus to approve any public claim.
 6. Record every unavailable vendor behavior as unverified; never use research or a mechanism spike as proof of conformance.

@@ -1,8 +1,8 @@
 # Box connector — blocked/deferred packet
 
 **Decision context:** Refs #3; child #6
-**Owner:** Seven of Nine
-**Required reviewers:** Miles O'Brien, Sarek, Rai, Fact Checker; Cyrus approval for any live action
+**Owner:** Identity/data engineer
+**Required reviewers:** Quality/reliability engineer, Legal researcher, Responsible AI reviewer, Fact Checker; Cyrus approval for any live action
 **Evidence class:** documented research only
 **Status:** blocked/deferred
 **Updated:** 2026-08-25 Cycle 3; no live mechanism evidence
@@ -51,7 +51,7 @@ If a passing design retains a token technically able to read more than selected 
 
 ## Remediation issue recommendation
 
-Create after incorporation: **“Execute approved Box least-privilege connector spike and commercial review”**, owner Seven of Nine; reviewers Miles, Sarek, Rai, Fact Checker. Prerequisites: approved plan/enterprise/users/app/admin, official Platform terms/DPA/subprocessors/region, picker/downscope design, API allocation, vault/spend and teardown. Link `Refs #3; child #6`.
+Create after incorporation: **“Execute approved Box least-privilege connector spike and commercial review”**, owner Identity/data engineer; reviewers Quality/reliability engineer, Legal researcher, Responsible AI reviewer, Fact Checker. Prerequisites: approved plan/enterprise/users/app/admin, official Platform terms/DPA/subprocessors/region, picker/downscope design, API allocation, vault/spend and teardown. Link `Refs #3; child #6`.
 
 ## Preview / GA disposition
 

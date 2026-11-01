@@ -48,7 +48,7 @@ The exact pass language remains subject to preregistration. At minimum, a fixtur
 - Jamula.net as canonical and an HTTPS Jamula.com redirect that preserves path and query;
 - protected `main` as the only production source, with auditable artifact/SHA provenance and rollback;
 - current TLS, DNS ownership/recovery, domain-email authentication, least privilege, secret separation, logging, alerts, and recovery controls;
-- the applicable WCAG 2.2 AA journeys and Dax's sole normative [performance gate](../experience/accessibility-seo-performance.md#6-performance-gate);
+- the applicable WCAG 2.2 AA journeys and Experience lead's sole normative [performance gate](../experience/accessibility-seo-performance.md#6-performance-gate);
 - export of Jamula-owned content, media, metadata, redirects, configuration, analytics history, and operational records in usable formats;
 - an independently buildable/redeployable exit artifact and documented DNS cutover/rollback;
 - quote-backed first-year, renewal, overage, tax, labor, migration, verification, professional-review, and exit assumptions;

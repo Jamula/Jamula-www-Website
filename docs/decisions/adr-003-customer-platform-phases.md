@@ -51,7 +51,7 @@ Stripe, Square, PayPal, and an accounting-hosted invoice flow remain unranked, d
 
 ### Phase 5
 
-Public AI remains optional and absent unless P5-AI-01 through P5-AI-12 pass. Required evidence covers public-only isolation; corpus rights/provenance and removal; transparency; intended and prohibited uses; harm/fairness and locale evaluation; representative and disabled-user participation; accessible appeal/correction and human support; evaluation privacy; change control; and rehearsed narrow/global shutdown. Rai and every named reviewer and professional gate remain mandatory.
+Public AI remains optional and absent unless P5-AI-01 through P5-AI-12 pass. Required evidence covers public-only isolation; corpus rights/provenance and removal; transparency; intended and prohibited uses; harm/fairness and locale evaluation; representative and disabled-user participation; accessible appeal/correction and human support; evaluation privacy; change control; and rehearsed narrow/global shutdown. Responsible AI reviewer and every named reviewer and professional gate remain mandatory.
 
 ## Consequences and tradeoffs
 

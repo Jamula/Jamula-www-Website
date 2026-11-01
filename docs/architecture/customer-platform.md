@@ -1,8 +1,8 @@
 # Customer platform architecture
 
 **Decision context:** Refs #3; child #6
-**Revision owner:** Jadzia Dax (independent revision owner)
-**Status:** proposed vendor-neutral architecture for Picard synthesis; documented research only; no identity provider, inference provider, model, deployment, or vendor is selected or approved
+**Revision owner:** Experience lead (independent revision owner)
+**Status:** proposed vendor-neutral architecture for Product lead synthesis; documented research only; no identity provider, inference provider, model, deployment, or vendor is selected or approved
 **Updated:** 2026-08-25 Cycle 4; N-09 vendor-neutral boundary revision; no live mechanism evidence
 
 ## Scope and boundaries
@@ -233,7 +233,7 @@ Follow `docs/privacy/data-inventory.md`, `docs/privacy/data-lifecycle.md` and th
 
 ## Security baseline and future evidence
 
-Pin OAuth security to RFC 9700 [S35], application verification to OWASP ASVS 5.0.0 Level 2 target [S36], and API threats to OWASP API Security Top 10 2023 [S37]. Miles maps exact version-qualified controls and threat model.
+Pin OAuth security to RFC 9700 [S35], application verification to OWASP ASVS 5.0.0 Level 2 target [S36], and API threats to OWASP API Security Top 10 2023 [S37]. Quality/reliability engineer maps exact version-qualified controls and threat model.
 
 Required implementation evidence:
 
@@ -252,9 +252,9 @@ No component passes from documented research alone. Connector packets currently 
 ## Decision and review gates
 
 - **Cyrus:** approve vendors, exact controlling workload version `RWL-2026-08-25.3`, regions, registrations, spend, disclosures and live spikes.
-- **Picard:** synthesize ADRs and reversibility.
-- **Geordi:** map runtime/storage/observability costs and portability.
-- **Miles:** threat model and verify controls/evidence.
-- **Sarek / professionals:** DPA/transfers, privacy, records, PCI/tax/accounting/renewal/refund.
-- **Rai:** AI purpose, safeguards, accessibility and human escalation.
+- **Product lead:** synthesize ADRs and reversibility.
+- **Platform engineer:** map runtime/storage/observability costs and portability.
+- **Quality/reliability engineer:** threat model and verify controls/evidence.
+- **Legal researcher / professionals:** DPA/transfers, privacy, records, PCI/tax/accounting/renewal/refund.
+- **Responsible AI reviewer:** AI purpose, safeguards, accessibility and human escalation.
 - **Fact Checker:** revalidate official sources, dynamic terms/price/limits and contradictions.

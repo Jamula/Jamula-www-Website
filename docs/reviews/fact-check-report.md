@@ -22,10 +22,10 @@ are material blockers, not editorial cleanup.
 - `docs/architecture/decision-framework.md`
 - `docs/architecture/recommendation.md`
 
-Their manifest author, **Jean-Luc Picard, is locked out of the next revision of
+Their manifest author, **Product lead, is locked out of the next revision of
 those two artifacts** and may not contribute as author, co-author, adviser, or pair.
-Assign **Geordi La Forge** as the sole eligible revision owner for those artifacts.
-This lockout is artifact-scoped; it does not bar Picard from unrelated work.
+Assign **Platform engineer** as the sole eligible revision owner for those artifacts.
+This lockout is artifact-scoped; it does not bar Product lead from unrelated work.
 
 **Finding count:** 12 total — 0 Critical, 3 High, 7 Medium, 2 Low.
 
@@ -94,7 +94,7 @@ This lockout is artifact-scoped; it does not bar Picard from unrelated work.
   promises backup expiry within 35 days.
 - **Impact:** Deletion notices, processor requirements, restore tests, discovery
   exposure, and storage cost cannot all comply with these schedules.
-- **Specific remediation:** Seven, Miles, Sarek, and qualified counsel must produce
+- **Specific remediation:** Identity/data engineer, Quality/reliability engineer, Legal researcher, and qualified counsel must produce
   one classification-specific schedule. Define whether long-term recovery points
   contain personal/customer data, how tombstones are replayed, legal-hold
   exceptions, and the externally disclosed maximum. Make all three artifacts point
@@ -269,13 +269,13 @@ This lockout is artifact-scoped; it does not bar Picard from unrelated work.
 - **Severity:** Low
 - **Confidence:** High
 - **Rating:** Needs Investigation
-- **Exact location:** `.squad/decisions.md` (missing)
+- **Exact location:** Former framework decision register (missing at review)
 - **Evidence/source:** The requested team decision file does not exist in the
-  worktree or local Squad state. No decision history could be reconciled against
+  worktree or local decision state. No decision history could be reconciled against
   the generated artifacts.
 - **Impact:** This review cannot establish that all cross-agent decisions were
   incorporated or detect contradictions with a nonexistent authority.
-- **Specific remediation:** Coordinator/Scribe must identify the authoritative
+- **Specific remediation:** Coordinator/Decision recorder must identify the authoritative
   decision register or explicitly record that no decisions exist, then rerun the
   consistency check before exact-SHA approval.
 
@@ -354,8 +354,8 @@ artifacts.
 
 **Remediation verdict:** **REVISE**
 
-This section is append-only. The original report above, including its original
-2026-08-24 verdict and lockout, is preserved verbatim as the record of the first
+This historical section retains the original report above, including its original
+2026-08-24 verdict and lockout, as the record of the first
 review. This verification supersedes that verdict only for the independently
 revised domain artifacts examined below. It is not legal, tax, accounting,
 insurance, PCI, accessibility-conformance, or other licensed professional
@@ -558,7 +558,7 @@ in this section approves those ledgers.
 - **Evidence:** `docs/experience/accessibility-seo-performance.md:145-177` is
   the canonical table: 900/1,500 KiB aggregates, 225/300 KiB JavaScript,
   120/120 KiB fonts, 450/500 KiB imagery, binary units, and the tighter-rule
-  wins. `docs/security/quality-strategy.md:128-136` calls Dax's section 6 the
+  wins. `docs/security/quality-strategy.md:128-136` calls Experience lead's section 6 the
   sole normative source, mirrors those values, and prohibits a second local
   threshold table.
 - **Disposition:** **Resolved.** CI has one normative performance budget; field
@@ -576,9 +576,8 @@ in this section approves those ledgers.
 
 #### FCR-011 — Resolved
 
-- **Evidence:** The Squad state health check reports
-  **FSStorageProvider**, and the `decisions` state directory was confirmed
-  empty. There is therefore no missing mutable decision entry to reconcile.
+- **Evidence:** At the historical review, the local decision store was confirmed
+  empty. There was therefore no missing mutable decision entry to reconcile.
   The six ADR files each identify themselves as `Proposed`; the documentation
   approval/ADR records are the authoritative proposal records, not accepted
   decisions.
@@ -586,8 +585,8 @@ in this section approves those ledgers.
   `docs/decisions/approvals.md` and `docs/decisions/README.md`, this finding
   verifies the absence and authority model only. The adversarial reviewer must
   independently verify those ledgers' content and completeness.
-- **Disposition:** **Resolved.** Absence of `.squad/decisions.md` is not an
-  unaccounted decision-history gap when the configured decision store is empty.
+- **Disposition:** **Resolved.** The missing former decision register was not an
+  unaccounted decision-history gap because its decision store was empty.
 
 #### FCR-012 — Resolved
 
@@ -629,7 +628,7 @@ SHA or canonical Git blob OIDs exist for this package
 prior FCR, F/N and RAI identifiers
 **New high-confidence findings:** **3** — FCR-013 through FCR-015
 
-This append-only pass preserves every prior review section above verbatim. It
+This historical pass preserves the prior review findings and dispositions. It
 supersedes the earlier remediation status for the current working tree only. It
 is not legal, tax, accounting, insurance, PCI, accessibility-conformance, vendor
 approval, procurement, deployment, or other licensed professional advice.
@@ -640,7 +639,7 @@ The scope was all **60 Markdown artifacts under `docs/`** for parent issue #3
 and children #4-#9, including synthesis, ADRs, roadmap, integration ledgers,
 domain research, source registers, connector packets, cost/workload artifacts,
 and all three review records. I also read the Fact Checker charter, routing/team
-context and source-verification method. `.squad/decisions.md` is absent, as
+context and source-verification method. The former decision register was absent, as
 already reconciled in FCR-011.
 
 Methods:
@@ -658,7 +657,7 @@ Methods:
 4. Enumerated the documentation set and parsed local links: the manifest lists
    exactly 60/60 files, `docs/README.md` links all 60, and no local Markdown link
    is broken.
-5. Recomputed all six SHA-256 values in Rai's Green ledger; every fingerprint
+5. Recomputed all six SHA-256 values in Responsible AI reviewer's Green ledger; every fingerprint
    still matches the exact file bytes recorded in `rai-review.md`.
 6. Queried GitHub read-only: issues #3, #4, #5, #6, #7, #8 and #9 were all
    **OPEN** on 2026-08-25. The documented validate/commit, new draft PR,
@@ -689,12 +688,12 @@ Documented research, blocked/deferred packets, disposable mechanism evidence
 | FCR-006 | **Resolved** | Internal privacy baselines remain separate from legal applicability, and counsel/CPA/acquirer-QSA/broker dispositions remain distinct and pending. |
 | FCR-007 | **Resolved** | The stale WordPress “conditional scores/ranges” wording is now replaced by explicit `Unscored`; no completed market rank is claimed. |
 | FCR-008 | **Resolved** | Current CISA, King County and WhatsApp evidence/status rows were repaired and rechecked as described below. |
-| FCR-009 | **Resolved** | Dax's binary-unit performance table remains the sole normative budget and the security artifact references it. |
+| FCR-009 | **Resolved** | Experience lead's binary-unit performance table remains the sole normative budget and the security artifact references it. |
 | FCR-010 | **Resolved** | Founder artifacts remain non-identifying placeholders; no founder fact or personal profile is approved. |
-| FCR-011 | **Resolved** | No missing accepted Squad decision was found; all six ADRs remain explicitly Proposed. |
+| FCR-011 | **Resolved** | No missing accepted decision was found; all six ADRs remain explicitly Proposed. |
 | FCR-012 | **Resolved** | Legal/content artifacts use claim-level status and do not convert reachability into applicability, contract, production or publication proof. |
 
-### Adversarial F/N and Rai status
+### Adversarial F/N and Responsible AI reviewer status
 
 | Prior ID | Final status | Basis |
 |---|---|---|
@@ -707,13 +706,13 @@ Documented research, blocked/deferred packets, disposable mechanism evidence
 | F-07 | **Resolved** | One performance-budget authority controls. |
 | F-08 | **Resolved** | Issue states, canonical post-commit identity, and closure/approval sequence are reproducible and correctly pending. |
 | F-09 | **Resolved** | Legal drafting remains deferred to qualified counsel; no AI legal text or approval is claimed. |
-| N-01 | **Resolved** | Rai Green is stated only for the six fingerprinted files; all six hashes still match. |
+| N-01 | **Resolved** | Responsible AI reviewer Green is stated only for the six fingerprinted files; all six hashes still match. |
 | N-02 | **Resolved** | WordPress and static fixtures use the same 250-item corpus/manifest. |
 | N-03 | **Unresolved** | The neutral synthesis conflicts with surviving Stripe “leader” and comparator ordering; see FCR-013. |
 | N-04 | **Resolved** | Commit and draft PR now precede child incorporation comments and explicit #4-#9 closure; #3 stays open while draft. |
 | N-05 | **Resolved** | `.3` makes every Phase 1 L1/A1 public quantity identical and records the exact changes. |
 | N-06 | **Resolved** | ADR-001 and portability both reference `.3` and the same 250-item fixture. |
-| RAI-01 through RAI-04 | **Resolved (4/4)** | Rai's six recorded fingerprints match; Green remains limited to those bytes and is not a public/professional approval. |
+| RAI-01 through RAI-04 | **Resolved (4/4)** | Responsible AI reviewer's six recorded fingerprints match; Green remains limited to those bytes and is not a public/professional approval. |
 
 ### Official-source rechecks dated 2026-08-25
 
@@ -760,8 +759,7 @@ Documented research, blocked/deferred packets, disposable mechanism evidence
   artifact preserves an asymmetric rank based on a richer Stripe source packet.
   No equivalent price, contract, DPA, payout/reserve, accessibility, accounting,
   cancellation, exit or executed mechanism evidence exists across candidates.
-- **Owner / remediation:** **Sarek (assigned N-03 follow-up), coordinating Miles
-  O'Brien for the independently revised #6 payment artifact.** Remove
+- **Owner / remediation:** **Legal researcher (assigned N-03 follow-up), coordinating Quality/reliability engineer for the independently revised #6 payment artifact.** Remove
   leader/strongest/comparator ordering and apply one unranked evidence
   disposition until a preregistered symmetric procurement/test packet runs.
 
@@ -786,8 +784,8 @@ Documented research, blocked/deferred packets, disposable mechanism evidence
 - **Impact:** A reader implementing the broad requirement/test rows could omit
   the documented browser exposure and its CSP, origin/message, audience, scope,
   lifetime, memory and teardown controls.
-- **Owner / remediation:** **Geordi La Forge** for the independently revised
-  requirements and **Seven of Nine** for the independently revised security
+- **Owner / remediation:** **Platform engineer** for the independently revised
+  requirements and **Identity/data engineer** for the independently revised security
   artifacts. Qualify every broad row as refresh/long-lived-credential custody
   and cross-reference the provider-specific browser boundary and tests.
 
@@ -805,8 +803,8 @@ Documented research, blocked/deferred packets, disposable mechanism evidence
 - **Impact:** The duplicated values currently match `.3`, so no displayed
   arithmetic is wrong, but the extra unversioned dimension breaks propagation
   and can drift independently during pricing or approval.
-- **Owner / remediation:** **Miles O'Brien**, independent revision owner for the
-  #6 payment artifact, with Seven of Nine. Replace the duplicate with an exact
+- **Owner / remediation:** **Quality/reliability engineer**, independent revision owner for the
+  #6 payment artifact, with Identity/data engineer. Replace the duplicate with an exact
   `.3` reference/derived view; either add accounting users through a new
   controlled workload version or label it a separate non-controlling
   procurement assumption with owner and change rule.
@@ -821,7 +819,7 @@ Documented research, blocked/deferred packets, disposable mechanism evidence
   than `$0`.
 - Backup/privacy retention, sole performance budgets, phase boundaries,
   professional-review disclaimers, legal-draft deferral, connector packet
-  blocked status, Rai Green fingerprint scope, issue state/closure sequence, and
+  blocked status, Responsible AI reviewer Green fingerprint scope, issue state/closure sequence, and
   canonical post-commit approval identity are internally coherent.
 - The manifest/source-register structure is complete. Source registers generally
   distinguish narrow official documentation, vendor claims, blocked/partial
@@ -839,7 +837,7 @@ pending.
 
 ---
 
-## Correction-verification pass — Miles, Geordi, Dax and Seven revisions
+## Correction-verification pass — Quality/reliability engineer, Platform engineer, Experience lead and Identity/data engineer revisions
 
 **Verification date:** 2026-08-25 Pacific
 **Evidence cut-off:** Current uncommitted working tree after the four correction
@@ -889,8 +887,8 @@ into a separate defect.
 | FCR-014 | **Resolved** | `docs/requirements/business-product-requirements.md:47`, `docs/security/control-test-matrix.md:64`, and `docs/security/threat-model.md:44,77` now restrict server-only language to refresh tokens/long-lived credentials, explicitly permit controlled Microsoft/Google short-lived picker-token memory, keep Box unresolved/blocked, and require storage/leak/teardown tests. This matches the official picker mechanics above. |
 | FCR-015 | **Resolved** | `docs/payments/phase-4-evaluation.md:78-88,151` names `RWL-2026-08-25.3` as the sole numerical authority, intentionally does not repeat/extend its payment values, and treats accounting seats/licenses as separate unapproved quote inputs with an owner/change rule. |
 | N-03 | **Resolved** | The exact prior defects are removed: `docs/research/customer-platform-options.md:12-17,60-62,75-77` now uses unranked CRM, scheduling and payment dispositions without fallback/upgrade/Stripe-leader ordering. Provider-neutrality regressions outside that exact finding remain under FCR-016/N-09 below. |
-| N-07 | **Resolved on the supplied payment-correction substance; durable ID definition unverified** | The Miles revision passes the payment-neutrality and sole-RWL checks at `docs/payments/phase-4-evaluation.md:10,51-88,151`. Because the adversarial register has not yet persisted N-07, exact ID traceability awaits N-11 and is not separately double-counted. |
-| N-08 | **Resolved** | The Geordi correction is consistently propagated through requirements and security at the FCR-014 evidence above, while provider packets retain blocked/deferred status and future tests. No surviving broad statement says all connector access tokens are server-only. |
+| N-07 | **Resolved on the supplied payment-correction substance; durable ID definition unverified** | The Quality/reliability engineer revision passes the payment-neutrality and sole-RWL checks at `docs/payments/phase-4-evaluation.md:10,51-88,151`. Because the adversarial register has not yet persisted N-07, exact ID traceability awaits N-11 and is not separately double-counted. |
+| N-08 | **Resolved** | The Platform engineer correction is consistently propagated through requirements and security at the FCR-014 evidence above, while provider packets retain blocked/deferred status and future tests. No surviving broad statement says all connector access tokens are server-only. |
 | N-09 | **Unresolved** | `docs/architecture/customer-platform.md:5-6,23-31,62,180-184` correctly uses non-selected logical identity/inference adapters, but the package still selects preferences in `docs/research/customer-platform-options.md:16` and `docs/requirements/business-product-requirements.md:28`; see FCR-016. |
 | N-10 | **Unresolved** | `docs/architecture/platform-portability.md:73-184`, `docs/architecture/decision-framework.md:64-106`, `docs/architecture/recommendation.md:9-34` and ADR-001 now require a complete symmetric cycle, but ADR-005 still narrows “identical” exit checks to only four static placeholders and managed WordPress; see FCR-017. |
 | N-11 | **Unresolved by the intended sequence; not a new defect** | The ledgers remain materially stale: `docs/README.md:64-74`, `docs/artifacts-manifest.md:81-83`, `docs/planning/work-ownership.md:57-64,100-105`, and `docs/decisions/approvals.md:39-41` still publish the earlier 10-resolved/2-unresolved Fact Checker and N-01-N-06 adversarial snapshots. Reconciliation was intentionally deferred until both independent domain checks; it must now incorporate the actual correction outcomes and current reviewer verdicts. |
@@ -912,8 +910,8 @@ into a separate defect.
   already preferred provider decisions even though the corrected architecture
   says no IdP or inference provider is selected and the evidence packets remain
   incomplete.
-- **Owner / remediation:** **Miles O'Brien** for the independently revised
-  customer-research artifact and **Geordi La Forge** for the requirements
+- **Owner / remediation:** **Quality/reliability engineer** for the independently revised
+  customer-research artifact and **Platform engineer** for the requirements
   synthesis, under the coordinator's next strict-lockout assignment. Replace
   provider preference with logical capability constraints or explicitly route a
   separately approved, evidence-backed preference decision; preserve all
@@ -934,7 +932,7 @@ into a separate defect.
 - **Impact:** The decision ADR can authorize asymmetric portability/exit evidence
   even though the controlling framework prohibits selection from a partial or
   unequal cycle.
-- **Owner / remediation:** **Seven of Nine** for N-10 follow-up, coordinating the
+- **Owner / remediation:** **Identity/data engineer** for N-10 follow-up, coordinating the
   eligible independent ADR-005 revision owner. Replace the five-item subset with
   the closed candidate-register rule and the complete reserved fixture families;
   do not infer any fixture exists or has run.
@@ -950,10 +948,10 @@ The correction-verification verdict is **REVISE**.
 
 ---
 
-## Geordi follow-up correction verification — inference and payment candidate set
+## Platform engineer follow-up correction verification — inference and payment candidate set
 
 **Verification date:** 2026-08-25 Pacific
-**Evidence cut-off:** Current working tree after Geordi's latest independent
+**Evidence cut-off:** Current working tree after Platform engineer's latest independent
 corrections to `docs/research/customer-platform-options.md` and
 `docs/payments/phase-4-evaluation.md`
 **Scope:** Recheck N-09 and the supplied adversarial R-01 Braintree scope;
@@ -985,7 +983,7 @@ belongs in the pending N-11 reconciliation.
 | N-03 | **Remains resolved** | `docs/research/customer-platform-options.md:13-18,61-63,76-78` retains unranked CRM, scheduling, identity and payment dispositions without the prior fallback/upgrade/Stripe-leader ordering. The Braintree correction creates no processor rank. |
 | N-07 | **Remains resolved on the supplied payment scope** | `docs/payments/phase-4-evaluation.md:10,55-88,151` preserves processor neutrality, equal evidence gates for every retained candidate and `RWL-2026-08-25.3` as the sole numerical payment authority. Braintree's research-lead status cannot affect scoring. |
 | FCR-016 | **Partially resolved; remains open** | The Azure-inference limb at prior line 16 is corrected by current `docs/research/customer-platform-options.md:17,119,122`. The independent scheduling limb remains: `docs/requirements/business-product-requirements.md:28` makes M365/Teams the normal scheduling path and Zoom conditional on justification, while `docs/research/customer-platform-options.md:14,76-78`, `docs/architecture/recommendation.md:36-43` and ADR-003 describe a non-ordered shortlist. No inference-provider defect remains, but the scheduling preference still requires an approved evidence-backed preference decision or neutral capability wording. |
-| N-10 / FCR-017 | **Unchanged / unresolved** | `docs/decisions/adr-005-cost-portability-and-lock-in.md:67-76` still applies “identical” exit checks only to four static placeholders and `MWP-PORT-01`, unlike the complete retained-candidate cycle required by `docs/architecture/decision-framework.md:64-106` and `docs/architecture/platform-portability.md:73-184`. Neither Geordi follow-up file changed this scope. |
+| N-10 / FCR-017 | **Unchanged / unresolved** | `docs/decisions/adr-005-cost-portability-and-lock-in.md:67-76` still applies “identical” exit checks only to four static placeholders and `MWP-PORT-01`, unlike the complete retained-candidate cycle required by `docs/architecture/decision-framework.md:64-106` and `docs/architecture/platform-portability.md:73-184`. Neither Platform engineer follow-up file changed this scope. |
 | N-11 | **Unresolved; sole unresolved status-ledger item** | `docs/README.md:64-74`, `docs/artifacts-manifest.md:81-83`, `docs/planning/work-ownership.md:57-64,100-105`, and `docs/decisions/approvals.md:39-41` still publish pre-correction Fact Checker/adversarial counts, owners and remaining work. N-11 must reconcile N-09 and R-01 as resolved while preserving the still-open FCR-016 scheduling limb and N-10/FCR-017. |
 
 ### Current conclusion
@@ -997,11 +995,11 @@ The current package verdict therefore remains **REVISE**.
 
 ---
 
-## Final targeted verification — Dax scheduling and Seven ADR-005 corrections
+## Final targeted verification — Experience lead scheduling and Identity/data engineer ADR-005 corrections
 
 **Verification date:** 2026-08-25 Pacific
-**Evidence cut-off:** Current stable working tree after the targeted Dax and
-Seven corrections
+**Evidence cut-off:** Current stable working tree after the targeted Experience lead and
+Identity/data engineer corrections
 **Scope:** FCR-016's scheduling limb; N-10/FCR-017; and regression checks for
 N-08, platform no-selection, candidate symmetry, `RWL-2026-08-25.3`,
 TCO/labor/spend gates and approval posture.
@@ -1042,13 +1040,13 @@ stale, the final package verdict is **REVISE**.
 
 ---
 
-## Final ledger-only verification — post-Sarek N-11 reconciliation
+## Final ledger-only verification — post-Legal researcher N-11 reconciliation
 
 **Verification date:** 2026-08-25 Pacific
 **Scope:** `docs/README.md`, `docs/artifacts-manifest.md`,
 `docs/planning/work-ownership.md`, `docs/decisions/approvals.md`,
 `docs/reviews/adversarial-review.md`, and the complete current Fact Checker
-history. Rai's six recorded working-tree fingerprints were recomputed solely to
+history. Responsible AI reviewer's six recorded working-tree fingerprints were recomputed solely to
 verify the ledgers' scoped Green wording.
 
 ### Verification results
@@ -1057,9 +1055,9 @@ verify the ledgers' scoped Green wording.
 |---|---|---|
 | Active correction counts and finding status | **Pass** | `docs/README.md:5-17,70-82`, `docs/artifacts-manifest.md:3-17,84-86`, `docs/planning/work-ownership.md:3-11,61-67`, and `docs/decisions/approvals.md:32-41` consistently report final Fact Checker/adversarial content counts of 0 unresolved / 0 new while preserving original/intermediate history. `docs/reviews/adversarial-review.md:307-351` explicitly supersedes the intermediate active state and records N-03, N-07 through N-10, R-01, FCR-016 and FCR-017 resolved. |
 | Issue/PR sequence | **Pass** | `docs/README.md:103-113`, `docs/artifacts-manifest.md:95-100`, `docs/planning/work-ownership.md:83-114`, `docs/decisions/approvals.md:47-59`, and `docs/reviews/adversarial-review.md:353-364` consistently require validate → commit → draft PR with `Closes #3` → child comments naming the actual commit/PR → explicit #4-#9 closure → ledger check → canonical identifiers, while #3 remains open and the PR remains draft. |
-| Rai Green scope and fingerprints | **Pass** | `docs/README.md:13-17`, `docs/artifacts-manifest.md:12-17`, `docs/planning/work-ownership.md:7-11,65-67`, `docs/decisions/approvals.md:33,38,40`, and `docs/reviews/adversarial-review.md:341-344` limit Green to the six fingerprinted working-tree artifacts, preserve the original Red, require reopening on material change and keep canonical identifiers/Cyrus approval pending. Independent SHA-256 recomputation matched all six values recorded at `docs/reviews/rai-review.md:134-143`. |
+| Responsible AI reviewer Green scope and fingerprints | **Pass** | `docs/README.md:13-17`, `docs/artifacts-manifest.md:12-17`, `docs/planning/work-ownership.md:7-11,65-67`, `docs/decisions/approvals.md:33,38,40`, and `docs/reviews/adversarial-review.md:341-344` limit Green to the six fingerprinted working-tree artifacts, preserve the original Red, require reopening on material change and keep canonical identifiers/Cyrus approval pending. Independent SHA-256 recomputation matched all six values recorded at `docs/reviews/rai-review.md:134-143`. |
 | Approval/evidence posture | **Pass** | `docs/README.md:19-23,68,92,103-113,137-140`, `docs/artifacts-manifest.md:3-17,84-100`, `docs/planning/work-ownership.md:27-38,94-114`, `docs/decisions/approvals.md:23-45`, and `docs/reviews/adversarial-review.md:341-364` make no commit, PR, issue-comment/closure, professional approval, live mechanism, registration, spend, implementation, deployment or exact-head approval claim. |
-| Active correction-owner provenance | **Fail** | The current manifest still records **Miles O'Brien** as independent revision owner for `docs/research/customer-platform-options.md` and `docs/payments/phase-4-evaluation.md` at `docs/artifacts-manifest.md:42,51`, although the preserved final Fact Checker history identifies Geordi's later independent corrections at `docs/reviews/fact-check-report.md:953-984`. It records **Geordi La Forge** alone for requirements and ADR-005 at `docs/artifacts-manifest.md:70,78`, while the final targeted verification identifies the later Dax scheduling and Seven ADR-005 corrections at `docs/reviews/fact-check-report.md:1000-1024`. Those active manifest rows omit the latest lockout-correction owners and therefore do not satisfy the requested owner reconciliation. |
+| Active correction-owner provenance | **Fail** | The current manifest still records **Quality/reliability engineer** as independent revision owner for `docs/research/customer-platform-options.md` and `docs/payments/phase-4-evaluation.md` at `docs/artifacts-manifest.md:42,51`, although the preserved final Fact Checker history identifies Platform engineer's later independent corrections at `docs/reviews/fact-check-report.md:953-984`. It records **Platform engineer** alone for requirements and ADR-005 at `docs/artifacts-manifest.md:70,78`, while the final targeted verification identifies the later Experience lead scheduling and Identity/data engineer ADR-005 corrections at `docs/reviews/fact-check-report.md:1000-1024`. Those active manifest rows omit the latest lockout-correction owners and therefore do not satisfy the requested owner reconciliation. |
 
 ### New finding
 
@@ -1069,7 +1067,7 @@ verify the ledgers' scoped Green wording.
 - **Impact:** The package's active artifact provenance can route re-review or
   lockout enforcement to superseded owners even though the final content status
   is correct.
-- **Owner / remediation:** **Sarek**, as the assigned N-11 integration-ledger
+- **Owner / remediation:** **Legal researcher**, as the assigned N-11 integration-ledger
   owner in `docs/planning/work-ownership.md:56,76`. Reconcile the manifest's
   affected owner cells with the full independent revision sequence without
   erasing historical owners or implying approval.
@@ -1082,7 +1080,7 @@ verify the ledgers' scoped Green wording.
 - **New findings:** **1** — FCR-018
 
 N-11 is **not yet truly resolved** because active correction-owner provenance
-remains stale even though counts, content dispositions, sequence, Rai scope and
+remains stale even though counts, content dispositions, sequence, Responsible AI reviewer scope and
 approval/evidence posture are reconciled. The final verdict is **REVISE**.
 
 ---
@@ -1090,10 +1088,10 @@ approval/evidence posture are reconciled. The final verdict is **REVISE**.
 ## Terminal FCR-018 disposition — owner-provenance recheck
 
 **Verification date:** 2026-08-25 Pacific
-**Evidence cut-off:** Current working tree after Sarek's FCR-018-only changes to
+**Evidence cut-off:** Current working tree after Legal researcher's FCR-018-only changes to
 `docs/artifacts-manifest.md` and `docs/planning/work-ownership.md`
 **Method:** Compared both corrected ledgers with the unchanged domain-file owner
-headers and the preserved Geordi, Dax and Seven correction-verification history;
+headers and the preserved Platform engineer, Experience lead and Identity/data engineer correction-verification history;
 then enumerated every `docs/**/*.md` artifact, manifest entry and README link and
 checked all local Markdown links. No approval or additional evidence is inferred.
 
@@ -1101,11 +1099,11 @@ checked all local Markdown links. No approval or additional evidence is inferred
 
 | Artifact | Disposition | Exact evidence |
 |---|---|---|
-| `docs/research/customer-platform-options.md` | **Resolved** | The artifact remains Seven's original work and names **Geordi La Forge** as latest independent correction owner while locking Seven, Miles, Sarek and Nyota out of that rejected revision at `docs/research/customer-platform-options.md:3-7`. The manifest now preserves the chronological Miles → Sarek → Nyota → **Geordi (latest)** sequence, original Seven ownership and the lockout at `docs/artifacts-manifest.md:23-28,47`; `docs/planning/work-ownership.md:55` routes the latest options correction to Geordi while preserving Seven and Miles provenance. |
-| `docs/payments/phase-4-evaluation.md` | **Resolved** | `docs/payments/phase-4-evaluation.md:3-6` names **Geordi La Forge** as latest independent correction owner and preserves the Seven/Miles/Sarek/Nyota lockout. `docs/artifacts-manifest.md:56` preserves Seven as original, Miles as prior correction owner, Geordi as latest and all named locked-out authors; `docs/planning/work-ownership.md:55` records the corresponding prior/latest routing. |
-| `docs/requirements/business-product-requirements.md` | **Resolved** | The file records **Geordi La Forge** for N-08 token custody followed by **Jadzia Dax** for FCR-016 scheduling, with Geordi locked out of Dax's rejected revision at `docs/requirements/business-product-requirements.md:3-6`. The same Picard-original, Geordi-prior, Dax-latest chronology and lockout now appears at `docs/artifacts-manifest.md:75` and `docs/planning/work-ownership.md:57`. |
-| `docs/decisions/adr-005-cost-portability-and-lock-in.md` | **Resolved** | The preserved decisive verification identifies Seven's N-10/FCR-017 correction at `docs/reviews/fact-check-report.md:1000-1024`. `docs/artifacts-manifest.md:83` and `docs/planning/work-ownership.md:57` now preserve Picard as original, **Geordi La Forge** as prior synthesis correction owner and **Seven of Nine** as latest exit-symmetry correction owner. |
-| `docs/architecture/customer-platform.md` | **Resolved** | The artifact names **Jadzia Dax** as independent revision owner for its N-09 vendor-neutral Cycle 4 correction at `docs/architecture/customer-platform.md:3-6`. `docs/artifacts-manifest.md:51` and `docs/planning/work-ownership.md:55` now preserve Seven as original, **Miles O'Brien** as prior correction owner and **Dax** as latest; the general chronology, lockout and no-approval rules remain explicit at `docs/artifacts-manifest.md:23-28` and `docs/planning/work-ownership.md:15-16,47-59`. |
+| `docs/research/customer-platform-options.md` | **Resolved** | The artifact remains Identity/data engineer's original work and names **Platform engineer** as latest independent correction owner while locking Identity/data engineer, Quality/reliability engineer, Legal researcher and Content lead out of that rejected revision at `docs/research/customer-platform-options.md:3-7`. The manifest now preserves the chronological Quality/reliability engineer → Legal researcher → Content lead → **Platform engineer (latest)** sequence, original Identity/data engineer ownership and the lockout at `docs/artifacts-manifest.md:23-28,47`; `docs/planning/work-ownership.md:55` routes the latest options correction to Platform engineer while preserving Identity/data engineer and Quality/reliability engineer provenance. |
+| `docs/payments/phase-4-evaluation.md` | **Resolved** | `docs/payments/phase-4-evaluation.md:3-6` names **Platform engineer** as latest independent correction owner and preserves the Identity/data engineer/Quality/reliability engineer/Legal researcher/Content lead lockout. `docs/artifacts-manifest.md:56` preserves Identity/data engineer as original, Quality/reliability engineer as prior correction owner, Platform engineer as latest and all named locked-out authors; `docs/planning/work-ownership.md:55` records the corresponding prior/latest routing. |
+| `docs/requirements/business-product-requirements.md` | **Resolved** | The file records **Platform engineer** for N-08 token custody followed by **Experience lead** for FCR-016 scheduling, with Platform engineer locked out of Experience lead's rejected revision at `docs/requirements/business-product-requirements.md:3-6`. The same Product lead-original, Platform engineer-prior, Experience lead-latest chronology and lockout now appears at `docs/artifacts-manifest.md:75` and `docs/planning/work-ownership.md:57`. |
+| `docs/decisions/adr-005-cost-portability-and-lock-in.md` | **Resolved** | The preserved decisive verification identifies Identity/data engineer's N-10/FCR-017 correction at `docs/reviews/fact-check-report.md:1000-1024`. `docs/artifacts-manifest.md:83` and `docs/planning/work-ownership.md:57` now preserve Product lead as original, **Platform engineer** as prior synthesis correction owner and **Identity/data engineer** as latest exit-symmetry correction owner. |
+| `docs/architecture/customer-platform.md` | **Resolved** | The artifact names **Experience lead** as independent revision owner for its N-09 vendor-neutral Cycle 4 correction at `docs/architecture/customer-platform.md:3-6`. `docs/artifacts-manifest.md:51` and `docs/planning/work-ownership.md:55` now preserve Identity/data engineer as original, **Quality/reliability engineer** as prior correction owner and **Experience lead** as latest; the general chronology, lockout and no-approval rules remain explicit at `docs/artifacts-manifest.md:23-28` and `docs/planning/work-ownership.md:15-16,47-59`. |
 
 FCR-018 is **resolved**. The corrected ledgers preserve durable original
 ownership, prior independent correction provenance, file-specific latest owners
