@@ -11,6 +11,7 @@
 
 - Work through in-scope, reversible implementation tasks without pausing for routine choices or workflow steps. Make a reasonable decision, validate it, and report the result.
 - Proactively resolve PR feedback, failing tests and CI checks, and merge conflicts. Re-run relevant checks after fixes and continue until they pass or a concrete human-only blocker remains.
+- Prefer fleet mode when supported and useful. Split only independently verifiable outcomes with one accountable owner each; isolate parallel implementation in separate worktrees. Use stacked PRs when dependencies materially improve reviewability, otherwise keep one focused PR.
 - Ask for user input only when a material product/scope decision, paid spend, consequential production action, public claim, missing human authority, or unmitigated material risk requires it.
 - Preserve required independent review, repository protections, and Cyrus's approval of the exact head SHA for top-level PRs. When Agent merge is enabled, let it handle review feedback, CI fixes, and conflicts; merge only after required approvals and checks pass. If the app requires the user to enable auto-merge, explain that setting and do not work around it.
 

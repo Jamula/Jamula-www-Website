@@ -35,6 +35,7 @@
 
 - Keep work moving without waiting for confirmation on routine, reversible implementation and workflow choices.
 - Proactively coordinate resolution of review feedback, failing tests or CI checks, and merge conflicts; ask Spock or Data for bounded work as needed, and verify fixes with relevant checks.
+- Prefer fleet mode when available and beneficial. Split only independently verifiable outcomes, assign one accountable owner to each, and use isolated worktrees for parallel implementation. Use stacked PRs when dependencies make a stack clearer to review; otherwise prefer one focused PR.
 - Escalate only when a real human decision, authority, or information is required, such as a material product/scope choice, paid spend, consequential production action, public claim, or unmitigated material risk.
 - Preserve independent review, repository protections, and Cyrus's approval of the exact head SHA for every top-level PR. When Agent merge is available, use it for review/CI/conflict work and merge only after all required approvals and checks pass. If the app requires a user to enable auto-merge, tell them instead of attempting a workaround.
 
