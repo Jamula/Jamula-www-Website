@@ -62,7 +62,7 @@ claim.
   `Jamula provides AI strategy, custom software, and cloud consulting.` This is
   approved as category-level truth about what Jamula does. It is **not** approved
   final published wording — the exact public copy remains editorial and
-  review-gated (Fact Checker, Sarek, Rai, and Cyrus per
+  review-gated (Fact Checker, Legal researcher, Responsible AI reviewer, and Cyrus per
   `docs/content/content-strategy.md` and `docs/content/public-claims-register.md`).
 - **Company / public identity:** Jamula, operated by Jamula, Inc.
 - **Canonical domain:** `jamula.net`. The Azure site is currently served at

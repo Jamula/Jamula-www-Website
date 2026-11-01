@@ -1,9 +1,9 @@
 # Jamula experience requirements
 
 **Work context:** Refs #3; child #5
-**Owner:** Jadzia Dax, Experience & Design Lead
-**Required reviewers:** Nyota Uhura, Miles O'Brien, Fact Checker
-**Status:** Evaluation requirements for Picard synthesis; not an implementation, accessibility audit, or claim of conformance
+**Owner:** Experience lead, Experience & Design Lead
+**Required reviewers:** Content lead, Quality/reliability engineer, Fact Checker
+**Status:** Evaluation requirements for Product lead synthesis; not an implementation, accessibility audit, or claim of conformance
 **Updated:** 2026-08-24
 
 ## 1. Experience direction
@@ -216,7 +216,7 @@ Vendor-specific behavior without current official evidence is **unverified**. Re
 
 ## 10. Synthesis-ready decisions and actions
 
-Picard should carry forward these platform gates:
+Product lead should carry forward these platform gates:
 
 1. Approve calm technical confidence, the Phase 1 IA, and progressive sophistication as the experience direction.
 2. Make all Level A and AA WCAG 2.2 criteria, critical-flow fallback, canonical-domain behavior, and good field Core Web Vitals non-negotiable.

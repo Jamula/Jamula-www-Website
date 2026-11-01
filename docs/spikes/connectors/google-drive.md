@@ -1,8 +1,8 @@
 # Google Drive connector — blocked/deferred packet
 
 **Decision context:** Refs #3; child #6
-**Owner:** Seven of Nine
-**Required reviewers:** Miles O'Brien, Sarek, Rai, Fact Checker; Cyrus approval for any live action
+**Owner:** Identity/data engineer
+**Required reviewers:** Quality/reliability engineer, Legal researcher, Responsible AI reviewer, Fact Checker; Cyrus approval for any live action
 **Evidence class:** documented research only
 **Status:** blocked/deferred
 **Updated:** 2026-08-25 Cycle 3; no live mechanism evidence
@@ -51,7 +51,7 @@ Passing consent flow must identify Jamula, the exact `drive.file` purpose, selec
 
 ## Remediation issue recommendation
 
-Create after incorporation: **“Execute approved Google Drive `drive.file` connector spike and verification review”**, owner Seven of Nine; reviewers Miles, Sarek, Rai, Fact Checker. Prerequisites: approved project/accounts/domain/brand, consent copy, exact scope classification, terms/DPA/Limited Use, region, vault, billing/spend and teardown. Link `Refs #3; child #6`.
+Create after incorporation: **“Execute approved Google Drive `drive.file` connector spike and verification review”**, owner Identity/data engineer; reviewers Quality/reliability engineer, Legal researcher, Responsible AI reviewer, Fact Checker. Prerequisites: approved project/accounts/domain/brand, consent copy, exact scope classification, terms/DPA/Limited Use, region, vault, billing/spend and teardown. Link `Refs #3; child #6`.
 
 ## Preview / GA disposition
 

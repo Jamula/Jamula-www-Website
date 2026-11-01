@@ -41,7 +41,7 @@ A restore is never immediately serving. It enters quarantine and is re-evaluated
 
 ## Reliability, performance, and coverage
 
-Dax's [performance gate](../experience/accessibility-seo-performance.md#6-performance-gate) is the sole normative performance budget. It includes <=900 KiB encoded aggregate for public content routes and <=1,500 KiB for interactive/authenticated shells; category limits and field outcomes remain authoritative there. No competing budget is established in this ADR.
+Experience lead's [performance gate](../experience/accessibility-seo-performance.md#6-performance-gate) is the sole normative performance budget. It includes <=900 KiB encoded aggregate for public content routes and <=1,500 KiB for interactive/authenticated shells; category limits and field outcomes remain authoritative there. No competing budget is established in this ADR.
 
 The [incident plan](../security/incident-detection-response.md) controls staffing and coverage:
 
@@ -88,7 +88,7 @@ Control labor, independent testing, accessibility participation, professional re
 
 ## Professional gates
 
-Counsel, privacy/security specialists, CPA, broker/insurance, acquirer/QSA, accessibility, Miles, Seven, Rai, Dax, Sarek, Fact Checker, and Cyrus dispositions apply exactly where assigned by the phase gates. A risk acceptance cannot replace a non-waivable gate.
+Counsel, privacy/security specialists, CPA, broker/insurance, acquirer/QSA, accessibility, Quality/reliability engineer, Identity/data engineer, Responsible AI reviewer, Experience lead, Legal researcher, Fact Checker, and Cyrus dispositions apply exactly where assigned by the phase gates. A risk acceptance cannot replace a non-waivable gate.
 
 ## Confidence and dissent
 
@@ -100,6 +100,6 @@ Reasonable dissent: the baseline is expensive for an early business. The safe re
 
 - A data class, purpose, jurisdiction, processor, threat model, AI boundary, or payment scope changes.
 - Restore testing reveals tombstone, ACL, tenant, classification, expiry, or legal-hold errors.
-- Dax changes the normative performance budget.
+- Experience lead changes the normative performance budget.
 - Required staffing, coverage, participant recruitment, or professional review cannot be funded.
 - A Critical/High defect, cross-tenant disclosure, rights failure, or AI gate failure occurs.

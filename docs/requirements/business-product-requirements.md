@@ -2,8 +2,8 @@
 
 **Status:** Proposed / pending Cyrus exact-SHA approval
 **Decision context:** [Parent #3](https://github.com/Jamula/Jamula-www-Website/issues/3) and children [#4](https://github.com/Jamula/Jamula-www-Website/issues/4)-[#9](https://github.com/Jamula/Jamula-www-Website/issues/9)
-**Token-custody revision owner:** Geordi La Forge, Platform Engineering (independent N-08 remediation)
-**Scheduling correction revision owner:** Jadzia Dax (independent FCR-016 remediation; Geordi La Forge is locked out from this rejected revision)
+**Token-custody revision owner:** Platform engineer, Platform Engineering (independent N-08 remediation)
+**Scheduling correction revision owner:** Experience lead (independent FCR-016 remediation; Platform engineer is locked out from this rejected revision)
 
 ## Product outcome and boundaries
 

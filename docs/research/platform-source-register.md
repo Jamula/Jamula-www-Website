@@ -13,7 +13,7 @@ the row says otherwise; tax and checkout may differ.
 
 | ID | Official URL | Title / publisher | Region/version | Exact supported claim | Status |
 |---|---|---|---|---|---|
-| S01 | [`docs/planning/evaluation-plan.md`](../planning/evaluation-plan.md) | Jamula Website Evaluation and Squad Bootstrap Plan / Jamula | Repository version at access | Requires equal rubric, preregistered gates/workloads/weights/penalties/risk ceiling, four cost scenarios, main-only production, portability contract, canonical-domain behavior and approval gates. | **verified**, internal durable source |
+| S01 | [`docs/planning/evaluation-plan.md`](../planning/evaluation-plan.md) | Jamula Website Evaluation Plan / Jamula | Repository version at access | Requires equal rubric, preregistered gates/workloads/weights/penalties/risk ceiling, four cost scenarios, main-only production, portability contract, canonical-domain behavior and approval gates. | **verified**, internal durable source |
 | S02 | https://azure.microsoft.com/en-us/pricing/details/app-service/static/ | Azure Static Web Apps pricing / Microsoft | US English; price snapshot | Free plan describes hosting, SSL, custom domain and 1m free Functions executions; Standard is hourly and supports bandwidth overage. The page response did not expose a Standard USD figure. | **partial** |
 | S03 | https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/tutorial-acm-create-budgets | Create and manage budgets / Microsoft Learn | Doc updated 2025-09-26; Azure global | Budgets notify on actual/forecast thresholds; resources are not affected and consumption is not stopped; data may lag 8–24h and evaluation occurs every 24h. | **verified** |
 | S04 | https://azure.microsoft.com/en-us/pricing/details/app-service/linux/ | App Service pricing—Linux / Microsoft | US English; current page | F1 has 60 CPU min/day, 1 GB RAM/storage, no SLA and is not supported for production; dynamic dollar cells were blank. | **verified** limits; **blocked** price |
@@ -47,12 +47,12 @@ the row says otherwise; tax and checkout may differ.
 
 | Packet | Attempted evidence | Blocker | Decision effect | Required remediation / owner |
 |---|---|---|---|---|
-| Wix Studio | S14–S15 | Dynamic/insufficient official responses | No gate pass, score or TCO assertion | Geordi: obtain dated US quote, commercial terms, full export/data/API and Git/main-only publishing docs; Fact Checker verifies |
-| Squarespace | S16–S17 | Dynamic/incorrect help response | No gate pass, score or TCO assertion | Geordi: obtain dated plan quote and export/redirect/developer docs |
-| Webflow complete plan | S10–S11 | Site price known; required Workspace price and main-only flow not established | Not scored as finalist | Geordi: quote combined plan and test export/rebuild in synthetic spike |
-| WordPress variants | S12–S13, S20 | WordPress.com price blank; managed-host contract unnamed | **Unscored; prior exploratory output withdrawn; exact plan evidence pending** | Geordi: official checkout quote and two managed-host quotes; Miles: restore/update SLA review |
+| Wix Studio | S14–S15 | Dynamic/insufficient official responses | No gate pass, score or TCO assertion | Platform engineer: obtain dated US quote, commercial terms, full export/data/API and Git/main-only publishing docs; Fact Checker verifies |
+| Squarespace | S16–S17 | Dynamic/incorrect help response | No gate pass, score or TCO assertion | Platform engineer: obtain dated plan quote and export/redirect/developer docs |
+| Webflow complete plan | S10–S11 | Site price known; required Workspace price and main-only flow not established | Not scored as finalist | Platform engineer: quote combined plan and test export/rebuild in synthetic spike |
+| WordPress variants | S12–S13, S20 | WordPress.com price blank; managed-host contract unnamed | **Unscored; prior exploratory output withdrawn; exact plan evidence pending** | Platform engineer: official checkout quote and two managed-host quotes; Quality/reliability engineer: restore/update SLA review |
 | Ghost / Power Pages | S21 / not reached | Insufficient official packet | Deferred comparator | Re-open only if shortlist needs another option or portal decision requires it |
-| Registrar/domain/email | S18–S19, S24–S25 | Renewal, registry lock, mailbox and transactional-email unit prices absent | Planning reserve only | Obtain non-purchase Namecheap/Azure/M365 quotes; Sarek reviews terms |
+| Registrar/domain/email | S18–S19, S24–S25 | Renewal, registry lock, mailbox and transactional-email unit prices absent | Planning reserve only | Obtain non-purchase Namecheap/Azure/M365 quotes; Legal researcher reviews terms |
 | Sustainability comparison | S26–S27 | Non-comparable vendor reports; no workload measurements | No vendor awarded points | Fact Checker reviews reports; implementation measures bytes/build/runtime/storage |
 
 ## Claim-use rules

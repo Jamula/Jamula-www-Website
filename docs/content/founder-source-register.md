@@ -47,8 +47,8 @@ The source lead is to be used as follows:
    statement, evidence state, permitted channels, exclusions, required reviews, expiry, and
    correction/removal action.
 3. Fact Checker verifies the exact claim against the confirmed source.
-4. Sarek reviews privacy, publicity, employer/vendor, trademark, and endorsement implications.
-5. Rai reviews potentially misleading or harmful framing.
+4. Legal researcher reviews privacy, publicity, employer/vendor, trademark, and endorsement implications.
+5. Responsible AI reviewer reviews potentially misleading or harmful framing.
 6. Cyrus approves the exact final wording before any use.
 
 No step may be skipped. The LinkedIn URL is not a publishable link until these gates close.
@@ -58,7 +58,7 @@ No step may be skipped. The LinkedIn URL is not a publishable link until these g
 | Public-repository field | Value |
 |---|---|
 | Approved founder facts | Cyrus Jamula is the founder of Jamula. (Owner-approved identification, issue #43 boundary comment, 2026-08-29.) |
-| Approved founder wording | Identification as founder only. Exact published copy requires Fact Checker, Sarek, Rai, Dax, and Cyrus exact-version gate. |
+| Approved founder wording | Identification as founder only. Exact published copy requires Fact Checker, Legal researcher, Responsible AI reviewer, Experience lead, and Cyrus exact-version gate. |
 | Technical background wording | **Review-required.** No approved wording exists. LinkedIn profile is an identified source lead; exact claim and wording require Cyrus confirmation, source verification, and all gate reviews before use. |
 | Excluded facts | Microsoft employer/title; community/religious affiliations; addresses; client names; private contacts; unverified credentials. |
 | Source lead | LinkedIn public profile — source type recorded; exact URL to be confirmed by Cyrus in the controlled private register only. |
@@ -70,9 +70,9 @@ No step may be skipped. The LinkedIn URL is not a publishable link until these g
 | Gate | Reviewer | Scope |
 |---|---|---|
 | Source fidelity and exact-claim verification | Fact Checker | Each approved fact must be verified against the controlled-register source |
-| Privacy, publicity, employer/vendor, trademark, and endorsement | Sarek | Blocking review; do not publish while blocked |
-| Harmful-framing review | Rai | Applicable to all founder copy and section context |
-| Presentation and accessibility | Dax | Founder section layout, reading order, and accessible implementation |
+| Privacy, publicity, employer/vendor, trademark, and endorsement | Legal researcher | Blocking review; do not publish while blocked |
+| Harmful-framing review | Responsible AI reviewer | Applicable to all founder copy and section context |
+| Presentation and accessibility | Experience lead | Founder section layout, reading order, and accessible implementation |
 | Exact artifact version approval | Cyrus | Approves final wording, channels, conditions, and expiry; no copy publishes without this |
 
 **Context:** `Refs #43; parent #39`; updated from C2 stub per issue #43 scope and Cyrus

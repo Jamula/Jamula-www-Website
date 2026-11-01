@@ -1,5 +1,11 @@
 # Jamula Website Documentation
 
+**Maintenance note:** Responsibilities are expressed as functional roles rather
+than former agent personas. Historical issue links, commit identifiers, review
+findings, and approval gates are retained; role-name normalization is not a new
+review or approval of the current files. Historical exact-text revisions remain
+available through their recorded commits.
+
 ## Status
 
 All six child workstreams, [#4](https://github.com/Jamula/Jamula-www-Website/issues/4)
@@ -16,11 +22,11 @@ ledger findings / 0 new findings**. Prior Reject/Revise dispositions remain
 preserved as historical review evidence; FCR-018 and the remaining N-11
 owner-provenance defect are resolved.
 
-Rai's remediation re-review remains **Green: 4 resolved / 0 unresolved** only
+Responsible AI reviewer's remediation re-review remains **Green: 4 resolved / 0 unresolved** only
 for the six fingerprinted working-tree artifacts. The original Red remains
 preserved as review history. Canonical Git blob OIDs for these changed ledger artifacts,
 the exact final PR-head SHA, Cyrus approval, and all professional gates remain
-pending; a material change to a fingerprinted file reopens its affected Rai
+pending; a material change to a fingerprinted file reopens its affected Responsible AI reviewer
 finding.
 
 [Issue #3](https://github.com/Jamula/Jamula-www-Website/issues/3) remains open
@@ -51,13 +57,13 @@ Here, “PR 2 work package” is the evaluation-plan phase name, not GitHub PR #
 
 ## Child research
 
-The durable mapping remains [#4 Uhura
-content](https://github.com/Jamula/Jamula-www-Website/issues/4), [#5 Dax
-experience](https://github.com/Jamula/Jamula-www-Website/issues/5), [#6 Seven
+The durable mapping remains [#4 Content lead
+content](https://github.com/Jamula/Jamula-www-Website/issues/4), [#5 Experience lead
+experience](https://github.com/Jamula/Jamula-www-Website/issues/5), [#6 Identity/data engineer
 customer platform](https://github.com/Jamula/Jamula-www-Website/issues/6), [#7
-Miles security/quality](https://github.com/Jamula/Jamula-www-Website/issues/7),
-[#8 Geordi platform/cost](https://github.com/Jamula/Jamula-www-Website/issues/8),
-and [#9 Sarek
+Quality/reliability engineer security/quality](https://github.com/Jamula/Jamula-www-Website/issues/7),
+[#8 Platform engineer platform/cost](https://github.com/Jamula/Jamula-www-Website/issues/8),
+and [#9 Legal researcher
 legal](https://github.com/Jamula/Jamula-www-Website/issues/9). Independent revision
 ownership and lockouts are in [work ownership](planning/work-ownership.md).
 

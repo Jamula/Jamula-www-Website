@@ -1,7 +1,7 @@
 # Reference Workload Dictionary
 
 **Version:** `RWL-2026-08-25.3`
-**Status:** Controlling numerical dictionary for the Geordi research, cost and
+**Status:** Controlling numerical dictionary for the Platform engineer research, cost and
 portability artifacts; proposed and not decision-eligible until Cyrus approves
 this exact version and SHA
 **Context:** `Refs #3; child #8`; Cycle 3 consistency remediation for N-05
@@ -121,8 +121,8 @@ reason, cost impact and affected calculations.
 
 | Version | Change | Evidence and reason | Cost impact |
 |---|---|---|---|
-| `RWL-2026-08-25.1` | Initial controlling workload dimensions; Geordi-derived labor sensitivities remained in the cost model | Cycle 2 reconciliation | Superseded for labor calculations |
-| `RWL-2026-08-25.2` | Replaced 4-12, 15-47, 17-55 and 30-90 h/month assumptions and Phase 2/3/4 ranges with P1 14, P2 24 cumulative, P3 40 cumulative, P4 52 cumulative and P5 62 cumulative when P4 is live | Seven's authoritative phase table in `incident-detection-response.md` | Recalculates Phase 1 public-site envelopes and later-phase increments; P3+ 24x7 coverage remains unpriced |
+| `RWL-2026-08-25.1` | Initial controlling workload dimensions; Platform engineer-derived labor sensitivities remained in the cost model | Cycle 2 reconciliation | Superseded for labor calculations |
+| `RWL-2026-08-25.2` | Replaced 4-12, 15-47, 17-55 and 30-90 h/month assumptions and Phase 2/3/4 ranges with P1 14, P2 24 cumulative, P3 40 cumulative, P4 52 cumulative and P5 62 cumulative when P4 is live | Identity/data engineer's authoritative phase table in `incident-detection-response.md` | Recalculates Phase 1 public-site envelopes and later-phase increments; P3+ 24x7 coverage remains unpriced |
 | `RWL-2026-08-25.3` | A1 Phase 1 inquiries changed `200` → `100` while transactional mail stays `500`; retained logs changed `10 GB` → `5 GB` while retention stays `30 days`. All other Phase 1 values are unchanged, making L1 and A1 public volume identical. | N-05 consistency finding: architecture/cost arms require the same public demand fixture | No arithmetic change to the unquoted public TCO envelopes: they use composite external-service reserves and the common P1 14 h/month control floor, not inquiry or retained-log unit multiplication. Requote exact services before scoring. |
 
 Future cadence or quantity changes must record the exact old/new value and every

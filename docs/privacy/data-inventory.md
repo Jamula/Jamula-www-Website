@@ -1,7 +1,7 @@
 # Customer-platform data inventory
 
 **Decision context:** Refs #3; child #6
-**Owner:** Seven of Nine
+**Owner:** Identity/data engineer
 **Status:** proposed global engineering baseline; lawful-basis, jurisdiction, transfer and notice conclusions require qualified professional review before collection
 **Updated:** 2026-08-25 Cycle 3; legal applicability remains professionally unresolved
 
@@ -67,7 +67,7 @@ The public notice must name or categorize recipients accurately and link a maint
 
 ## Required reviews
 
-- **Sarek / counsel:** served-market-specific lawful bases/LIAs, controller/processor roles, minors, marketing, GPC, DSR/appeal clocks, transfers, authoritative-record retention, legal holds, AI and financial disclosures. GDPR and UK applicability remain `needs counsel`; the voluntary internal baseline is separate.
+- **Legal researcher / counsel:** served-market-specific lawful bases/LIAs, controller/processor roles, minors, marketing, GPC, DSR/appeal clocks, transfers, authoritative-record retention, legal holds, AI and financial disclosures. GDPR and UK applicability remain `needs counsel`; the voluntary internal baseline is separate.
 - **CPA/counsel:** invoice/payment retention, taxes, revenue recognition, automatic renewal, cancellation/refund and dispute records.
-- **Miles:** security classifications, access/logging, RPO/RTO, restoration/deletion interaction, breach and incident controls.
-- **Rai:** AI purpose, minimization, transparency, human escalation and impacts.
+- **Quality/reliability engineer:** security classifications, access/logging, RPO/RTO, restoration/deletion interaction, breach and incident controls.
+- **Responsible AI reviewer:** AI purpose, minimization, transparency, human escalation and impacts.

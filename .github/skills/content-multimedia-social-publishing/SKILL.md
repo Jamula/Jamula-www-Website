@@ -10,4 +10,4 @@ description: Rights-safe editorial, multimedia, and social publishing workflows.
 - Require captions, transcripts, alt text, accessible players, responsive renditions, compression, metadata, source-asset ownership, and retention.
 - Adapt content to LinkedIn, Medium, WhatsApp, GitHub, and future channels without duplicating unsupported claims.
 - Record platform terms, disclosure, moderation, correction, takedown, and account-control requirements.
-- Public environmental, ethical, social, customer, and performance claims require the claims register, dated evidence, Fact Checker, Sarek, Rai, and Cyrus approval.
+- Public environmental, ethical, social, customer, and performance claims require the claims register, dated evidence, Fact Checker, Legal researcher, Responsible AI reviewer, and Cyrus approval.

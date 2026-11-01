@@ -7,7 +7,7 @@
 **Context:** Refs #3; child #7
 
 **Owner:** Quality & Reliability Engineering
-**Token-custody revision owner:** Geordi La Forge, Platform Engineering (independent N-08 remediation)
+**Token-custody revision owner:** Platform engineer, Platform Engineering (independent N-08 remediation)
 
 **Required review:** Identity/Data/AI, Platform, Experience/Accessibility, Fact Checker; Cyrus approves phase gates and risk acceptance
 

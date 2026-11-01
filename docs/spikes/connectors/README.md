@@ -1,7 +1,7 @@
 # Storage connector evidence packets
 
 **Decision context:** Refs #3; child #6
-**Owner:** Seven of Nine
+**Owner:** Identity/data engineer
 **Updated:** 2026-08-25 Cycle 3; no live mechanism evidence
 
 ## Evaluation status

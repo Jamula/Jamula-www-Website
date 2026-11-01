@@ -80,7 +80,7 @@ Before release:
 - A scanner's absence from its database is not evidence of safety. Record database timestamp, ecosystem coverage and unsupported components.
 - False positives require component/version/path evidence and expiry; suppression is reviewed and scoped, never global.
 - Generate VEX only when the selected format/tool and review policy are approved; `not affected` needs technical justification and expiry.
-- License and notice checks support, but do not replace, Sarek/qualified legal review. Unknown/incompatible licensing blocks distribution.
+- License and notice checks support, but do not replace, Legal researcher/qualified legal review. Unknown/incompatible licensing blocks distribution.
 - On new high-impact advisory, triage inventory within 4 hours for Critical/known exploited and 1 business day for High; containment/patch SLO is set by exposure and incident severity, not CVSS alone.
 
 ## Dependency and action intake

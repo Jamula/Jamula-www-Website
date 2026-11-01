@@ -1,8 +1,8 @@
 # Multimedia and Social Plan
 
 **Status:** Draft plan; no production publishing authorized
-**Owner:** Nyota Uhura
-**Reviewers:** Jadzia Dax, Sarek, Rai, Fact Checker
+**Owner:** Content lead
+**Reviewers:** Experience lead, Legal researcher, Responsible AI reviewer, Fact Checker
 **Approver:** Cyrus Jamula
 
 ## Publishing model
@@ -11,11 +11,11 @@
 
 | Channel | Format and purpose | Cadence | Owner / approval | Metric | Expiry control |
 |---|---|---|---|---|---|
-| Website | Canonical pages, articles, diagrams, demos, case studies | Monthly review; readiness-driven publication | Nyota; reviewers above; Cyrus exact-version approval | Task completion, qualified contacts, accessibility defects | 90-day factual / 180-day evergreen review |
-| LinkedIn | Short insight, document/image post, captioned clip linking to canonical source | Maximum 2/week | Nyota/publisher; Cyrus campaign or sensitive-post approval | Meaningful engagements and qualified visits | 30-day outcome review; 90-day factual expiry |
-| Medium | Source-rich technical article; canonical link and disclosure where applicable | Maximum 2/month | Nyota/editor; Cyrus exact-version approval | Reads, read ratio, qualified referrals | Sources 90 days; article 180 days |
+| Website | Canonical pages, articles, diagrams, demos, case studies | Monthly review; readiness-driven publication | Content lead; reviewers above; Cyrus exact-version approval | Task completion, qualified contacts, accessibility defects | 90-day factual / 180-day evergreen review |
+| LinkedIn | Short insight, document/image post, captioned clip linking to canonical source | Maximum 2/week | Content lead/publisher; Cyrus campaign or sensitive-post approval | Meaningful engagements and qualified visits | 30-day outcome review; 90-day factual expiry |
+| Medium | Source-rich technical article; canonical link and disclosure where applicable | Maximum 2/month | Content lead/editor; Cyrus exact-version approval | Reads, read ratio, qualified referrals | Sources 90 days; article 180 days |
 | WhatsApp | Opted-in, event-driven conversation or approved template | No unsolicited schedule | Communications owner; Cyrus template approval | Opt-outs, complaints, response SLO, resolution | Consent per send; template 90 days |
-| GitHub | Project-specific README/release/showcase content | Release/event driven | Maintainer + Nyota; Cyrus positioning approval | Documentation task success, issue SLO, referrals | Each release and quarterly |
+| GitHub | Project-specific README/release/showcase content | Release/event driven | Maintainer + Content lead; Cyrus positioning approval | Documentation task success, issue SLO, referrals | Each release and quarterly |
 
 ## Channel adaptation rules
 
@@ -34,7 +34,7 @@ No asset enters draft layout without an asset ID and ledger record. Required fie
 | Copy and translations | Authorship or license; quotation/source record; translator approval | Plagiarism and factual review; preserve meaning and disclosure |
 | Photography | Photographer rights plus model/property release where applicable | Record minors, private locations, sensitive context, and alteration |
 | Illustration, icons, diagrams | Creator/license and source files | Do not assume stock or template elements permit trademark/commercial use |
-| Fonts | Exact family/weight/file and web/app embedding license | Sarek verifies redistribution, self-hosting, and attribution terms |
+| Fonts | Exact family/weight/file and web/app embedding license | Legal researcher verifies redistribution, self-hosting, and attribution terms |
 | Audio, music, sound effects | Composition and recording rights, voice consent, channel/territory/term | “Royalty free” is not a rights record |
 | Video, animation, livestream | Footage, performance, music, location, logo, and distribution rights | Preserve project files, releases, caption/transcript masters |
 | Testimonials and quotations | Signed exact wording, attribution, channels, term, result substantiation | Material connections and non-typical results require disclosure/review |
@@ -65,10 +65,10 @@ Production requirements:
 - Plan captions, descriptions, and transcripts in the script/storyboard. Automated output is a starting point only; a human corrects names, terminology, timing, speaker identity, and meaningful sounds.
 - Use a player with keyboard-operable controls, visible focus, programmatic names/states, caption selection, transcript access, volume controls, and no forced autoplay with sound.
 - Retain a lossless or highest-quality source master; generate efficient modern renditions plus a supported fallback. Strip unnecessary metadata while retaining the provenance record separately.
-- Implementation establishes page-weight and quality thresholds through representative tests; until Dax/Miles/Picard approve numeric budgets, rendition-size claims are **blocked/deferred**.
+- Implementation establishes page-weight and quality thresholds through representative tests; until Experience lead/Quality/reliability engineer/Product lead approve numeric budgets, rendition-size claims are **blocked/deferred**.
 - Future implementation tests measure caption and transcript coverage, alt-text completeness, player conformance, responsive cropping, media transfer size, rendering time, and broken-asset rate in CI or scheduled audits.
 
-The W3C [Images Tutorial](https://www.w3.org/WAI/tutorials/images/) and [Making Audio and Video Media Accessible](https://www.w3.org/WAI/media/av/) were verified 2026-08-24 and are the documented-research basis. WCAG 2.2 AA is the project target; legal conformance conclusions remain for Sarek/counsel.
+The W3C [Images Tutorial](https://www.w3.org/WAI/tutorials/images/) and [Making Audio and Video Media Accessible](https://www.w3.org/WAI/media/av/) were verified 2026-08-24 and are the documented-research basis. WCAG 2.2 AA is the project target; legal conformance conclusions remain for Legal researcher/counsel.
 
 ## Account control
 
@@ -91,7 +91,7 @@ Publish a concise participation standard: be relevant, respectful, truthful, pri
 | Severity | Example | Action and service level |
 |---|---|---|
 | Critical | Credible threat, doxxing, exposed credential/customer data, child-safety concern | Hide/restrict where possible; preserve minimum evidence securely; alert incident owner immediately; initial action within 1 hour |
-| High | Harassment, hate, impersonation, fraud, infringement notice | Restrict/report; Sarek or safety owner review; initial action within 4 hours |
+| High | Harassment, hate, impersonation, fraud, infringement notice | Restrict/report; Legal researcher or safety owner review; initial action within 4 hours |
 | Standard | Spam, repeated off-topic promotion, misinformation risk | Label/hide/remove per policy; action within 1 business day |
 | Constructive | Question, criticism, correction | Acknowledge within 2 business days; answer or route without suppressing dissent |
 
@@ -103,7 +103,7 @@ Track count, category, channel, response time, outcome, appeal, and repeat patte
 - Working exports: delete within 30 days after approved master/derivatives are secured.
 - Social drafts: delete rejected drafts within 30 days unless needed for an active dispute or documented learning.
 - Platform analytics: export only aggregate fields needed for the scorecard; retain 13 months provisionally, subject to privacy approval.
-- Consent, release, claim, correction, and takedown evidence: retention is **blocked pending Sarek/Seven review**; do not invent a period.
+- Consent, release, claim, correction, and takedown evidence: retention is **blocked pending Legal researcher/Identity/data engineer review**; do not invent a period.
 - Expiry automation must flag items 14 days before review; expired factual content is unpublished, unlisted, or clearly marked stale until reapproved.
 - Correction/takedown follows the workflow in `editorial-workflow.md`; platform removal never substitutes for correcting the canonical source and derivative archive.
 
@@ -113,12 +113,12 @@ Claim-level retrieval was repeated on **2026-08-25**. Statuses describe only the
 
 | Source | Narrow use | Status |
 |---|---|---|
-| LinkedIn [User Agreement](https://www.linkedin.com/legal/user-agreement) and [Professional Community Policies](https://www.linkedin.com/legal/professional-community-policies) | Account/service responsibility and content/conduct restrictions | `verified narrow official claim`; launch applicability requires Sarek |
+| LinkedIn [User Agreement](https://www.linkedin.com/legal/user-agreement) and [Professional Community Policies](https://www.linkedin.com/legal/professional-community-policies) | Account/service responsibility and content/conduct restrictions | `verified narrow official claim`; launch applicability requires Legal researcher |
 | Medium [Terms](https://policy.medium.com/medium-terms-of-service-9db0094a1e0f), [Rules](https://help.medium.com/hc/en-us/articles/213477928-Medium-Rules), and [Stats](https://help.medium.com/hc/en-us/articles/215108608-Stats) | User/content responsibilities, moderation rules, and named metrics | `verified narrow official claim`; feature/metric behavior is `vendor-documented` |
 | WhatsApp [Business Terms](https://www.whatsapp.com/legal/business-terms), [Business Messaging Policy](https://www.whatsapp.com/legal/business-policy/), and [Messaging Guidelines](https://www.whatsapp.com/legal/messaging-guidelines) | Current business use, recipient opt-in/opt-out, approved templates, escalation paths, and messaging restrictions | `verified narrow official claim` for current retrieved pages |
-| WhatsApp [preview replacement terms](https://www.facebook.com/legal/wa-for-business-terms-preview) | WhatsApp states replacement terms take effect **2026-09-23** | `vendor-documented`; Sarek review is `needs investigation`, and affected publishing pauses if unresolved |
+| WhatsApp [preview replacement terms](https://www.facebook.com/legal/wa-for-business-terms-preview) | WhatsApp states replacement terms take effect **2026-09-23** | `vendor-documented`; Legal researcher review is `needs investigation`, and affected publishing pauses if unresolved |
 | GitHub [Terms](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service) and [Acceptable Use Policies](https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies) | Account/content responsibility and safety, IP, privacy, authenticity, and conduct restrictions | `verified narrow official claim` |
-| Federal Register API [2023-14795](https://www.federalregister.gov/api/v1/documents/2023-14795.json) and [official GovInfo PDF](https://www.govinfo.gov/content/pkg/FR-2023-07-26/pdf/2023-14795.pdf) | FTC adopted revised Endorsement Guides effective 2023-07-26 | `verified narrow official claim`; exact applicability/disclosure wording requires Sarek/counsel |
+| Federal Register API [2023-14795](https://www.federalregister.gov/api/v1/documents/2023-14795.json) and [official GovInfo PDF](https://www.govinfo.gov/content/pkg/FR-2023-07-26/pdf/2023-14795.pdf) | FTC adopted revised Endorsement Guides effective 2023-07-26 | `verified narrow official claim`; exact applicability/disclosure wording requires Legal researcher/counsel |
 | FTC [Disclosures 101](https://www.ftc.gov/business-guidance/resources/disclosures-101-social-media-influencers), [AI topic](https://www.ftc.gov/industry/technology/artificial-intelligence), and prior AI-claims blog endpoint | No narrow claim is relied on because current automated access returned 403 and FCR-008 also recorded stale/404 AI-blog behavior | `access-blocked` / `needs investigation`; not verified |
 
 Reachability is not publication approval. Platform terms do not substantiate Jamula outcomes, and no AI, endorsement, customer, environmental, accessibility, or performance claim may bypass the claims gate.

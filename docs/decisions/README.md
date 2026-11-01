@@ -32,7 +32,7 @@ capacity promise.
 
 Acceptance requires:
 
-1. final independent Fact Checker/Ralph and Rai re-reviews of the exact revision;
+1. final independent Fact Checker/Work monitor and Responsible AI reviewer re-reviews of the exact revision;
 2. required domain and qualified-professional dispositions;
 3. committed per-artifact Git blob OIDs and the full PR head commit SHA;
 4. issue comments and explicit child closure against that head;

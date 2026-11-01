@@ -1,24 +1,24 @@
 # Editorial Workflow
 
 **Status:** Cycle 2 independent remediation; no copy or asset is approved for production publishing
-**Original author / editorial process owner:** Nyota Uhura
-**Revision owner:** Jadzia Dax (assigned under RAI-02 strict lockout)
-**Lockout:** Nyota Uhura may not author, advise on, or co-author this artifact revision
-**Required independent re-reviewers:** Rai (rejecting reviewer), Sarek, Fact Checker
-**Reviewer independence:** Jadzia Dax is the revision author and cannot approve her own revision
+**Original author / editorial process owner:** Content lead
+**Revision owner:** Experience lead (assigned under RAI-02 strict lockout)
+**Lockout:** Content lead may not author, advise on, or co-author this artifact revision
+**Required independent re-reviewers:** Responsible AI reviewer (rejecting reviewer), Legal researcher, Fact Checker
+**Reviewer independence:** Experience lead is the revision author and cannot approve her own revision
 **Final approver:** Cyrus Jamula
 
 ## Workflow
 
 | Stage | Owner | Required record | Exit criterion |
 |---|---|---|---|
-| 1. Intake | Requester + Nyota | Content ID, audience, purpose, channel, owner, due window, canonical location, sensitivity, proposed metric, expiry | Scope and accountable owner accepted |
+| 1. Intake | Requester + Content lead | Content ID, audience, purpose, channel, owner, due window, canonical location, sensitivity, proposed metric, expiry | Scope and accountable owner accepted |
 | 2. Source/evidence | Author + Fact Checker | Source URLs/files, publisher, retrieval date, version/region, exact supported statement, counter-evidence, evidence state | Each factual statement supported or removed |
-| 3. Claims triage | Nyota | Claim classification and proposed claims-register packet | Regulated/public claims approved in register or omitted |
-| 4. Rights/privacy | Author + Sarek | Asset ledger, licenses/releases, confidentiality and personal-data check, disclosures | Rights and privacy scope verified |
+| 3. Claims triage | Content lead | Claim classification and proposed claims-register packet | Regulated/public claims approved in register or omitted |
+| 4. Rights/privacy | Author + Legal researcher | Asset ledger, licenses/releases, confidentiality and personal-data check, disclosures | Rights and privacy scope verified |
 | 5. Draft/adapt | Author | Canonical draft and channel adaptations; change history | Meaning, citations, disclosure, correction path, and expiry preserved |
-| 6. Accessibility/experience | Dax + author | Alt text, captions, transcript, descriptions, responsive renditions, plain-language and player checks | All applicable checks pass |
-| 7. Safety/accuracy/legal | Rai, Fact Checker, Sarek | Review dispositions and conditions | No unresolved blocker; professional gate identified where needed |
+| 6. Accessibility/experience | Experience lead + author | Alt text, captions, transcript, descriptions, responsive renditions, plain-language and player checks | All applicable checks pass |
+| 7. Safety/accuracy/legal | Responsible AI reviewer, Fact Checker, Legal researcher | Review dispositions and conditions | No unresolved blocker; professional gate identified where needed |
 | 8. Approval | Cyrus | Exact artifact version/hash, channels, conditions, approval time, expiry | Explicit exact-version approval |
 | 9. Publish | Named publisher | URL/post ID, timestamp, actor, approved version, disclosures, expiry | Live item matches approved version; no draft is silently substituted |
 | 10. Verify | Publisher + author | Link, rendering, metadata, accessibility smoke test, analytics/consent check | Verification within 1 hour; rollback if critical failure |
@@ -63,11 +63,11 @@ The following must not be published without an approved `public-claims-register.
 - speed, quality, reliability, security, privacy, compatibility, scale, accuracy, or other performance claims;
 - rankings, comparisons, “best,” “leading,” “green,” “secure,” “compliant,” or similar implications.
 
-The packet proposed to Picard must contain exact wording, status (`aspiration` or `achieved`), scope/baseline, method/metric, dated evidence, limitations, owner, Fact Checker disposition, Sarek and Rai dispositions, Cyrus approval field, review cadence, expiry, and correction/removal action. Until integrated and approved, substitute neutral mechanism language or omit the statement.
+The packet proposed to Product lead must contain exact wording, status (`aspiration` or `achieved`), scope/baseline, method/metric, dated evidence, limitations, owner, Fact Checker disposition, Legal researcher and Responsible AI reviewer dispositions, Cyrus approval field, review cadence, expiry, and correction/removal action. Until integrated and approved, substitute neutral mechanism language or omit the statement.
 
 ## Editorial calendar
 
-Nyota maintains a planning calendar with one record per content ID:
+Content lead maintains a planning calendar with one record per content ID:
 
 `content ID | working title | audience | purpose | canonical/channel | pillar | evidence state | claim status | asset IDs | author | owner | reviewers | approver | draft/review/publish windows | metric | review date | expiry | status | correction link`
 
@@ -84,11 +84,11 @@ Status values are `idea`, `research`, `blocked`, `draft`, `in review`, `approved
 
 | Role | Decision |
 |---|---|
-| Nyota | Editorial purpose, coherence, adaptation, calendar, and publishing readiness |
-| Dax | Information experience, visual communication, responsive behavior, and accessibility |
+| Content lead | Editorial purpose, coherence, adaptation, calendar, and publishing readiness |
+| Experience lead | Information experience, visual communication, responsive behavior, and accessibility |
 | Fact Checker | Source quality, exact factual support, contradictions, freshness, and metric interpretation |
-| Sarek | Rights, releases, platform terms, disclosures, regulatory exposure, and professional-review escalation |
-| Rai | Social impact, fairness, harmful framing, responsible AI, and content-safety escalation |
+| Legal researcher | Rights, releases, platform terms, disclosures, regulatory exposure, and professional-review escalation |
+| Responsible AI reviewer | Social impact, fairness, harmful framing, responsible AI, and content-safety escalation |
 | Customer/partner | Exact use of its name, logo, quotation, result, screenshot, or confidential context |
 | Cyrus | Exact public version, conditions, channels, and expiry; the only final publication approver |
 | Publisher | Faithful execution only; cannot waive a gate or alter approved meaning |
@@ -117,7 +117,7 @@ Correction record: content/asset ID; reporter; received time; affected channels;
 - Correct the canonical source first, then all known derivatives and scheduled content.
 - Preserve a public correction note when transparency outweighs removal; remove immediately when continued exposure causes privacy, security, safety, or rights harm.
 - A platform that cannot be edited receives a clarifying follow-up or deletion/repost according to reviewer direction.
-- Takedown requests are acknowledged within 1 business day; validity and final legal deadlines are determined by Sarek/counsel, not guessed here.
+- Takedown requests are acknowledged within 1 business day; validity and final legal deadlines are determined by Legal researcher/counsel, not guessed here.
 - Expired approval, source, license, release, or claim automatically pauses publication until reapproval.
 
 ## Analytics and governance checks
@@ -142,7 +142,7 @@ Targets beyond process completeness require an approved baseline. Analytics coll
 - Every six months: exercise account recovery and correction/takedown propagation using synthetic content.
 - Before staff/contractor exit: revoke platform sessions/tokens within 4 hours for privileged access and transfer approved assets/records.
 - Fourteen days before expiry: notify owner and reviewers; at expiry, unpublish/unlist/mark stale if no reapproval.
-- Retention periods for consent, releases, claims, moderation evidence, and legal holds remain **blocked pending Sarek and Seven review**. Working exports are deleted within 30 days after secure master ingestion.
+- Retention periods for consent, releases, claims, moderation evidence, and legal holds remain **blocked pending Legal researcher and Identity/data engineer review**. Working exports are deleted within 30 days after secure master ingestion.
 
 ## Future implementation tests
 
@@ -157,16 +157,16 @@ Targets beyond process completeness require an approved baseline. Analytics coll
 
 These are acceptance criteria, not evidence that the controls exist.
 
-## Register update proposals and Picard actions
+## Register update proposals and Product lead actions
 
-**Context for every item: `Refs #3; child #4`.** These are proposals only; Nyota did not edit either register.
+**Context for every item: `Refs #3; child #4`.** These are proposals only; Content lead did not edit either register.
 
-1. **Founder register:** ask Cyrus to select exact LinkedIn facts and exact GitHub projects/activity, approve precise wording, set review/expiry dates, and define correction/removal action. Picard should keep founder publication blocked until this is complete.
-2. **Claims register:** add candidate entries only when exact proposed wording and evidence exist for Jamula positioning, accessibility, environmental responsibility, ethical/social responsibility, customer outcomes, AI capability, security/privacy, compatibility, and performance. Picard should preserve the required Fact Checker, Sarek, Rai, and Cyrus gates.
-3. **Channel terms:** assign Sarek a launch/applicability review of the currently retrievable LinkedIn terms and the WhatsApp replacement terms effective 2026-09-23. Retrieval supports only the narrow source statements below; legal applicability and post-effective WhatsApp use remain blocked pending disposition.
-4. **Retention:** assign Seven and Sarek to approve retention/deletion periods for consent, release, claim, moderation, analytics, correction, and takedown records.
-5. **Implementation backlog:** Picard should create future implementation acceptance criteria for approval enforcement, expiry, rights ledger, accessibility audits, consent suppression, account recovery, analytics governance, and correction propagation. Do not create production issues or code during this evaluation task.
-6. **Source integration:** Picard should have Fact Checker reconcile the dated primary-source notes in these four artifacts with the shared research source register and contradiction pass.
+1. **Founder register:** ask Cyrus to select exact LinkedIn facts and exact GitHub projects/activity, approve precise wording, set review/expiry dates, and define correction/removal action. Product lead should keep founder publication blocked until this is complete.
+2. **Claims register:** add candidate entries only when exact proposed wording and evidence exist for Jamula positioning, accessibility, environmental responsibility, ethical/social responsibility, customer outcomes, AI capability, security/privacy, compatibility, and performance. Product lead should preserve the required Fact Checker, Legal researcher, Responsible AI reviewer, and Cyrus gates.
+3. **Channel terms:** assign Legal researcher a launch/applicability review of the currently retrievable LinkedIn terms and the WhatsApp replacement terms effective 2026-09-23. Retrieval supports only the narrow source statements below; legal applicability and post-effective WhatsApp use remain blocked pending disposition.
+4. **Retention:** assign Identity/data engineer and Legal researcher to approve retention/deletion periods for consent, release, claim, moderation, analytics, correction, and takedown records.
+5. **Implementation backlog:** Product lead should create future implementation acceptance criteria for approval enforcement, expiry, rights ledger, accessibility audits, consent suppression, account recovery, analytics governance, and correction propagation. Do not create production issues or code during this evaluation task.
+6. **Source integration:** Product lead should have Fact Checker reconcile the dated primary-source notes in these four artifacts with the shared research source register and contradiction pass.
 
 ## Dated primary-source basis
 
@@ -175,11 +175,11 @@ Claim-level retrieval was repeated **2026-08-25**:
 | Source | Narrow claim supported | Status |
 |---|---|---|
 | W3C [WCAG 2.2 Quick Reference](https://www.w3.org/WAI/WCAG22/quickref/), [Images Tutorial](https://www.w3.org/WAI/tutorials/images/), and [Accessible Audio/Video](https://www.w3.org/WAI/media/av/) | Official accessibility criteria/guidance cover text alternatives and accessible media planning/deliverables | `verified narrow official claim` |
-| LinkedIn [User Agreement](https://www.linkedin.com/legal/user-agreement) and [Professional Community Policies](https://www.linkedin.com/legal/professional-community-policies) | Official pages state account/service responsibilities and content/conduct restrictions | `verified narrow official claim`; launch applicability still requires Sarek |
+| LinkedIn [User Agreement](https://www.linkedin.com/legal/user-agreement) and [Professional Community Policies](https://www.linkedin.com/legal/professional-community-policies) | Official pages state account/service responsibilities and content/conduct restrictions | `verified narrow official claim`; launch applicability still requires Legal researcher |
 | Medium [Terms](https://policy.medium.com/medium-terms-of-service-9db0094a1e0f), [Rules](https://help.medium.com/hc/en-us/articles/213477928-Medium-Rules), and [Stats](https://help.medium.com/hc/en-us/articles/215108608-Stats) | Official pages document user/content responsibilities, moderation rules, and named metric definitions | `verified narrow official claim`; product behavior remains `vendor-documented` |
-| WhatsApp [Business Terms](https://www.whatsapp.com/legal/business-terms), [Business Messaging Policy](https://www.whatsapp.com/legal/business-policy/), and [Messaging Guidelines](https://www.whatsapp.com/legal/messaging-guidelines) | Current official pages document business use, opt-in/opt-out, template, escalation, and messaging-policy duties | `verified narrow official claim` for current pages; replacement terms effective 2026-09-23 are `needs investigation` pending Sarek review |
+| WhatsApp [Business Terms](https://www.whatsapp.com/legal/business-terms), [Business Messaging Policy](https://www.whatsapp.com/legal/business-policy/), and [Messaging Guidelines](https://www.whatsapp.com/legal/messaging-guidelines) | Current official pages document business use, opt-in/opt-out, template, escalation, and messaging-policy duties | `verified narrow official claim` for current pages; replacement terms effective 2026-09-23 are `needs investigation` pending Legal researcher review |
 | GitHub [Terms](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service) and [Acceptable Use Policies](https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies) | Official pages document account/content responsibility and restrictions involving safety, IP, privacy, authenticity, and conduct | `verified narrow official claim` |
-| Federal Register API, [Guides Concerning the Use of Endorsements and Testimonials in Advertising](https://www.federalregister.gov/api/v1/documents/2023-14795.json), with [official GovInfo PDF](https://www.govinfo.gov/content/pkg/FR-2023-07-26/pdf/2023-14795.pdf) | FTC adopted revised Endorsement Guides, effective 2023-07-26 | `verified narrow official claim`; exact applicability/disclosure wording requires Sarek/counsel |
+| Federal Register API, [Guides Concerning the Use of Endorsements and Testimonials in Advertising](https://www.federalregister.gov/api/v1/documents/2023-14795.json), with [official GovInfo PDF](https://www.govinfo.gov/content/pkg/FR-2023-07-26/pdf/2023-14795.pdf) | FTC adopted revised Endorsement Guides, effective 2023-07-26 | `verified narrow official claim`; exact applicability/disclosure wording requires Legal researcher/counsel |
 | FTC [Disclosures 101](https://www.ftc.gov/business-guidance/resources/disclosures-101-social-media-influencers), [AI topic](https://www.ftc.gov/industry/technology/artificial-intelligence), and prior AI-claims blog endpoint | Automated retrieval returned 403, while FCR-008 also observed stale/404 behavior for the AI blog | `access-blocked` / `needs investigation`; these endpoints do not support a verified claim in this packet |
 
 No source row is a publication approval, legal conclusion, platform-conformance result, or public claim.

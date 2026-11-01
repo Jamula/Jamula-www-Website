@@ -56,7 +56,7 @@ Stripe, Square, PayPal, and an accounting-hosted invoice flow remain non-ordered
 
 ### Phase 5 — optional public AI
 
-Keep Phase 5 absent unless every P5-AI-01 through P5-AI-12 gate passes. The system must use an approved public-only corpus; establish rights/provenance and removal; disclose limitations and data use; constrain intended/prohibited uses; pass harm, fairness, locale, privacy, accessibility, appeal/correction, change-control, and shutdown evidence; and obtain separate Rai, Dax, Sarek, Miles, Fact Checker, Cyrus, and required professional dispositions.
+Keep Phase 5 absent unless every P5-AI-01 through P5-AI-12 gate passes. The system must use an approved public-only corpus; establish rights/provenance and removal; disclose limitations and data use; constrain intended/prohibited uses; pass harm, fairness, locale, privacy, accessibility, appeal/correction, change-control, and shutdown evidence; and obtain separate Responsible AI reviewer, Experience lead, Legal researcher, Quality/reliability engineer, Fact Checker, Cyrus, and required professional dispositions.
 
 ## Cost posture
 
@@ -77,7 +77,7 @@ Apply spend alerts, vendor caps where actually supported, application quotas, an
 ## Cross-cutting authorities
 
 - Classification-specific backup limits and the tombstone-aware quarantined restore model: [backup and recovery](../security/backup-recovery.md#authoritative-classification-specific-backup-schedule).
-- Sole normative transfer and execution budgets: [Dax's performance gate](../experience/accessibility-seo-performance.md#6-performance-gate), including a <=900 KiB public aggregate and <=1,500 KiB interactive/authenticated aggregate.
+- Sole normative transfer and execution budgets: [Experience lead's performance gate](../experience/accessibility-seo-performance.md#6-performance-gate), including a <=900 KiB public aggregate and <=1,500 KiB interactive/authenticated aggregate.
 - Staffing and coverage: [incident detection and response](../security/incident-detection-response.md).
 - Privacy and rights: [data inventory](../privacy/data-inventory.md) and [data lifecycle](../privacy/data-lifecycle.md).
 
