@@ -108,17 +108,26 @@ jobs:
               return;
             }
 
+            // Seven coordinates the issue; other members own their specialist work.
+            const isCoordinator = assignedMember.name.toLowerCase() === 'seven';
+            const nextStep = isCoordinator
+              ? 'Seven will coordinate this issue and route specialist work to its accountable owner.'
+              : `${assignedMember.name} will pick this up in the next Copilot session.`;
+            const kickoff = isCoordinator
+              ? `Seven, coordinate issue #${issue.number}`
+              : `${assignedMember.name}, work on issue #${issue.number}`;
+
             // Post assignment acknowledgment
             const comment = [
                 `### 📋 Assigned to ${assignedMember.name} (${assignedMember.role})`,
                 '',
                 `**Issue:** #${issue.number} — ${issue.title}`,
                 '',
-                `${assignedMember.name} will pick this up in the next Copilot session.`,
+                nextStep,
                 '',
                 `> **For Copilot coding agent:** If enabled, this issue will be worked automatically.`,
                 `> Otherwise, start a Copilot session and say:`,
-                `> \`${assignedMember.name}, work on issue #${issue.number}\``,
+                `> \`${kickoff}\``,
             ].join('\n');
 
             await github.rest.issues.createComment({
