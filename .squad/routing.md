@@ -53,3 +53,7 @@ here only when their agent names also exist in the casting registry.
 - Data independently reviews Spock's code changes and must not author the same changes being reviewed. Changes are not complete until the review gate is satisfied.
 - Uhura owns documentation work.
 - Preserve quality, safety, security, and privacy. Get the user's approval before paid spending or consequential production actions.
+- Work autonomously on reversible, in-scope tasks. Do not pause for routine implementation choices or ordinary workflow steps; make a reasonable decision, validate it, and report it.
+- Proactively address PR feedback, failing tests and CI checks, and merge conflicts. Re-run the relevant checks after fixes, and continue until the work passes or a concrete blocker requires human authority or information.
+- Ask the user only for decisions that genuinely require them, including product or scope choices with materially different outcomes, paid spending, consequential production actions, public claims, or unresolved risks that cannot be safely mitigated.
+- Preserve the required independent review and all repository branch-protection rules. Top-level PRs still require Cyrus to approve the exact head SHA before merge. Use Agent merge for review feedback, CI fixes, and conflict resolution when enabled; auto-merge only when the app/repository permits it and all required approvals and checks are satisfied. If an app setting requires the user, explain the exact action rather than retrying through another mechanism.
