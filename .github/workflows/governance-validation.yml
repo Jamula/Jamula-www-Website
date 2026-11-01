@@ -5,11 +5,9 @@ on:
     branches: [main]
     paths:
       - ".copilot/**"
-      - ".mcp.json"
       - ".gitignore"
       - ".vscode/**"
       - ".github/**"
-      - ".squad/**"
       - "docs/**"
       - "scripts/validate_governance.py"
       - "scripts/*preview*.py"
@@ -21,11 +19,9 @@ on:
     branches: [main]
     paths:
       - ".copilot/**"
-      - ".mcp.json"
       - ".gitignore"
       - ".vscode/**"
       - ".github/**"
-      - ".squad/**"
       - "docs/**"
       - "scripts/validate_governance.py"
       - "scripts/*preview*.py"

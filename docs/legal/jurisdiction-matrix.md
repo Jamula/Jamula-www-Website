@@ -1,6 +1,6 @@
 # Jurisdiction and Privacy Applicability Matrix
 
-**Research status:** Issue spotting only; not legal, tax, accounting, or insurance advice. AI/Squad research does not satisfy a licensed-professional gate.
+**Research status:** Issue spotting only; not legal, tax, accounting, or insurance advice. AI research does not satisfy a licensed-professional gate.
 **Research date:** 2026-08-25. No blanket source-verification claim is made. **Re-check:** before each phase launch and at least quarterly while the served-market decision remains open.
 
 Claim-level source status is recorded in each row: `verified narrow official claim`, `vendor-documented`, `partial`, `access-blocked/unverified`, `unverified`, or `future professional decision`. A status validates only the narrow statement identified in that row; it never resolves legal applicability.

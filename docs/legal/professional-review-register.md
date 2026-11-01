@@ -1,6 +1,6 @@
 # Professional Review Register
 
-AI/Squad research is issue spotting, not legal, tax, accounting, insurance or PCI advice, and never satisfies a professional gate. Every review must identify the reviewer, qualification/license and jurisdiction, exact artifact/version or SHA, scope, outcome, conditions, expiry and re-review trigger.
+AI research is issue spotting, not legal, tax, accounting, insurance or PCI advice, and never satisfies a professional gate. Every review must identify the reviewer, qualification/license and jurisdiction, exact artifact/version or SHA, scope, outcome, conditions, expiry and re-review trigger.
 
 | Area / jurisdiction | Required reviewer qualification | Phase and exact artifact scope | Status | Required evidence / blocking condition | Expiry / re-review trigger | Context |
 |---|---|---|---|---|---|---|
