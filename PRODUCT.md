@@ -122,10 +122,9 @@ claim.
   direction (palette, typography, components) is fixed here.
 - **Voice (from confirmed positioning):** practical and honest, without hype or
   inflated claims.
-- **Identity constraint:** internal Squad working identities (fictional-character
-  code names used only inside `.squad/`) are internal only and must never appear in
-  public branding, content, metadata, or assets, and must not imply affiliation with
-  any rights holder.
+- **Non-affiliation constraint:** third-party fictional-character names, logos,
+  likenesses, and other protected assets must not appear in Jamula branding,
+  public content, metadata, or assets, and must not imply rights-holder affiliation.
 
 ## Evidence on Hand
 

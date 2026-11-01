@@ -148,8 +148,7 @@ register](decisions/approvals.md).
 ## Operational exceptions
 
 Standard-location files remain indexed here: root `LICENSE`, `LICENSE_SCOPE.md`,
-`TRADEMARKS.md`, `CONTRIBUTING.md`, `THIRD_PARTY_NOTICES.md`; `.github/`;
-`.squad/`; `.mcp.json`.
+`TRADEMARKS.md`, `CONTRIBUTING.md`, `THIRD_PARTY_NOTICES.md`; `.github/`.
 
 ## Branch and deployment model
 

@@ -1,6 +1,6 @@
 # Phase Legal and Professional Review Gates
 
-**Status:** Research-derived gates, not legal, tax, accounting or insurance advice. AI/Squad review never satisfies a licensed-professional gate.
+**Status:** Research-derived gates, not legal, tax, accounting or insurance advice. AI review never satisfies a licensed-professional gate.
 **Research date:** 2026-08-25. No blanket verification claim is made. Gate records must name the approver, exact artifact hash/PR SHA, prerequisites, outcome, conditions, expiry and re-review triggers.
 
 Claim-level status is one of: `verified narrow official claim`, `vendor-documented`, `partial`, `access-blocked/unverified`, `unverified`, or `future professional decision`.

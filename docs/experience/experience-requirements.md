@@ -16,7 +16,7 @@ The brand and experience must:
 - feel precise, warm, contemporary, and human, with generous space and a restrained visual rhythm;
 - use a distinctive but durable color, type, illustration, and diagram system that remains effective in high contrast, monochrome, print, and reduced-motion contexts;
 - avoid dark patterns, urgency theater, scroll-jacking, autoplay, inaccessible novelty, and decorative motion that competes with the task;
-- never use internal Squad identities or imply Microsoft, cloud-provider, customer, or rights-holder endorsement;
+- never imply Microsoft, cloud-provider, customer, or rights-holder endorsement;
 - distinguish approved achievements from aspirations and route public factual claims through the claims register;
 - treat accessibility, privacy, security, performance, and environmental efficiency as design constraints, not later polish.
 

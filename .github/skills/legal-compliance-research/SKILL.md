@@ -10,4 +10,4 @@ description: Official-source legal/compliance issue spotting with professional e
 - Cover Washington, Kirkland/King County, US federal, global privacy, advertising/endorsement, messaging, accessibility, contracts, IP/trademark, licensing, social/channel terms, payments, tax escalation, insurance, and hiring triggers.
 - Classify every item as applicable, not applicable, needs counsel, needs CPA, needs broker/professional, or needs user decision.
 - Record professional qualification, scope, artifact version, conditions, expiry, and re-review triggers.
-- An AI or Squad review never satisfies a licensed-professional gate.
+- An AI review never satisfies a licensed-professional gate.
