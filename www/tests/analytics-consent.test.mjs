@@ -39,7 +39,12 @@ class Element extends EventTarget {
   }
 }
 
-function harness({ url = "https://jamula.net/", stored, gpc = false } = {}) {
+function harness({
+  url = "https://jamula.net/",
+  stored,
+  gpc = false,
+  storage: sharedStorage,
+} = {}) {
   const elements = new Map(
     ["consent", "status", "accept", "reject", "preferences", "withdraw"].map((name) => [
       `#analytics-${name}`,
@@ -50,7 +55,7 @@ function harness({ url = "https://jamula.net/", stored, gpc = false } = {}) {
   const cookies = [];
   const warnings = [];
   const timers = new Map();
-  const storage = new Map(stored === undefined ? [] : [[KEY, stored]]);
+  const storage = sharedStorage ?? new Map(stored === undefined ? [] : [[KEY, stored]]);
   const win = new EventTarget();
   win.location = new URL(url);
   win.reloads = 0;
@@ -67,6 +72,7 @@ function harness({ url = "https://jamula.net/", stored, gpc = false } = {}) {
   win.localStorage = {
     getItem: (key) => storage.get(key) ?? null,
     setItem: (key, value) => storage.set(key, value),
+    removeItem: (key) => storage.delete(key),
   };
   const doc = new EventTarget();
   doc.querySelector = (selector) => elements.get(selector);
@@ -369,18 +375,97 @@ test("blocked storage reads and failed writes surface errors and never start col
   }
 });
 
-test("failed withdrawal persistence still disables collection without reloading stale consent", () => {
+test("failed rejection writes remove the prior grant before the next page load", async (t) => {
+  for (const action of ["withdraw", "reject"]) {
+    for (const failure of ["throws", "no-op"]) {
+      await t.test(`${action} write ${failure}`, () => {
+        const h = harness({ stored: JSON.stringify(receipt()) });
+        h.storage.set("unrelated-preference", "preserved");
+        h.init();
+        h.win.localStorage.setItem = () => {
+          if (failure === "throws") throw new Error("write blocked");
+        };
+        h.click(action);
+        h.contactClick();
+        assert.equal(h.win["ga-disable-G-7JW27J2XSW"], true);
+        assert.equal(h.scripts[0].removed, true);
+        assert.equal(h.timers.size, 0);
+        assert.deepEqual(h.commands(), []);
+        assert.equal(h.storage.has(KEY), false);
+        assert.equal(h.storage.get("unrelated-preference"), "preserved");
+        assert.equal(h.win.reloads, 1);
+        assert.match(h.status(), /off/);
+        assert.doesNotMatch(h.status(), /could not|may resume/);
+        const revisit = harness({ storage: h.storage });
+        revisit.init();
+        revisit.contactClick();
+        assert.deepEqual(revisit.scripts, []);
+        assert.deepEqual(revisit.commands(), []);
+        assert.equal(revisit.elements.get("#analytics-consent").hidden, false);
+      });
+    }
+  }
+});
+
+test("unmodifiable withdrawal storage warns that a later load can resume the prior grant", async (t) => {
+  for (const writeFailure of ["throws", "no-op"]) {
+    for (const removalFailure of ["throws", "no-op"]) {
+      await t.test(`write ${writeFailure} removal ${removalFailure}`, () => {
+        const priorGrant = JSON.stringify(receipt());
+        const h = harness({ stored: priorGrant });
+        h.init();
+        h.win.localStorage.setItem = () => {
+          if (writeFailure === "throws") throw new Error("write blocked");
+        };
+        h.win.localStorage.removeItem = () => {
+          if (removalFailure === "throws") throw new Error("removal blocked");
+        };
+        h.click("withdraw");
+        h.contactClick();
+        assert.equal(h.win["ga-disable-G-7JW27J2XSW"], true);
+        assert.equal(h.scripts[0].removed, true);
+        assert.equal(h.timers.size, 0);
+        assert.deepEqual(h.commands(), []);
+        assert.equal(h.win.reloads, 0);
+        assert.equal(h.storage.get(KEY), priorGrant);
+        assert.equal(h.elements.get("#analytics-consent").hidden, false);
+        assert.match(h.status(), /off on this page only/);
+        assert.match(h.status(), /withdrawal could not be saved/i);
+        assert.match(h.status(), /may resume/);
+        assert.match(
+          h.status(),
+          /clear site data.*before.*reload|clear site data.*before.*return/i
+        );
+        assert.ok(h.warnings.length >= 2);
+        const revisit = harness({ storage: h.storage });
+        revisit.init();
+        assert.equal(revisit.scripts.length, 1);
+        assert.equal(revisit.win["ga-disable-G-7JW27J2XSW"], false);
+      });
+    }
+  }
+});
+
+test("unverifiable withdrawal removal does not claim persistent success or reload", () => {
   const h = harness({ stored: JSON.stringify(receipt()) });
   h.init();
   h.win.localStorage.setItem = () => {
-    throw new Error("storage became read-only");
+    throw new Error("write blocked");
+  };
+  h.win.localStorage.getItem = () => {
+    throw new Error("read blocked");
   };
   h.click("withdraw");
   h.contactClick();
-  assert.equal(h.win["ga-disable-G-7JW27J2XSW"], true);
+  assert.equal(h.storage.has(KEY), false);
   assert.equal(h.win.reloads, 0);
+  assert.equal(h.win["ga-disable-G-7JW27J2XSW"], true);
   assert.deepEqual(h.commands(), []);
-  assert.match(h.status(), /clear site data/);
+  assert.match(h.status(), /withdrawal could not be saved/i);
+  assert.equal(h.elements.get("#analytics-consent").hidden, false);
+  const revisit = harness({ storage: h.storage });
+  revisit.init();
+  assert.deepEqual(revisit.scripts, []);
 });
 
 test("tag load failure disables analytics and reports the failure", () => {

@@ -184,7 +184,23 @@ export function initializeAnalytics(win = window, doc = document) {
 
   function deny() {
     const wasActive = stop();
-    const saved = save(false);
+    let saved = save(false);
+    if (!saved) {
+      try {
+        // Quota-limited storage may still allow the old grant to be removed.
+        win.localStorage.removeItem(STORAGE_KEY);
+        if (win.localStorage.getItem(STORAGE_KEY) !== null) {
+          throw new Error("Prior consent was not removed.");
+        }
+        saved = true;
+      } catch (error) {
+        win.console.warn("Analytics consent could not be removed.", error);
+        showPanel(true);
+        report(
+          "Analytics is off on this page only. Your withdrawal could not be saved, so analytics may resume on a later page load. Clear site data in your browser before reloading or returning."
+        );
+      }
+    }
     if (saved) {
       report("Optional analytics is off. This site's analytics cookies have been removed.");
       showPanel(false);

@@ -162,11 +162,18 @@ static-site preference mechanism, **not** the authenticated service's append-onl
 receipt/audit architecture above. Invalid/stale grants require a new choice.
 Withdrawal disables the stream first, empties queued commands, removes its script,
 deletes only the integration's two host-only `/` cookies and, when rejection is
-successfully saved, reloads to unload Google's code. It does not send a
-denied-consent update to an already loaded tag. Cross-tab revocation, clearing,
-expiry and GPC changes disable further site events. A write failure still stops
-collection in the current document and visibly instructs the visitor to clear site
-data before returning; a failed write cannot guarantee a persisted rejection.
+successfully saved or removal of the prior receipt is verified, reloads to unload
+Google's code. A failed rejection write falls back to removing only the consent
+receipt and verifies its absence; the next load then requires a new choice with
+analytics off. It does not send a denied-consent update to an already loaded tag.
+Cross-tab revocation, clearing,
+expiry and GPC changes disable further site events. If neither replacement nor
+verified removal is possible, collection still stops in the current document,
+but the page does not automatically reload or claim persistent withdrawal. It
+keeps the choice panel open and explicitly warns that analytics may resume on a
+later page load, instructing the visitor to clear browser site data before
+reloading or returning. Browser storage that rejects every mutation cannot be
+made to persist withdrawal by this static-site controller.
 Withdrawal cannot cancel already dispatched requests or delete Google's historical
 records. A later opt-in after stopping requires a clean document reload.
 
