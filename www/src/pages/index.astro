@@ -10,12 +10,22 @@
  * for the used/omitted claim ledger.
  */
 import BaseLayout from "../layouts/BaseLayout.astro";
+
+const organizationStructuredData = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "@id": "https://jamula.net/#organization",
+  name: "Jamula",
+  url: "https://jamula.net/",
+  logo: "https://jamula.net/apple-touch-icon.png",
+};
 ---
 
 <BaseLayout
   title="AI Strategy, Custom Software & Cloud Consulting"
   description="Jamula works across AI strategy, custom software, and cloud consulting in a single engagement — so what we recommend is also what we build and run."
   canonicalUrl="https://jamula.net/"
+  structuredData={organizationStructuredData}
 >
   <div class="home">
     <!-- DESIGN CONTRACT — Homepage / The Standing Statement

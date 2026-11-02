@@ -1,0 +1,1070 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+import { parse } from "parse5";
+import postcss from "postcss";
+
+const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
+const BUILD_DIR = path.resolve(scriptDirectory, "..", "dist");
+const SITE_URL = "https://jamula.net";
+const ALLOWED_HOSTS = new Set(["jamula.net", "www.jamula.net", "jamula.com", "www.jamula.com"]);
+
+function parsePage(html) {
+  const tags = [];
+  const anchors = [];
+  const ids = [];
+  const canonicals = [];
+  const descriptions = [];
+  const ogUrls = [];
+  const stylesheets = [];
+  const inlineStyles = [];
+  const styleSources = [];
+  const jsonLd = [];
+  const resources = [];
+  const title = [];
+
+  function visit(node) {
+    if (!node.tagName) {
+      for (const child of node.childNodes ?? []) visit(child);
+      return;
+    }
+    const tag = node.tagName;
+    const attributes = Object.fromEntries(node.attrs.map(({ name, value }) => [name, value]));
+    const text = () =>
+      (node.childNodes ?? [])
+        .filter((child) => child.nodeName === "#text")
+        .map((child) => child.value)
+        .join("");
+    tags.push([tag, attributes]);
+    if (tag === "title" && node.namespaceURI === "http://www.w3.org/1999/xhtml") {
+      title.push(text().trim());
+    }
+    if (tag === "style") {
+      inlineStyles.push(text());
+      styleSources.push({ css: text(), media: attributes.media });
+    }
+    if (attributes.id) ids.push(attributes.id);
+    if (tag === "a") anchors.push(attributes.href ?? "");
+
+    if (tag === "meta") {
+      if (attributes.name?.toLowerCase() === "description") {
+        descriptions.push(attributes.content ?? "");
+      }
+      if (attributes.property?.toLowerCase() === "og:url") {
+        ogUrls.push(attributes.content ?? "");
+      }
+    }
+
+    if (tag === "link") {
+      const rel = new Set((attributes.rel ?? "").toLowerCase().split(/\s+/));
+      if (rel.has("canonical")) canonicals.push(attributes.href ?? "");
+      if (rel.has("stylesheet")) {
+        stylesheets.push(attributes.href ?? "");
+        styleSources.push({ href: attributes.href ?? "", media: attributes.media });
+      }
+      if (["stylesheet", "preload", "modulepreload", "icon"].some((item) => rel.has(item))) {
+        resources.push(attributes.href ?? "");
+      }
+    }
+
+    if (["script", "img", "iframe", "video", "audio", "source"].includes(tag)) {
+      if (attributes.src) resources.push(attributes.src);
+      if (tag === "script" && attributes.type?.toLowerCase() === "application/ld+json") {
+        jsonLd.push(text());
+      }
+    }
+    for (const child of node.childNodes ?? []) visit(child);
+  }
+  visit(parse(html));
+
+  const headingLevels = tags
+    .map(([tag]) => (/^h[1-6]$/.test(tag) ? Number(tag[1]) : null))
+    .filter((level) => level !== null);
+  return {
+    title,
+    tags,
+    anchors,
+    ids,
+    canonicals,
+    descriptions,
+    ogUrls,
+    stylesheets,
+    inlineStyles,
+    styleSources,
+    jsonLd,
+    resources,
+    headingLevels,
+  };
+}
+
+function normalizeRoute(route) {
+  return route.replace(/\/+$/, "") || "/";
+}
+
+function isWithin(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== "..");
+}
+
+function localFile(root, currentFile, urlPath) {
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(urlPath);
+  } catch {
+    return null;
+  }
+  let candidate = path.resolve(
+    decodedPath.startsWith("/")
+      ? path.join(root, decodedPath.replace(/^\/+/, ""))
+      : path.resolve(path.dirname(currentFile), decodedPath)
+  );
+  if (!isWithin(root, candidate)) return null;
+  if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+    candidate = path.join(candidate, "index.html");
+  }
+  if (!fs.existsSync(candidate) && !path.extname(candidate)) {
+    const routeFile = `${candidate}.html`;
+    if (fs.existsSync(routeFile)) candidate = routeFile;
+  }
+  return fs.existsSync(candidate) && fs.statSync(candidate).isFile() ? candidate : null;
+}
+
+function luminance(color) {
+  const match = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!match) throw new Error(`unsupported color value ${JSON.stringify(color)}`);
+  const digits =
+    match[1].length === 3 ? [...match[1]].map((digit) => digit + digit).join("") : match[1];
+  const channels = [0, 2, 4].map((index) => parseInt(digits.slice(index, index + 2), 16) / 255);
+  const [red, green, blue] = channels.map((channel) =>
+    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+  );
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function contrastRatio(first, second) {
+  const [lighter, darker] = [luminance(first), luminance(second)].sort((a, b) => b - a);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function resolveColor(token, variables, seen = new Set()) {
+  if (seen.has(token)) throw new Error(`cyclic color token ${token}`);
+  seen.add(token);
+  const value = variables[token];
+  if (!value) throw new Error(`missing color token ${token}`);
+  const reference = value.match(/^var\((--[\w-]+)\)$/);
+  if (reference) return resolveColor(reference[1], variables, seen);
+  if (!/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(value)) {
+    throw new Error(`${token} does not resolve to a hex color`);
+  }
+  return value;
+}
+
+function contrastErrors(styles) {
+  const variables = { light: {}, dark: {} };
+  const important = { light: new Set(), dark: new Set() };
+  const errors = [];
+  let hasDarkRoot = false;
+  for (const css of styles) {
+    let sheet;
+    try {
+      sheet = postcss.parse(css);
+    } catch (error) {
+      errors.push(`cannot parse stylesheet for contrast checks: ${error.message}`);
+      continue;
+    }
+    sheet.walkRules((rule) => {
+      if (rule.selector !== ":root") return;
+      let themes = ["light", "dark"];
+      for (let parent = rule.parent; parent.type !== "root"; parent = parent.parent) {
+        const theme =
+          parent.type === "atrule" && parent.name === "media"
+            ? parent.params
+                .match(/^\(prefers-color-scheme\s*:\s*(light|dark)\)$/i)?.[1]
+                ?.toLowerCase()
+            : null;
+        if (!theme) {
+          errors.push("unsupported conditional or nested :root rule in contrast checks");
+          return;
+        }
+        themes = themes.filter((value) => value === theme);
+      }
+      if (themes.length === 1 && themes[0] === "dark") hasDarkRoot = true;
+      for (const declaration of rule.nodes) {
+        if (declaration.type !== "decl" || !declaration.prop.startsWith("--")) continue;
+        for (const theme of themes) {
+          if (important[theme].has(declaration.prop) && !declaration.important) continue;
+          variables[theme][declaration.prop] = declaration.value.trim();
+          if (declaration.important) important[theme].add(declaration.prop);
+        }
+      }
+    });
+  }
+  if (!hasDarkRoot) errors.push("color tokens are missing a prefers-color-scheme: dark root");
+  const pairs = [
+    ["--j-color-text", "--j-color-bg", 4.5],
+    ["--j-color-text", "--j-color-surface", 4.5],
+    ["--j-color-text-subtle", "--j-color-bg", 4.5],
+    ["--j-color-text-subtle", "--j-color-surface", 4.5],
+    ["--j-color-accent", "--j-color-bg", 4.5],
+    ["--j-color-accent", "--j-color-surface", 4.5],
+    ["--j-color-accent-hover", "--j-color-bg", 4.5],
+    ["--j-color-accent-hover", "--j-color-surface", 4.5],
+    ["--j-color-skip-link-fg", "--j-color-skip-link-bg", 4.5],
+    ["--j-color-focus-ring", "--j-color-bg", 3],
+  ];
+  for (const [theme, values] of Object.entries(variables)) {
+    for (const [foreground, background, minimum] of pairs) {
+      try {
+        const ratio = contrastRatio(
+          resolveColor(foreground, values),
+          resolveColor(background, values)
+        );
+        if (ratio < minimum) {
+          errors.push(
+            `${theme} contrast ${foreground} on ${background} is ${ratio.toFixed(2)}:1, ` +
+              `below ${minimum.toFixed(1)}:1`
+          );
+        }
+      } catch (error) {
+        errors.push(`${theme} contrast: ${error.message}`);
+      }
+    }
+  }
+  return errors;
+}
+
+function validateOrganizationSchema(page, prefix) {
+  if (page.jsonLd.length !== 1) {
+    return [`${prefix}homepage must contain exactly one JSON-LD block`];
+  }
+  let schema;
+  try {
+    schema = JSON.parse(page.jsonLd[0]);
+  } catch {
+    return [`${prefix}Organization JSON-LD is invalid`];
+  }
+  if (!schema || Array.isArray(schema) || typeof schema !== "object") {
+    return [`${prefix}Organization JSON-LD must be an object`];
+  }
+
+  const expected = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": "https://jamula.net/#organization",
+    name: "Jamula",
+    url: "https://jamula.net/",
+    logo: "https://jamula.net/apple-touch-icon.png",
+  };
+  const errors = [];
+  for (const [property, value] of Object.entries(expected)) {
+    if (schema[property] !== value) {
+      errors.push(`${prefix}Organization JSON-LD has an incorrect ${property} property`);
+    }
+  }
+  const extraProperties = Object.keys(schema).filter((property) => !(property in expected));
+  if (extraProperties.length) {
+    errors.push(
+      `${prefix}Organization JSON-LD has unsupported properties: ${extraProperties.sort().join(", ")}`
+    );
+  }
+  return errors;
+}
+
+function validateSitemaps(root, canonicalRoutes) {
+  const errors = [];
+  const robotsPath = path.join(root, "robots.txt");
+  const indexPath = path.join(root, "sitemap-index.xml");
+  if (!fs.existsSync(robotsPath)) {
+    errors.push("robots.txt is missing from the built site");
+  } else {
+    const lines = fs.readFileSync(robotsPath, "utf8").split(/\r?\n/);
+    const sitemapLines = lines
+      .filter((line) => line.toLowerCase().startsWith("sitemap:"))
+      .map((line) => line.split(":").slice(1).join(":").trim());
+    if (!lines.includes("User-agent: *") || !lines.includes("Allow: /")) {
+      errors.push("robots.txt must allow public crawling for all user agents");
+    }
+    const directives = lines.map((line) => line.split("#")[0].trim()).filter(Boolean);
+    if (
+      JSON.stringify(directives) !==
+      JSON.stringify(["User-agent: *", "Allow: /", `Sitemap: ${SITE_URL}/sitemap-index.xml`])
+    ) {
+      errors.push("robots.txt must match the approved public-crawling policy");
+    }
+    if (JSON.stringify(sitemapLines) !== JSON.stringify([`${SITE_URL}/sitemap-index.xml`])) {
+      errors.push("robots.txt must reference the Jamula.net sitemap index exactly once");
+    }
+  }
+  if (!fs.existsSync(indexPath)) {
+    return [...errors, "sitemap-index.xml is missing from the built site"];
+  }
+
+  const indexXml = fs.readFileSync(indexPath, "utf8");
+  if (
+    !/<sitemapindex\b[^>]*xmlns=["']http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9["']/i.test(
+      indexXml
+    ) ||
+    !/<\/sitemapindex>/i.test(indexXml)
+  ) {
+    return [...errors, "sitemap-index.xml must contain a sitemapindex root"];
+  }
+  const entries = [
+    ...indexXml.matchAll(/<sitemap\b[^>]*>[\s\S]*?<loc>([\s\S]*?)<\/loc>[\s\S]*?<\/sitemap>/gi),
+  ];
+  if (entries.length === 0) errors.push("sitemap index does not reference any sitemap files");
+
+  const sitemapUrls = [];
+  for (const entry of entries) {
+    const sitemapUrl = entry[1].replace(/&amp;/g, "&").trim();
+    let parsed;
+    try {
+      parsed = new URL(sitemapUrl);
+    } catch {
+      errors.push(`sitemap index contains an invalid sitemap URL: ${sitemapUrl}`);
+      continue;
+    }
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.hostname !== "jamula.net" ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      errors.push(`sitemap index contains a non-canonical sitemap URL: ${sitemapUrl}`);
+      continue;
+    }
+    const sitemapFile = localFile(root, indexPath, parsed.pathname);
+    if (!sitemapFile) {
+      errors.push(`sitemap index references a missing built file: ${sitemapUrl}`);
+      continue;
+    }
+    const xml = fs.readFileSync(sitemapFile, "utf8");
+    if (
+      !/<urlset\b[^>]*xmlns=["']http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9["']/i.test(
+        xml
+      ) ||
+      !/<\/urlset>/i.test(xml)
+    ) {
+      errors.push(`${path.basename(sitemapFile)} must contain a urlset root`);
+      continue;
+    }
+    const locations = [
+      ...xml.matchAll(/<url\b[^>]*>[\s\S]*?<loc>([\s\S]*?)<\/loc>[\s\S]*?<\/url>/gi),
+    ];
+    sitemapUrls.push(...locations.map((location) => location[1].replace(/&amp;/g, "&").trim()));
+  }
+
+  if (new Set(sitemapUrls).size !== sitemapUrls.length) {
+    errors.push("sitemap contains duplicate page URLs");
+  }
+  const expectedUrls = new Set(Object.values(canonicalRoutes).map((route) => route.url));
+  const observedUrls = new Set();
+  for (const sitemapUrl of sitemapUrls) {
+    let parsed;
+    try {
+      parsed = new URL(sitemapUrl);
+    } catch {
+      errors.push(`sitemap contains an invalid page URL: ${sitemapUrl}`);
+      continue;
+    }
+    if (parsed.protocol !== "https:" || parsed.hostname !== "jamula.net") {
+      errors.push(`sitemap contains a non-canonical page URL: ${sitemapUrl}`);
+      continue;
+    }
+    if (!canonicalRoutes[normalizeRoute(parsed.pathname)]) {
+      errors.push(`sitemap URL has no generated page route: ${sitemapUrl}`);
+    }
+    observedUrls.add(sitemapUrl);
+  }
+  if (
+    expectedUrls.size !== observedUrls.size ||
+    [...expectedUrls].some((url) => !observedUrls.has(url))
+  ) {
+    errors.push("sitemap page URLs must exactly match generated canonical HTML routes");
+  }
+  return errors;
+}
+
+function validateSite(siteDirectory) {
+  const root = path.resolve(siteDirectory);
+  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
+    return [`built site directory does not exist: ${root}`];
+  }
+  const htmlFiles = [];
+  function collectHtml(directory) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const fullPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) collectHtml(fullPath);
+      else if (entry.isFile() && entry.name.endsWith(".html")) htmlFiles.push(fullPath);
+    }
+  }
+  collectHtml(root);
+  if (htmlFiles.length === 0) return ["built site contains no HTML routes"];
+
+  const pages = new Map(htmlFiles.map((file) => [file, parsePage(fs.readFileSync(file, "utf8"))]));
+  const canonicalRoutes = {};
+  const errors = [];
+
+  for (const [file, page] of pages) {
+    const relative = path.relative(root, file).split(path.sep).join("/");
+    const prefix = `${relative}: `;
+    if (page.title.length !== 1 || !page.title[0]) {
+      errors.push(`${prefix}expected one non-empty document title`);
+    }
+    if (page.descriptions.length !== 1 || !page.descriptions[0].trim()) {
+      errors.push(`${prefix}expected one non-empty meta description`);
+    }
+    if (page.canonicals.length !== 1) {
+      errors.push(`${prefix}expected exactly one canonical link`);
+    } else {
+      let canonical;
+      try {
+        canonical = new URL(page.canonicals[0]);
+      } catch {
+        canonical = null;
+      }
+      if (
+        !canonical ||
+        canonical.protocol !== "https:" ||
+        canonical.hostname !== "jamula.net" ||
+        canonical.search ||
+        canonical.hash
+      ) {
+        errors.push(`${prefix}canonical must be an absolute Jamula.net HTTPS URL`);
+      } else {
+        const route = normalizeRoute(canonical.pathname);
+        if (localFile(root, file, canonical.pathname) !== file) {
+          errors.push(`${prefix}canonical path does not resolve to this built page`);
+        }
+        if (path.basename(file) !== "404.html") {
+          if (canonicalRoutes[route]) {
+            errors.push(`${prefix}canonical route duplicates ${canonicalRoutes[route].file}`);
+          }
+          canonicalRoutes[route] = { file, url: canonical.href };
+        }
+      }
+      if (page.ogUrls.length !== 1 || page.ogUrls[0] !== page.canonicals[0]) {
+        errors.push(`${prefix}Open Graph URL must match the canonical URL`);
+      }
+    }
+
+    const htmlTags = page.tags.filter(([tag]) => tag === "html");
+    if (htmlTags.length !== 1 || !htmlTags[0][1].lang?.trim()) {
+      errors.push(`${prefix}html element must declare a non-empty language`);
+    }
+    for (const landmark of ["header", "nav", "main", "footer"]) {
+      if (page.tags.filter(([tag]) => tag === landmark).length !== 1) {
+        errors.push(`${prefix}expected exactly one ${landmark} landmark`);
+      }
+    }
+    if (page.headingLevels.filter((level) => level === 1).length !== 1) {
+      errors.push(`${prefix}expected exactly one h1 heading`);
+    }
+    if (page.headingLevels[0] !== 1) {
+      errors.push(`${prefix}first heading must be h1`);
+    }
+    for (let index = 1; index < page.headingLevels.length; index += 1) {
+      if (page.headingLevels[index] > page.headingLevels[index - 1] + 1) {
+        errors.push(
+          `${prefix}heading level jumps from h${page.headingLevels[index - 1]} ` +
+            `to h${page.headingLevels[index]}`
+        );
+        break;
+      }
+    }
+    const mains = page.tags.filter(([tag]) => tag === "main");
+    if (
+      mains.length === 1 &&
+      (mains[0][1].id !== "main-content" || mains[0][1].tabindex !== "-1")
+    ) {
+      errors.push(`${prefix}main landmark must have id=main-content and tabindex=-1`);
+    }
+    if (page.anchors[0] !== "#main-content" || !page.ids.includes("main-content")) {
+      errors.push(`${prefix}first link must target the existing main-content skip target`);
+    }
+    if (new Set(page.ids).size !== page.ids.length) {
+      errors.push(`${prefix}duplicate id attributes are present`);
+    }
+    if (file === path.join(root, "index.html")) {
+      errors.push(...validateOrganizationSchema(page, prefix));
+    }
+
+    const canonical = page.canonicals.length === 1 ? page.canonicals[0] : `${SITE_URL}/${relative}`;
+    const resourceTargets = new Map();
+    for (const resource of page.resources) {
+      let parsed;
+      try {
+        parsed = new URL(resource, canonical);
+      } catch {
+        errors.push(`${prefix}invalid network resource URL: ${resource}`);
+        continue;
+      }
+      if (parsed.protocol === "data:") continue;
+      if (parsed.hostname && !ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) {
+        errors.push(`${prefix}third-party network resource is not allowed: ${resource}`);
+        continue;
+      }
+      if (parsed.protocol !== "https:") {
+        errors.push(`${prefix}network resource must use HTTPS: ${resource}`);
+        continue;
+      }
+      const target = localFile(root, file, parsed.pathname);
+      if (!target) errors.push(`${prefix}resource does not resolve to a built file: ${resource}`);
+      else resourceTargets.set(resource, target);
+    }
+    const styles = [];
+    for (const source of page.styleSources) {
+      let css = source.css;
+      if (source.href !== undefined) {
+        const target = resourceTargets.get(source.href);
+        if (!target) continue;
+        css = fs.readFileSync(target, "utf8");
+      }
+      styles.push(source.media ? `@media ${source.media}{${css}}` : css);
+    }
+    errors.push(...contrastErrors(styles).map((error) => `${prefix}${error}`));
+  }
+
+  for (const [file, page] of pages) {
+    const canonical = page.canonicals.length === 1 ? page.canonicals[0] : `${SITE_URL}/`;
+    for (const href of page.anchors) {
+      if (!href) continue;
+      let targetUrl;
+      try {
+        targetUrl = new URL(href, canonical);
+      } catch {
+        errors.push(`${path.basename(file)}: invalid internal link URL: ${href}`);
+        continue;
+      }
+      if (!ALLOWED_HOSTS.has(targetUrl.hostname.toLowerCase())) continue;
+      if (targetUrl.protocol === "http:") {
+        errors.push(
+          `${path.relative(root, file).split(path.sep).join("/")}: ` +
+            `internal link must use HTTPS: ${href}`
+        );
+        continue;
+      }
+      if (targetUrl.protocol !== "https:") continue;
+      const route = normalizeRoute(targetUrl.pathname || new URL(canonical).pathname);
+      const routePage = canonicalRoutes[route];
+      const target = routePage?.file ?? localFile(root, file, targetUrl.pathname);
+      if (!target) {
+        errors.push(
+          `${path.relative(root, file).split(path.sep).join("/")}: ` +
+            `internal link has no built target: ${href}`
+        );
+        continue;
+      }
+      if (targetUrl.hash && target.endsWith(".html")) {
+        const targetPage = pages.get(target) ?? parsePage(fs.readFileSync(target, "utf8"));
+        let fragment;
+        try {
+          fragment = decodeURIComponent(targetUrl.hash.slice(1));
+        } catch {
+          fragment = targetUrl.hash.slice(1);
+        }
+        if (!targetPage.ids.includes(fragment)) {
+          errors.push(
+            `${path.relative(root, file).split(path.sep).join("/")}: ` +
+              `internal fragment does not exist: ${href}`
+          );
+        }
+      }
+    }
+  }
+  errors.push(...validateSitemaps(root, canonicalRoutes));
+  return errors;
+}
+
+function copyBuild(t) {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "jamula-site-"));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  const destination = path.join(temporary, "dist");
+  fs.cpSync(BUILD_DIR, destination, { recursive: true });
+  return destination;
+}
+
+function builtPage(root = BUILD_DIR) {
+  return path.join(root, "index.html");
+}
+
+function baseStylesheet(root) {
+  const directory = path.join(root, "_astro");
+  return fs
+    .readdirSync(directory)
+    .map((file) => path.join(directory, file))
+    .find((file) => file.endsWith(".css") && fs.readFileSync(file, "utf8").includes("--j-ink"));
+}
+
+test("built output satisfies SEO, accessibility, privacy, and schema contracts", () => {
+  assert.deepEqual(validateSite(BUILD_DIR), []);
+});
+
+test("HTML parsing preserves title text without multi-character tag stripping", () => {
+  const page = parsePage(
+    '<title>&lt;script&gt; &amp; <scr<script>ipt></title><a href="/?a=1&amp;b=2">Link</a>'
+  );
+  assert.deepEqual(page.title, ["<script> & <scr<script>ipt>"]);
+  assert.deepEqual(page.anchors, ["/?a=1&b=2"]);
+});
+
+test("document titles exclude SVG titles but retain HTML titles in foreignObject", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  const original = fs.readFileSync(file, "utf8");
+  const icon = '<svg role="img"><title>Jamula mark</title></svg>';
+  fs.writeFileSync(file, original.replace("</body>", `${icon}</body>`));
+  assert.deepEqual(validateSite(root), []);
+  fs.writeFileSync(
+    file,
+    original.replace(
+      "</body>",
+      "<svg><foreignObject><title>Extra</title></foreignObject></svg></body>"
+    )
+  );
+  assert.ok(validateSite(root).includes("index.html: expected one non-empty document title"));
+});
+
+test("HTML parsing respects raw text and whitespace script closing tags", () => {
+  const json = '{"name":"<h1 id=\\"fake\\">not a heading</h1>"}';
+  const page = parsePage(
+    `<script type="application/ld+json">${json}</script \n>` +
+      '<style>/* <h2 id="fake-style"> */</style \t>' +
+      '<a href="/?value=>">Link</a>'
+  );
+  assert.deepEqual(page.jsonLd, [json]);
+  assert.deepEqual(page.headingLevels, []);
+  assert.deepEqual(page.ids, []);
+  assert.deepEqual(page.anchors, ["/?value=>"]);
+  assert.deepEqual(page.inlineStyles, ['/* <h2 id="fake-style"> */']);
+});
+
+test("semantic checks reject a required heading hidden inside an HTML comment", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  fs.writeFileSync(
+    file,
+    fs.readFileSync(file, "utf8").replace(/<h1\b[\s\S]*?<\/h1>/i, "<!-- $& -->")
+  );
+  assert.ok(validateSite(root).includes("index.html: expected exactly one h1 heading"));
+});
+
+test("Organization schema accepts whitespace in its HTML closing tag", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace("</script>", "</script \n>"));
+  assert.deepEqual(validateSite(root), []);
+});
+
+test("canonical validation rejects a nonexistent route even when metadata and sitemap agree", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  fs.writeFileSync(
+    file,
+    fs.readFileSync(file, "utf8").replaceAll('https://jamula.net/"', 'https://jamula.net/missing/"')
+  );
+  const sitemap = path.join(root, "sitemap-0.xml");
+  fs.writeFileSync(
+    sitemap,
+    fs.readFileSync(sitemap, "utf8").replace("https://jamula.net/", "https://jamula.net/missing/")
+  );
+  assert.ok(
+    validateSite(root).includes("index.html: canonical path does not resolve to this built page")
+  );
+});
+
+test("nested directory routes do not require homepage Organization data", (t) => {
+  const root = copyBuild(t);
+  const directory = path.join(root, "about");
+  fs.mkdirSync(directory);
+  const html = fs
+    .readFileSync(builtPage(root), "utf8")
+    .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/i, "")
+    .replaceAll('https://jamula.net/"', 'https://jamula.net/about/"');
+  fs.writeFileSync(path.join(directory, "index.html"), html);
+  const sitemap = path.join(root, "sitemap-0.xml");
+  fs.writeFileSync(
+    sitemap,
+    fs
+      .readFileSync(sitemap, "utf8")
+      .replace("</urlset>", "<url><loc>https://jamula.net/about/</loc></url></urlset>")
+  );
+  assert.deepEqual(validateSite(root), []);
+});
+
+test("contrast checks include late unconditional and theme-specific root overrides", async (t) => {
+  for (const [name, css, themes] of [
+    ["unconditional", ":root{--j-color-text:var(--j-color-bg)}", ["light", "dark"]],
+    [
+      "dark",
+      "@media(prefers-color-scheme:dark){:root{--j-color-text:var(--j-color-bg)}}",
+      ["dark"],
+    ],
+    [
+      "light",
+      "@media(prefers-color-scheme:light){:root{--j-color-text:var(--j-color-bg)}}",
+      ["light"],
+    ],
+  ]) {
+    await t.test(name, (subtest) => {
+      const root = copyBuild(subtest);
+      fs.appendFileSync(baseStylesheet(root), css);
+      const errors = validateSite(root);
+      for (const theme of themes) {
+        assert.ok(
+          errors.includes(
+            `index.html: ${theme} contrast --j-color-text on --j-color-bg is 1.00:1, below 4.5:1`
+          )
+        );
+      }
+    });
+  }
+});
+
+test("contrast checks preserve important root declarations over later normal declarations", () => {
+  const css = fs.readFileSync(baseStylesheet(BUILD_DIR), "utf8");
+  assert.deepEqual(
+    contrastErrors([
+      css,
+      ":root{--j-color-text:var(--j-ink)!important}" + ":root{--j-color-text:var(--j-color-bg)}",
+    ]),
+    []
+  );
+});
+
+test("contrast checks require jointly applicable dark media ancestors", async (t) => {
+  const sheet = postcss.parse(fs.readFileSync(baseStylesheet(BUILD_DIR), "utf8"));
+  sheet.walkAtRules("media", (rule) => rule.remove());
+  const lightOnly = sheet.toString();
+  for (const [name, outer, inner, expected] of [
+    [
+      "light outside dark",
+      "light",
+      "dark",
+      ["color tokens are missing a prefers-color-scheme: dark root"],
+    ],
+    [
+      "dark outside light",
+      "dark",
+      "light",
+      ["color tokens are missing a prefers-color-scheme: dark root"],
+    ],
+    ["matching dark ancestors", "dark", "dark", []],
+  ]) {
+    await t.test(name, () => {
+      const color = outer === inner ? "var(--j-ink)" : "var(--j-color-bg)";
+      const nested =
+        `@media(prefers-color-scheme:${outer}){` +
+        `@media(prefers-color-scheme:${inner}){:root{--j-color-text:${color}}}}`;
+      assert.deepEqual(contrastErrors([lightOnly, nested]), expected);
+    });
+  }
+  assert.deepEqual(contrastErrors([lightOnly]), [
+    "color tokens are missing a prefers-color-scheme: dark root",
+  ]);
+});
+
+test("contrast checks report unsupported root conditions and cyclic color tokens", () => {
+  const css = fs.readFileSync(baseStylesheet(BUILD_DIR), "utf8");
+  assert.ok(
+    contrastErrors([css, "@media(min-width:1px){:root{--j-color-text:#fff}}"]).includes(
+      "unsupported conditional or nested :root rule in contrast checks"
+    )
+  );
+  assert.ok(
+    contrastErrors([css, ":root{--j-color-text:var(--j-color-text)}"]).includes(
+      "light contrast: cyclic color token --j-color-text"
+    )
+  );
+});
+
+test("metadata checks reject an empty title, missing description, and wrong canonical", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  let html = fs.readFileSync(file, "utf8");
+  html = html.replace(/<title>[\s\S]*?<\/title>/i, "<title></title>");
+  html = html.replace(/<meta name="description"[^>]*>/i, "");
+  html = html.replace(
+    '<link rel="canonical" href="https://jamula.net/">',
+    '<link rel="canonical" href="http://jamula.com/">'
+  );
+  fs.writeFileSync(file, html);
+
+  const messages = validateSite(root).join("\n");
+  assert.match(messages, /non-empty document title/);
+  assert.match(messages, /meta description/);
+  assert.match(messages, /canonical must be an absolute Jamula\.net HTTPS URL/);
+});
+
+test("robots checks reject crawler-specific blocking groups", (t) => {
+  const root = copyBuild(t);
+  fs.appendFileSync(path.join(root, "robots.txt"), "\nUser-agent: Googlebot\nDisallow: /\n");
+  assert.ok(
+    validateSite(root).includes("robots.txt must match the approved public-crawling policy")
+  );
+});
+
+test("resources on every approved host must resolve to built files", async (t) => {
+  for (const host of ["jamula.net", "www.jamula.net", "jamula.com", "www.jamula.com"]) {
+    await t.test(host, (subtest) => {
+      const root = copyBuild(subtest);
+      const file = builtPage(root);
+      const resource = `https://${host}/missing.png`;
+      fs.writeFileSync(
+        file,
+        fs.readFileSync(file, "utf8").replace("</body>", `<img src="${resource}" alt=""></body>`)
+      );
+      assert.deepEqual(validateSite(root), [
+        `index.html: resource does not resolve to a built file: ${resource}`,
+      ]);
+      fs.writeFileSync(
+        file,
+        fs.readFileSync(file, "utf8").replace(resource, `https://${host}/apple-touch-icon.png`)
+      );
+      assert.deepEqual(validateSite(root), []);
+    });
+  }
+});
+
+test("nested relative resources resolve against the page rather than the site root", (t) => {
+  const root = copyBuild(t);
+  const directory = path.join(root, "about");
+  fs.mkdirSync(directory);
+  const file = path.join(directory, "index.html");
+  const html = fs
+    .readFileSync(builtPage(root), "utf8")
+    .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/i, "")
+    .replaceAll('https://jamula.net/"', 'https://jamula.net/about/"')
+    .replace("</body>", '<img src="photo.png" alt=""></body>');
+  fs.writeFileSync(file, html);
+  const sitemap = path.join(root, "sitemap-0.xml");
+  fs.writeFileSync(
+    sitemap,
+    fs
+      .readFileSync(sitemap, "utf8")
+      .replace("</urlset>", "<url><loc>https://jamula.net/about/</loc></url></urlset>")
+  );
+  fs.copyFileSync(path.join(root, "apple-touch-icon.png"), path.join(directory, "photo.png"));
+  assert.deepEqual(validateSite(root), []);
+  fs.renameSync(path.join(directory, "photo.png"), path.join(root, "photo.png"));
+  assert.deepEqual(validateSite(root), [
+    "about/index.html: resource does not resolve to a built file: photo.png",
+  ]);
+});
+
+test("contrast checks preserve per-page inline and linked stylesheet order", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  const original = fs.readFileSync(file, "utf8");
+  const directory = path.join(root, "about");
+  fs.mkdirSync(directory);
+  fs.writeFileSync(
+    path.join(directory, "index.html"),
+    original
+      .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/i, "")
+      .replaceAll('https://jamula.net/"', 'https://jamula.net/about/"')
+  );
+  const sitemap = path.join(root, "sitemap-0.xml");
+  fs.writeFileSync(
+    sitemap,
+    fs
+      .readFileSync(sitemap, "utf8")
+      .replace("</urlset>", "<url><loc>https://jamula.net/about/</loc></url></urlset>")
+  );
+  assert.deepEqual(validateSite(root), []);
+  const override = "<style>:root{--j-color-text:var(--j-color-bg)}</style>";
+  fs.writeFileSync(file, original.replace("</head>", `${override}</head>`));
+  const errors = validateSite(root);
+  assert.ok(
+    errors.includes(
+      "index.html: light contrast --j-color-text on --j-color-bg is 1.00:1, below 4.5:1"
+    )
+  );
+  assert.ok(errors.every((error) => error.startsWith("index.html: ")));
+  fs.writeFileSync(
+    file,
+    original.replace(/<link rel="stylesheet"/, `${override}<link rel="stylesheet"`)
+  );
+  assert.deepEqual(validateSite(root), []);
+});
+
+test("semantic checks reject a broken skip target and missing h1", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  let html = fs.readFileSync(file, "utf8");
+  html = html.replace('href="#main-content"', 'href="#missing-main"');
+  html = html.replace("<h1 ", "<h2 ").replace("</h1>", "</h2>");
+  fs.writeFileSync(file, html);
+
+  const messages = validateSite(root).join("\n");
+  assert.match(messages, /exactly one h1 heading/);
+  assert.match(messages, /first link must target the existing main-content skip target/);
+});
+
+test("internal link validation rejects a missing fragment target", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  fs.writeFileSync(
+    file,
+    fs.readFileSync(file, "utf8").replace('href="#synthesis"', 'href="#missing-section"')
+  );
+
+  assert.match(validateSite(root).join("\n"), /internal fragment does not exist/);
+});
+
+test("internal link validation rejects HTTP on every approved Jamula host", async (t) => {
+  for (const host of ["jamula.net", "www.jamula.net", "jamula.com", "www.jamula.com"]) {
+    await t.test(host, (subtest) => {
+      const root = copyBuild(subtest);
+      const file = builtPage(root);
+      const href = `http://${host}/#synthesis`;
+      fs.writeFileSync(
+        file,
+        fs.readFileSync(file, "utf8").replace('href="#synthesis"', `href="${href}"`)
+      );
+
+      assert.deepEqual(validateSite(root), [`index.html: internal link must use HTTPS: ${href}`]);
+    });
+  }
+});
+
+test("internal link validation preserves HTTPS target and fragment checks on every Jamula host", async (t) => {
+  const cases = [
+    { name: "existing fragment", route: "/#synthesis", diagnostic: null },
+    {
+      name: "missing target",
+      route: "/missing-page/",
+      diagnostic: "internal link has no built target",
+    },
+    {
+      name: "missing fragment",
+      route: "/#missing-section",
+      diagnostic: "internal fragment does not exist",
+    },
+  ];
+  for (const host of ["jamula.net", "www.jamula.net", "jamula.com", "www.jamula.com"]) {
+    for (const { name, route, diagnostic } of cases) {
+      await t.test(`${host} ${name}`, (subtest) => {
+        const root = copyBuild(subtest);
+        const file = builtPage(root);
+        const href = `https://${host}${route}`;
+        fs.writeFileSync(
+          file,
+          fs.readFileSync(file, "utf8").replace('href="#synthesis"', `href="${href}"`)
+        );
+
+        assert.deepEqual(
+          validateSite(root),
+          diagnostic ? [`index.html: ${diagnostic}: ${href}`] : []
+        );
+      });
+    }
+  }
+});
+
+test("internal link validation still skips external hosts and intentional non-HTTPS schemes", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  const links = [
+    "http://example.invalid/missing/#missing",
+    "https://example.invalid/missing/#missing",
+    "http://jamula.net.example.invalid/missing/#missing",
+    "mailto:hello@example.invalid",
+    "tel:+15555550100",
+    "ftp://jamula.net/missing/",
+  ];
+  fs.writeFileSync(
+    file,
+    fs
+      .readFileSync(file, "utf8")
+      .replace("</body>", `${links.map((href) => `<a href="${href}">Link</a>`).join("")}</body>`)
+  );
+
+  assert.deepEqual(validateSite(root), []);
+});
+
+test("sitemap validation rejects a noncanonical and unknown route", (t) => {
+  const root = copyBuild(t);
+  const sitemap = path.join(root, "sitemap-0.xml");
+  fs.writeFileSync(
+    sitemap,
+    fs.readFileSync(sitemap, "utf8").replace("https://jamula.net/", "https://jamula.com/missing/")
+  );
+
+  const messages = validateSite(root).join("\n");
+  assert.match(messages, /sitemap contains a non-canonical page URL/);
+  assert.match(messages, /sitemap page URLs must exactly match/);
+});
+
+test("contrast validation detects light and dark token regressions", (t) => {
+  const root = copyBuild(t);
+  const stylesheet = baseStylesheet(root);
+  assert.ok(stylesheet, "the built base stylesheet must contain the Jamula color tokens");
+  let css = fs.readFileSync(stylesheet, "utf8");
+  css = css.replace("--j-ink:#1b1a16", "--j-ink:#e9e7df");
+  css = css.replace("--j-press:#63bd8d", "--j-press:#17160f");
+  fs.writeFileSync(stylesheet, css);
+
+  const messages = validateSite(root).join("\n");
+  assert.match(messages, /light contrast --j-color-text on --j-color-bg/);
+  assert.match(messages, /dark contrast --j-color-accent on --j-color-bg/);
+});
+
+test("Organization schema validation rejects invalid JSON, wrong identity, and extra fields", async (t) => {
+  const mutations = [
+    {
+      name: "invalid JSON",
+      update: (value) => value.replace('"@context"', "broken"),
+      diagnostic: /Organization JSON-LD is invalid/,
+    },
+    {
+      name: "wrong canonical",
+      update: (value) =>
+        value.replace('"url":"https://jamula.net/"', '"url":"https://jamula.com/"'),
+      diagnostic: /incorrect url property/,
+    },
+    {
+      name: "extra field",
+      update: (value) =>
+        value.replace(
+          '"logo":"https://jamula.net/apple-touch-icon.png"',
+          '"logo":"https://jamula.net/apple-touch-icon.png","sameAs":"https://example.invalid"'
+        ),
+      diagnostic: /unsupported properties: sameAs/,
+    },
+  ];
+
+  for (const mutation of mutations) {
+    await t.test(mutation.name, (subtest) => {
+      const root = copyBuild(subtest);
+      const file = builtPage(root);
+      let html = fs.readFileSync(file, "utf8");
+      const script = /(<script type="application\/ld\+json">)([\s\S]*?)(<\/script>)/i;
+      const match = html.match(script);
+      assert.ok(match, "the baseline homepage must have one JSON-LD block");
+      html = html.replace(script, `${match[1]}${mutation.update(match[2])}${match[3]}`);
+      fs.writeFileSync(file, html);
+
+      assert.match(validateSite(root).join("\n"), mutation.diagnostic);
+    });
+  }
+});
+
+test("external third-party resources are rejected", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  fs.writeFileSync(
+    file,
+    fs
+      .readFileSync(file, "utf8")
+      .replace("</body>", '<script src="https://tracker.example/collect.js"></script></body>')
+  );
+
+  assert.match(validateSite(root).join("\n"), /third-party network resource/);
+});
+
+if (!fs.existsSync(BUILD_DIR)) {
+  throw new Error(`Build the Astro site before running tests: ${BUILD_DIR}`);
+}

@@ -126,8 +126,8 @@ Required fail-safe behavior:
 
 ### 5.2 Crawl and index control
 
-- `sitemap.xml` contains only absolute Jamula.net canonical URLs that are intended to index and return `200`; it excludes redirects, errors, duplicate/filter URLs, previews, authentication, portal, consent callbacks, and payment/session routes. `lastmod` reflects meaningful content change. Submit and monitor it in the relevant search-console properties [S3].
-- Root `robots.txt` is syntactically valid, references the Jamula.net sitemap, and permits required HTML/CSS/image/script resources. It manages crawling only; it is not used to hide sensitive content or force canonicalization [S4].
+- A sitemap index and its referenced child files contain only absolute Jamula.net canonical URLs intended to index and return `200`; they exclude redirects, errors, duplicate/filter URLs, previews, authentication, portal, consent callbacks, and payment/session routes. The current Astro build emits `/sitemap-index.xml` and `/sitemap-0.xml`. If `lastmod` is included, it reflects meaningful content changes. Submit and monitor the sitemap index in the relevant search-console properties [S3].
+- Root `robots.txt` is syntactically valid, references `https://jamula.net/sitemap-index.xml`, and permits required HTML/CSS/image/script resources. It manages crawling only; it is not used to hide sensitive content or force canonicalization [S4].
 - Non-public content is protected by authorization. Public-but-nonindexable pages use supported `noindex` delivery while remaining crawlable as needed; preview environments use access controls plus noindex defense in depth.
 - Search/crawl validation checks status, canonical, index directive, language, title, description, heading, links, and rendered/HTML parity across every representative template.
 
