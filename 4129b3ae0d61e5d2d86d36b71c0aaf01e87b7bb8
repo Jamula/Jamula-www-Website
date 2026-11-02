@@ -1,5 +1,5 @@
 {
   "memory/config.json": "{\n  \"version\": 1,\n  \"defaultProvider\": \"local\",\n  \"promptOnlyFallback\": true,\n  \"externalProviders\": {\n    \"hostInjectedCopilotAdapter\": {\n      \"enabled\": false,\n      \"requireApproval\": true\n    }\n  },\n  \"policy\": {\n    \"rejectForbidden\": true,\n    \"rejectTransientDurableWrites\": true,\n    \"auditContent\": false,\n    \"auditMaxBytes\": 1048576,\n    \"auditMaxArchives\": 3\n  }\n}\n",
   "memory/index.json": "[]\n",
-  "memory/audit.jsonl": ""
+  "memory/audit.jsonl": "{\"timestamp\":\"2026-11-02T00:36:29.602Z\",\"action\":\"classify\",\"class\":\"DECISION\",\"title\":\"Classified governed memory\",\"reason\":\"Content is allowed for governed local memory\"}\n"
 }
