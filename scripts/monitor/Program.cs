@@ -1,8 +1,8 @@
-// Jamula apex uptime and A-record drift monitor.
+// Jamula hostname uptime and apex A-record drift monitor.
 //
 // Usage:
 //   JamulaMonitor              — run live DNS + HTTPS checks
-//   JamulaMonitor --self-test  — run offline canonical-parser self-tests
+//   JamulaMonitor --self-test  — run offline monitor self-tests
 //
 // Exit codes:
 //   0  All checks passed
@@ -13,24 +13,28 @@
 //   5  Canonical: no <link rel="canonical"> tag in response HTML
 //   6  Canonical: tag found but href attribute is absent or empty
 //   7  Canonical: href value does not match expected canonical URL
+//   8  HTTP-to-HTTPS: redirect is missing or violates the same-host policy
+//   9  Content: expected successful-page content is absent
+//  10  Not found: expected HTTP 404 experience is absent
 
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.RegularExpressions;
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 if (args.Length > 0 && args[0] == "--self-test")
-    return SelfTests.Run();
+    return await SelfTests.RunAsync();
 
-using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(28));
+using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(110));
 try
 {
     return await Monitor.RunAsync(cts.Token);
 }
 catch (OperationCanceledException)
 {
-    Console.Error.WriteLine("::error::Monitor timed out (28-second global budget exceeded).");
+    Console.Error.WriteLine("::error::Monitor timed out (110-second global budget exceeded).");
     return 3;
 }
 
@@ -40,8 +44,20 @@ static class Config
 {
     public const string ApexHost = "jamula.net";
     public const string ApprovedIp = "48.192.33.154"; // approved Azure Static Web Apps inbound IP
-    public const string ApexUrl = "https://jamula.net/";
     public const string ExpectedCanonical = "https://jamula.net/";
+    public const string ExpectedHomeTitle = "Home — Jamula";
+    public const string ExpectedHomeContent = "AI strategy.";
+    public const string ExpectedNotFoundContent = "Page not found";
+    public const string UpgradePath = "/__jamula_monitor_path_check__";
+    public const string UpgradeQuery = "jamula-monitor=1";
+    public const string NotFoundPath = "/__jamula_monitor_not_found__";
+    public static readonly string[] ApprovedHosts =
+    [
+        "jamula.net",
+        "www.jamula.net",
+        "jamula.com",
+        "www.jamula.com"
+    ];
 }
 
 // ── Result types ──────────────────────────────────────────────────────────────
@@ -57,24 +73,15 @@ enum CanonicalResult
 
 static class CanonicalParser
 {
-    // Matches any complete <link ...> or <link ... /> tag.
     private static readonly Regex LinkTag =
         new(@"<link\b[^>]*/?>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
-    // Checks whether a tag carries rel="canonical".  Negative lookbehind (?<![a-zA-Z0-9\-])
-    // prevents matching hyphenated names such as data-rel (where \b would incorrectly match).
     private static readonly Regex RelCanonical =
         new(@"(?<![a-zA-Z0-9\-])rel\s*=\s*([""'])canonical\1", RegexOptions.IgnoreCase);
 
-    // Extracts the href attribute value.  Same boundary guard as RelCanonical.
     private static readonly Regex HrefAttr =
         new(@"(?<![a-zA-Z0-9\-])href\s*=\s*([""'])([^""']*)\1", RegexOptions.IgnoreCase);
 
-    /// <summary>
-    /// Extracts the canonical URL from the first &lt;link rel="canonical"&gt; tag in
-    /// <paramref name="html"/>.  Returns a discriminated result so callers can emit
-    /// precise diagnostics for each failure mode.
-    /// </summary>
     public static (CanonicalResult Result, string? Href) Extract(string html)
     {
         var canonicalTag = LinkTag.Matches(html)
@@ -96,9 +103,11 @@ static class CanonicalParser
 
 static class Monitor
 {
+    private static readonly Regex HtmlTitle =
+        new(@"<title\b[^>]*>(.*?)</title\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
     public static async Task<int> RunAsync(CancellationToken ct)
     {
-        // ── DNS A-record check ─────────────────────────────────────────────
         IPAddress[] addresses;
         try
         {
@@ -107,7 +116,7 @@ static class Monitor
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            throw; // propagates to the top-level handler → exit 3 with timeout diagnostic
+            throw;
         }
         catch (Exception ex)
         {
@@ -116,8 +125,6 @@ static class Monitor
             return 1;
         }
 
-        // Collect all distinct IPv4 A records so that an unexpected address alongside
-        // the approved one is not silently ignored (order-independent comparison).
         var ipv4Addresses = addresses
             .Where(a => a.AddressFamily == AddressFamily.InterNetwork)
             .Select(a => a.ToString())
@@ -142,87 +149,225 @@ static class Monitor
 
         Console.WriteLine($"DNS OK: {Config.ApexHost} → {ipv4Addresses[0]}");
 
-        // ── HTTPS check ────────────────────────────────────────────────────
-        HttpResponseMessage response;
-        string html;
+        using var handler = new HttpClientHandler
+        {
+            AllowAutoRedirect = false
+        };
+        using var client = new HttpClient(handler)
+        {
+            Timeout = TimeSpan.FromSeconds(8)
+        };
+
+        return await CheckApprovedHostsAsync(client, Config.ApprovedHosts, Console.Out, ct);
+    }
+
+    public static async Task<int> CheckApprovedHostsAsync(
+        HttpClient client,
+        IReadOnlyList<string> hosts,
+        TextWriter output,
+        CancellationToken ct)
+    {
+        int firstFailure = 0;
+        foreach (string host in hosts)
+        {
+            int hostResult = await CheckHostAsync(client, host, output, ct);
+            if (firstFailure == 0 && hostResult != 0)
+                firstFailure = hostResult;
+        }
+
+        if (firstFailure == 0)
+            output.WriteLine("All approved hostname checks passed.");
+
+        return firstFailure;
+    }
+
+    private static async Task<int> CheckHostAsync(
+        HttpClient client,
+        string host,
+        TextWriter output,
+        CancellationToken ct)
+    {
+        int firstFailure = 0;
+        void Fail(int code, string invariant, string detail)
+        {
+            output.WriteLine($"::error::{host}: {invariant}: {detail}");
+            if (firstFailure == 0)
+                firstFailure = code;
+        }
+
+        string? homeHtml = null;
+        Uri homeUri = new($"https://{host}/");
         try
         {
-            // Redirects disabled: the acceptance criterion is that https://jamula.net/
-            // itself returns HTTP 200, not that a redirect chain eventually reaches 200.
-            using var handler = new HttpClientHandler
+            using var response = await client.GetAsync(homeUri, ct);
+            int statusCode = (int)response.StatusCode;
+            if (statusCode != 200)
             {
-                AllowAutoRedirect = false
-            };
-            using var client = new HttpClient(handler)
+                Fail(4, "HTTPS", $"{homeUri} returned HTTP {statusCode}; expected 200.");
+            }
+            else
             {
-                Timeout = TimeSpan.FromSeconds(20)
-            };
-
-            response = await client.GetAsync(Config.ApexUrl, ct);
-            html = await response.Content.ReadAsStringAsync(ct);
+                homeHtml = await response.Content.ReadAsStringAsync(ct);
+                output.WriteLine($"HTTPS OK: {homeUri} → HTTP 200");
+            }
         }
         catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
         {
-            Console.Error.WriteLine(
-                $"::error::HTTPS: request to {Config.ApexUrl} timed out: {ex.Message}");
-            return 3;
+            Fail(3, "HTTPS", $"request to {homeUri} timed out: {ex.Message}");
         }
         catch (HttpRequestException ex)
         {
-            Console.Error.WriteLine(
-                $"::error::HTTPS: request to {Config.ApexUrl} failed: {ex.Message}");
-            return 3;
+            Fail(3, "HTTPS", $"request to {homeUri} failed (including TLS validation): {ex.Message}");
         }
 
-        int statusCode = (int)response.StatusCode;
-        if (statusCode != 200)
+        if (homeHtml is not null)
         {
-            Console.Error.WriteLine(
-                $"::error::HTTPS: {Config.ApexUrl} returned HTTP {statusCode} "
-                + $"{response.ReasonPhrase} — expected 200 (redirects not followed).");
-            return 4;
+            Match titleMatch = HtmlTitle.Match(homeHtml);
+            string title = titleMatch.Success
+                ? WebUtility.HtmlDecode(titleMatch.Groups[1].Value.Trim())
+                : string.Empty;
+            if (title != Config.ExpectedHomeTitle
+                || !homeHtml.Contains(Config.ExpectedHomeContent, StringComparison.Ordinal))
+            {
+                Fail(9, "page content",
+                    $"expected title '{Config.ExpectedHomeTitle}' and content "
+                    + $"'{Config.ExpectedHomeContent}'.");
+            }
+            else
+            {
+                output.WriteLine($"Page content OK: {host}");
+            }
+
+            var (canonicalResult, href) = CanonicalParser.Extract(homeHtml);
+            switch (canonicalResult)
+            {
+                case CanonicalResult.Absent:
+                    Fail(5, "canonical URL", "no <link rel=\"canonical\"> tag found.");
+                    break;
+                case CanonicalResult.MalformedHref:
+                    Fail(6, "canonical URL", "the canonical link has an absent or empty href.");
+                    break;
+                default:
+                    if (href != Config.ExpectedCanonical)
+                    {
+                        Fail(7, "canonical URL",
+                            $"got '{href}', expected '{Config.ExpectedCanonical}'.");
+                    }
+                    else
+                    {
+                        output.WriteLine($"Canonical OK: {href}");
+                    }
+                    break;
+            }
         }
 
-        Console.WriteLine($"HTTPS OK: {Config.ApexUrl} → HTTP {statusCode}");
-
-        // ── Canonical check ────────────────────────────────────────────────
-        var (result, href) = CanonicalParser.Extract(html);
-        switch (result)
-        {
-            case CanonicalResult.Absent:
-                Console.Error.WriteLine(
-                    $"::error::Canonical: no <link rel=\"canonical\"> tag found in "
-                    + $"{Config.ApexUrl} response HTML.");
-                return 5;
-
-            case CanonicalResult.MalformedHref:
-                Console.Error.WriteLine(
-                    $"::error::Canonical: <link rel=\"canonical\"> found but href attribute "
-                    + $"is absent or empty in {Config.ApexUrl} response HTML.");
-                return 6;
-
-            default:
-                if (href != Config.ExpectedCanonical)
-                {
-                    Console.Error.WriteLine(
-                        $"::error::Canonical mismatch: got '{href}', "
-                        + $"expected '{Config.ExpectedCanonical}'.");
-                    return 7;
-                }
-                Console.WriteLine($"Canonical OK: {href}");
-                break;
-        }
-
-        Console.WriteLine("All checks passed.");
-        return 0;
+        await CheckHttpUpgradeAsync(client, host, output, ct, Fail);
+        await CheckNotFoundAsync(client, host, output, ct, Fail);
+        return firstFailure;
     }
+
+    private static async Task CheckHttpUpgradeAsync(
+        HttpClient client,
+        string host,
+        TextWriter output,
+        CancellationToken ct,
+        Action<int, string, string> fail)
+    {
+        var requestUri = new UriBuilder(Uri.UriSchemeHttp, host)
+        {
+            Path = Config.UpgradePath,
+            Query = Config.UpgradeQuery
+        }.Uri;
+
+        try
+        {
+            using var response = await client.GetAsync(requestUri, ct);
+            Uri? location = response.Headers.Location is null
+                ? null
+                : new Uri(requestUri, response.Headers.Location);
+            bool validRedirect = IsRedirect(response.StatusCode)
+                && location is not null
+                && location.Scheme == Uri.UriSchemeHttps
+                && string.Equals(location.Host, host, StringComparison.OrdinalIgnoreCase)
+                && location.Port == 443
+                && location.AbsolutePath == requestUri.AbsolutePath
+                && location.Query == requestUri.Query;
+
+            if (!validRedirect)
+            {
+                fail(8, "HTTP-to-HTTPS upgrade",
+                    $"{requestUri} returned HTTP {(int)response.StatusCode} with "
+                    + $"Location '{response.Headers.Location?.ToString() ?? "(absent)"}'; "
+                    + "expected HTTPS on the same hostname with the same path and query.");
+                return;
+            }
+
+            output.WriteLine($"HTTP upgrade OK: {requestUri} → {location}");
+        }
+        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            fail(8, "HTTP-to-HTTPS upgrade", $"request to {requestUri} timed out: {ex.Message}");
+        }
+        catch (HttpRequestException ex)
+        {
+            fail(8, "HTTP-to-HTTPS upgrade", $"request to {requestUri} failed: {ex.Message}");
+        }
+    }
+
+    private static async Task CheckNotFoundAsync(
+        HttpClient client,
+        string host,
+        TextWriter output,
+        CancellationToken ct,
+        Action<int, string, string> fail)
+    {
+        Uri notFoundUri = new($"https://{host}{Config.NotFoundPath}");
+        try
+        {
+            using var response = await client.GetAsync(notFoundUri, ct);
+            string html = await response.Content.ReadAsStringAsync(ct);
+            if ((int)response.StatusCode != 404
+                || !html.Contains(Config.ExpectedNotFoundContent, StringComparison.Ordinal))
+            {
+                fail(10, "404 experience",
+                    $"{notFoundUri} returned HTTP {(int)response.StatusCode}; expected HTTP 404 "
+                    + $"with '{Config.ExpectedNotFoundContent}' content.");
+                return;
+            }
+
+            output.WriteLine($"404 experience OK: {host}");
+        }
+        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            fail(10, "404 experience", $"request to {notFoundUri} timed out: {ex.Message}");
+        }
+        catch (HttpRequestException ex)
+        {
+            fail(10, "404 experience", $"request to {notFoundUri} failed: {ex.Message}");
+        }
+    }
+
+    private static bool IsRedirect(HttpStatusCode statusCode) =>
+        statusCode is HttpStatusCode.MovedPermanently
+            or HttpStatusCode.Found
+            or HttpStatusCode.SeeOther
+            or HttpStatusCode.TemporaryRedirect
+            or HttpStatusCode.PermanentRedirect;
 }
 
-// ── Self-tests (offline, covers all CanonicalParser paths) ────────────────────
+// ── Self-tests (offline; no network or third-party packages) ──────────────────
 
 static class SelfTests
 {
-    public static int Run()
+    private const string HomeHtml =
+        "<html><head><title>Home — Jamula</title>"
+        + "<link rel=\"canonical\" href=\"https://jamula.net/\"></head>"
+        + "<body><p>AI strategy.</p></body></html>";
+    private const string NotFoundHtml =
+        "<html><head><title>Page not found — Jamula</title></head>"
+        + "<body><h1>Page not found</h1></body></html>";
+
+    public static async Task<int> RunAsync()
     {
         int failures = 0;
 
@@ -237,88 +382,238 @@ static class SelfTests
             }
         }
 
-        // 1. Valid canonical — double quotes, standard attribute order
-        {
-            const string html = """
-                <html><head>
-                <link rel="canonical" href="https://jamula.net/">
-                </head></html>
-                """;
-            var (r, h) = CanonicalParser.Extract(html);
-            Assert("Valid canonical — result is Ok", r == CanonicalResult.Ok);
-            Assert("Valid canonical — href matches expected", h == Config.ExpectedCanonical);
-        }
+        RunCanonicalParserTests(Assert);
 
-        // 2. Absent canonical — no link tag at all
-        {
-            const string html = """
-                <html><head><meta charset="utf-8"></head><body></body></html>
-                """;
-            var (r, _) = CanonicalParser.Extract(html);
-            Assert("Absent canonical — result is Absent", r == CanonicalResult.Absent);
-        }
+        var successfulRun = await RunWebScenarioAsync(DefaultResponse, Config.ApprovedHosts);
+        Assert("AllApprovedHosts_CheckContentCanonicalUpgradeAnd404",
+            successfulRun.ExitCode == 0
+            && Config.ApprovedHosts.All(host => HasAllRequestTypes(successfulRun.Requests, host))
+            && successfulRun.Output.Contains("All approved hostname checks passed.", StringComparison.Ordinal));
 
-        // 3. Malformed: rel="canonical" tag present but no href attribute
-        {
-            const string html = """
-                <html><head><link rel="canonical"></head></html>
-                """;
-            var (r, _) = CanonicalParser.Extract(html);
-            Assert("Malformed canonical (no href) — result is MalformedHref",
-                r == CanonicalResult.MalformedHref);
-        }
+        var failedHostRun = await RunWebScenarioAsync(
+            (request, host) => host == "jamula.net"
+                && request.Scheme == Uri.UriSchemeHttps
+                && request.AbsolutePath == "/"
+                    ? throw new HttpRequestException("certificate chain validation failed")
+                    : DefaultResponse(request, host),
+            Config.ApprovedHosts);
+        Assert("AllApprovedHosts_ContinuesAfterOneHostFails",
+            failedHostRun.ExitCode == 3
+            && Config.ApprovedHosts.All(host => HasAllRequestTypes(failedHostRun.Requests, host))
+            && failedHostRun.Output.Contains("jamula.net: HTTPS:", StringComparison.Ordinal)
+            && Config.ApprovedHosts.Skip(1).All(host =>
+                failedHostRun.Output.Contains($"HTTPS OK: https://{host}/", StringComparison.Ordinal)));
 
-        // 4. Canonical mismatch — www prefix present (wrong value)
-        {
-            const string html = """
-                <html><head>
-                <link rel="canonical" href="https://www.jamula.net/">
-                </head></html>
-                """;
-            var (r, h) = CanonicalParser.Extract(html);
-            Assert("Mismatch canonical — result is Ok (href captured)", r == CanonicalResult.Ok);
-            Assert("Mismatch canonical — href is NOT the expected value",
-                h != Config.ExpectedCanonical);
-            Assert("Mismatch canonical — href is the www variant",
-                h == "https://www.jamula.net/");
-        }
+        await AssertScenarioAsync(
+            "HttpsCertificateFailure_IsReportedForHostname",
+            (request, _) => request.Scheme == Uri.UriSchemeHttps && request.AbsolutePath == "/"
+                ? throw new HttpRequestException("certificate chain validation failed")
+                : DefaultResponse(request, _),
+            3,
+            "jamula.net: HTTPS: request");
 
-        // 5. Single-quoted attributes
-        {
-            const string html =
-                "<html><head><link rel='canonical' href='https://jamula.net/'></head></html>";
-            var (r, h) = CanonicalParser.Extract(html);
-            Assert("Single-quoted canonical — result is Ok", r == CanonicalResult.Ok);
-            Assert("Single-quoted canonical — href matches", h == Config.ExpectedCanonical);
-        }
+        await AssertScenarioAsync(
+            "HttpsNonSuccessStatus_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttps && request.AbsolutePath == "/"
+                ? HtmlResponse(HttpStatusCode.ServiceUnavailable, HomeHtml)
+                : DefaultResponse(request, _),
+            4,
+            "jamula.net: HTTPS:");
 
-        // 6. Reversed attribute order (href before rel)
-        {
-            const string html = """
-                <html><head>
-                <link href="https://jamula.net/" rel="canonical">
-                </head></html>
-                """;
-            var (r, h) = CanonicalParser.Extract(html);
-            Assert("Reversed attributes — result is Ok", r == CanonicalResult.Ok);
-            Assert("Reversed attributes — href matches", h == Config.ExpectedCanonical);
-        }
+        await AssertScenarioAsync(
+            "UnexpectedHomeContent_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttps && request.AbsolutePath == "/"
+                ? HtmlResponse(HttpStatusCode.OK, HomeHtml.Replace("AI strategy.", "Other content.", StringComparison.Ordinal))
+                : DefaultResponse(request, _),
+            9,
+            "jamula.net: page content:");
 
-        // 7. Hyphenated-attribute guard — data-rel / data-href must not match
-        {
-            const string html = """
-                <html><head>
-                <link data-rel="canonical" data-href="https://jamula.net/">
-                </head></html>
-                """;
-            var (r, _) = CanonicalParser.Extract(html);
-            Assert("Hyphenated-prefix guard — result is Absent", r == CanonicalResult.Absent);
-        }
+        await AssertScenarioAsync(
+            "IncorrectCanonical_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttps && request.AbsolutePath == "/"
+                ? HtmlResponse(HttpStatusCode.OK,
+                    HomeHtml.Replace(Config.ExpectedCanonical, "https://www.jamula.net/", StringComparison.Ordinal))
+                : DefaultResponse(request, _),
+            7,
+            "jamula.net: canonical URL:");
+
+        await AssertScenarioAsync(
+            "AbsentCanonical_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttps && request.AbsolutePath == "/"
+                ? HtmlResponse(HttpStatusCode.OK,
+                    HomeHtml.Replace("<link rel=\"canonical\" href=\"https://jamula.net/\">", "", StringComparison.Ordinal))
+                : DefaultResponse(request, _),
+            5,
+            "jamula.net: canonical URL:");
+
+        await AssertScenarioAsync(
+            "AbsentHttpUpgrade_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttp
+                ? HtmlResponse(HttpStatusCode.OK, HomeHtml)
+                : DefaultResponse(request, _),
+            8,
+            "jamula.net: HTTP-to-HTTPS upgrade:");
+
+        await AssertScenarioAsync(
+            "WrongHostHttpUpgrade_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttp
+                ? RedirectResponse(new Uri(
+                    $"https://www.jamula.net{Config.UpgradePath}?{Config.UpgradeQuery}"))
+                : DefaultResponse(request, _),
+            8,
+            "jamula.net: HTTP-to-HTTPS upgrade:");
+
+        await AssertScenarioAsync(
+            "HttpUpgradePathLoss_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttp
+                ? RedirectResponse(new Uri(
+                    $"https://jamula.net/?{Config.UpgradeQuery}"))
+                : DefaultResponse(request, _),
+            8,
+            "same path and query");
+
+        await AssertScenarioAsync(
+            "HttpUpgradeQueryLoss_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttp
+                ? RedirectResponse(new Uri($"https://jamula.net{Config.UpgradePath}"))
+                : DefaultResponse(request, _),
+            8,
+            "same path and query");
+
+        await AssertScenarioAsync(
+            "NonRedirectHttpStatus_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttp
+                ? RedirectResponse(
+                    new Uri($"https://jamula.net{Config.UpgradePath}?{Config.UpgradeQuery}"),
+                    HttpStatusCode.NotModified)
+                : DefaultResponse(request, _),
+            8,
+            "expected HTTPS on the same hostname");
+
+        await AssertScenarioAsync(
+            "Missing404Status_IsRejected",
+            (request, _) => request.AbsolutePath == Config.NotFoundPath
+                ? HtmlResponse(HttpStatusCode.OK, HomeHtml)
+                : DefaultResponse(request, _),
+            10,
+            "jamula.net: 404 experience:");
+
+        await AssertScenarioAsync(
+            "HomepageFallbackOn404_IsRejected",
+            (request, _) => request.AbsolutePath == Config.NotFoundPath
+                ? HtmlResponse(HttpStatusCode.NotFound, HomeHtml)
+                : DefaultResponse(request, _),
+            10,
+            "Page not found");
 
         Console.WriteLine(failures == 0
-            ? "\nAll 7 self-tests passed."
-            : $"\n{failures} self-test(s) FAILED.");
-
+            ? "\nAll monitor self-tests passed."
+            : $"\n{failures} monitor self-test(s) FAILED.");
         return failures == 0 ? 0 : 1;
+
+        async Task AssertScenarioAsync(
+            string name,
+            Func<Uri, string, HttpResponseMessage> responseFactory,
+            int expectedExitCode,
+            string expectedDiagnostic)
+        {
+            var scenario = await RunWebScenarioAsync(responseFactory, ["jamula.net"]);
+            Assert(name,
+                scenario.ExitCode == expectedExitCode
+                && scenario.Output.Contains(expectedDiagnostic, StringComparison.Ordinal));
+        }
     }
+
+    private static void RunCanonicalParserTests(Action<string, bool> assert)
+    {
+        var (validResult, validHref) = CanonicalParser.Extract(
+            "<html><head><link rel=\"canonical\" href=\"https://jamula.net/\"></head></html>");
+        assert("CanonicalParser_ExtractsValidCanonical",
+            validResult == CanonicalResult.Ok && validHref == Config.ExpectedCanonical);
+
+        var (absentResult, _) = CanonicalParser.Extract("<html><head></head></html>");
+        assert("CanonicalParser_ReportsAbsentCanonical", absentResult == CanonicalResult.Absent);
+
+        var (malformedResult, _) = CanonicalParser.Extract("<link rel=\"canonical\">");
+        assert("CanonicalParser_ReportsMissingHref", malformedResult == CanonicalResult.MalformedHref);
+
+        var (quotedResult, quotedHref) = CanonicalParser.Extract(
+            "<link href='https://jamula.net/' rel='canonical'>");
+        assert("CanonicalParser_HandlesSingleQuotesAndReversedAttributes",
+            quotedResult == CanonicalResult.Ok && quotedHref == Config.ExpectedCanonical);
+
+        var (boundaryResult, _) = CanonicalParser.Extract(
+            "<link data-rel=\"canonical\" data-href=\"https://jamula.net/\">");
+        assert("CanonicalParser_IgnoresHyphenatedAttributePrefixes",
+            boundaryResult == CanonicalResult.Absent);
+    }
+
+    private static async Task<(int ExitCode, string Output, List<Uri> Requests)> RunWebScenarioAsync(
+        Func<Uri, string, HttpResponseMessage> responseFactory,
+        IReadOnlyList<string> hosts)
+    {
+        var requests = new List<Uri>();
+        using var handler = new ScenarioHttpMessageHandler((request) =>
+        {
+            Uri uri = request.RequestUri!;
+            requests.Add(uri);
+            return responseFactory(uri, uri.Host);
+        });
+        using var client = new HttpClient(handler)
+        {
+            Timeout = TimeSpan.FromSeconds(2)
+        };
+        using var output = new StringWriter();
+        int exitCode = await Monitor.CheckApprovedHostsAsync(
+            client, hosts, output, CancellationToken.None);
+        return (exitCode, output.ToString(), requests);
+    }
+
+    private static bool HasAllRequestTypes(IReadOnlyList<Uri> requests, string host) =>
+        requests.Any(uri =>
+            uri.Host == host && uri.Scheme == Uri.UriSchemeHttps && uri.AbsolutePath == "/")
+        && requests.Any(uri =>
+            uri.Host == host && uri.Scheme == Uri.UriSchemeHttp
+            && uri.AbsolutePath == Config.UpgradePath && uri.Query == $"?{Config.UpgradeQuery}")
+        && requests.Any(uri =>
+            uri.Host == host && uri.Scheme == Uri.UriSchemeHttps
+            && uri.AbsolutePath == Config.NotFoundPath);
+
+    private static HttpResponseMessage DefaultResponse(Uri request, string host)
+    {
+        if (request.Scheme == Uri.UriSchemeHttp)
+        {
+            return RedirectResponse(new Uri(
+                $"https://{host}{Config.UpgradePath}?{Config.UpgradeQuery}"));
+        }
+
+        if (request.AbsolutePath == Config.NotFoundPath)
+            return HtmlResponse(HttpStatusCode.NotFound, NotFoundHtml);
+
+        return HtmlResponse(HttpStatusCode.OK, HomeHtml);
+    }
+
+    private static HttpResponseMessage HtmlResponse(HttpStatusCode statusCode, string html) =>
+        new(statusCode)
+        {
+            Content = new StringContent(html, Encoding.UTF8, "text/html")
+        };
+
+    private static HttpResponseMessage RedirectResponse(
+        Uri location,
+        HttpStatusCode statusCode = HttpStatusCode.MovedPermanently)
+    {
+        var response = new HttpResponseMessage(statusCode);
+        response.Headers.Location = location;
+        return response;
+    }
+}
+
+sealed class ScenarioHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
+    : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(responseFactory(request));
 }
