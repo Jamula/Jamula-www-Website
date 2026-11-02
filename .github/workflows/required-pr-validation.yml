@@ -11,6 +11,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+env:
+  NODE_VERSION: "26.13.0"
+  NPM_VERSION: "12.2.1"
+  NPM_INTEGRITY: "sha512-bKCmFRVT/BB+YPEYbZwQ1XUI3N5t4xKSpU1MxOjo7z3iWzKBJ0ZXRC1xFdEN+TC7N5TdywaBzf2dMXGJq/e2PQ=="
+
 jobs:
   required-pr-validation:
     name: required-pr-validation
@@ -51,15 +56,29 @@ jobs:
 
       - name: Set up Node.js
         if: steps.changes.outputs.website == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24.15.0
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: www/package-lock.json
 
-      - name: Install npm 12
+      - name: Install verified npm
         if: steps.changes.outputs.website == 'true'
-        run: npm install --global npm@12.0.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          observed_integrity="$(
+            npm view "npm@${NPM_VERSION}" dist.integrity \
+              --registry=https://registry.npmjs.org/
+          )"
+          if [[ "$observed_integrity" != "$NPM_INTEGRITY" ]]; then
+            echo "::error::npm ${NPM_VERSION} registry integrity did not match the pinned value."
+            exit 1
+          fi
+          npm install --global "npm@${NPM_VERSION}" \
+            --ignore-scripts \
+            --registry=https://registry.npmjs.org/
+          [[ "$(npm --version)" == "$NPM_VERSION" ]]
 
       - name: Install website dependencies
         if: steps.changes.outputs.website == 'true'
@@ -89,6 +108,12 @@ jobs:
       - name: Build static website
         if: steps.changes.outputs.website == 'true'
         run: npm exec -- astro build
+
+      - name: Set up .NET SDK
+        if: steps.changes.outputs.monitor == 'true'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: scripts/monitor/global.json
 
       - name: Verify .NET SDK
         if: steps.changes.outputs.monitor == 'true'
