@@ -9,7 +9,7 @@ if (Directory.Exists(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")))
 var dataDirectory = Path.Combine(root, ".local");
 Directory.CreateDirectory(dataDirectory);
 var json = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true };
-var refreshGate = new SemaphoreSlim(1);
+using var refreshGate = new SemaphoreSlim(1);
 
 async Task<Snapshot> Refresh(string value, CancellationToken cancellationToken)
 {
@@ -19,13 +19,13 @@ async Task<Snapshot> Refresh(string value, CancellationToken cancellationToken)
     var issuesTask = GitHub.CollectAsync(false, cancellationToken);
     await Task.WhenAll(pullsTask, issuesTask);
     var now = DateTimeOffset.UtcNow;
-    var costs = await Costs.ReadAsync(Path.Combine(dataDirectory, $"costs-{value}.json"), month, now, cancellationToken);
-    var snapshot = new Snapshot(GitHub.Repo, value, month.Start, month.End, started, now,
+    var costs = await Costs.ReadAsync(Path.Combine(dataDirectory, $"costs-{month.Value}.json"), month, now, cancellationToken);
+    var snapshot = new Snapshot(GitHub.Repo, month.Value, month.Start, month.End, started, now,
         month.Start > now ? "Future period; no delivery observations yet" :
         month.End > now ? "Month to date (UTC)" : "Past UTC month; latest state, not an archived month-end snapshot",
         pullsTask.Result, issuesTask.Result, Metrics.Summarize(pullsTask.Result, month, now, true),
         Metrics.Summarize(issuesTask.Result, month, now, false), costs);
-    var path = Path.Combine(dataDirectory, $"snapshot-{value}.json");
+    var path = Path.Combine(dataDirectory, $"snapshot-{month.Value}.json");
     var temporary = path + ".tmp";
     await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(snapshot, json), cancellationToken);
     File.Move(temporary, path, overwrite: true);
@@ -79,10 +79,10 @@ app.UseStaticFiles();
 app.MapGet("/", () => Results.File(Path.Combine(root, "wwwroot", "index.html"), "text/html"));
 app.MapGet("/api/snapshot", async (HttpContext context) =>
 {
-    var month = context.Request.Query["month"].ToString();
-    try { ReviewMonth.Parse(month); }
+    ReviewMonth month;
+    try { month = ReviewMonth.Parse(context.Request.Query["month"].ToString()); }
     catch (ArgumentException) { return Results.BadRequest(new { error = "Use an exact YYYY-MM month." }); }
-    var path = Path.Combine(dataDirectory, $"snapshot-{month}.json");
+    var path = Path.Combine(dataDirectory, $"snapshot-{month.Value}.json");
     if (!File.Exists(path)) return Results.NotFound(new { error = "No snapshot for this month. Select Refresh data to read GitHub." });
     return Results.Text(await File.ReadAllTextAsync(path, context.RequestAborted), "application/json");
 });

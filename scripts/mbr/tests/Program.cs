@@ -102,6 +102,11 @@ try
     }
     Check((await Import(measurement)).Status == "imported", "valid scoped cost provenance");
     Check((await Import(measurement with { Value = 0 })).Measurements.Single().Value == 0, "documented zero preserved");
+    var omittedValue = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(
+        new CostImport(GitHub.Repo, month.Value, [measurement with { Key = "aiUsd", Value = 0 }])))!;
+    omittedValue["Measurements"]![0]!.AsObject().Remove("Value");
+    await File.WriteAllTextAsync(path, omittedValue.ToJsonString());
+    Check((await Costs.ReadAsync(path, month, now)).Status == "invalid", "omitted cost amount rejected instead of measured zero");
     Check((await Import(measurement, "other/repo")).Status == "invalid", "cross-repository import rejected");
     Check((await Import(measurement with { Value = -1 })).Status == "invalid", "negative usage rejected");
     Check((await Import(measurement with { Value = 1.5m })).Status == "invalid", "fractional tokens rejected");

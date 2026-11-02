@@ -1,7 +1,9 @@
 const $ = id => document.getElementById(id);
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-const month = new URLSearchParams(location.search).get("month") ?? new Date().toISOString().slice(0, 7);
+const requestedMonth = new URLSearchParams(location.search).get("month");
+const currentMonth = () => requestedMonth ?? new Date().toISOString().slice(0, 7);
+const month = currentMonth();
 const validMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(month) &&
   Number(month.slice(0, 4)) >= 2000 && Number(month.slice(0, 4)) <= 9998;
 const monthStart = new Date(`${month}-01T00:00:00Z`);
@@ -13,6 +15,8 @@ if (validMonth) text("month-title", new Intl.DateTimeFormat("en", { month: "long
 
 function render(data) {
   snapshot = data;
+  text("month-title", new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" })
+    .format(new Date(`${data.month}-01T00:00:00Z`)));
   $("dashboard").hidden = false;
   const historical = new Date(data.periodEnd) <= new Date(data.observedAt);
   const future = new Date(data.periodStart) > new Date(data.observedAt);
@@ -104,7 +108,7 @@ async function load(refresh) {
   text("status", refresh ? "Updating review..." : "Loading review...");
   $("status").dataset.error = "false";
   try {
-    const response = await fetch(`/api/${refresh ? "refresh" : "snapshot"}?month=${encodeURIComponent(month)}`,
+    const response = await fetch(`/api/${refresh ? "refresh" : "snapshot"}?month=${encodeURIComponent(currentMonth())}`,
       refresh ? { method: "POST", headers: { "X-MBR-Refresh": "1" } } : {});
     if (!response.ok) throw new Error("Review request failed.");
     const data = await response.json();

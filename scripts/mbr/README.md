@@ -82,6 +82,9 @@ management priorities are explicitly current, not reconstructed historical
 backlog or a statement about which constraints existed during that month.
 Future months explicitly have no activity observations yet; present workload is
 not a forecast.
+Without an explicit `?month=`, Refresh follows the current UTC month even if the
+page was left open across a month boundary. An explicit month stays pinned.
+The heading changes only after data for the requested month loads successfully.
 
 Only fixed endpoints are exposed. A same-origin POST with `X-MBR-Refresh: 1`
 refreshes; GET only reads local data. Month input never becomes a shell command.
@@ -170,7 +173,8 @@ For estimated USD rows, also supply `pricingSource` (provider URL/export referen
 and calculation assumptions) and `pricingDate` (`YYYY-MM-DD`). State runner type,
 rate, free allowances and retry/matrix handling in the evidence where relevant.
 The importer validates structure/coverage, not the truth of user-supplied evidence.
-Duplicate keys, negative values, unknown fields, wrong scope and invalid estimates
+Missing required fields (including an omitted amount), duplicate keys, negative
+values, unknown fields, wrong scope and invalid estimates
 reject the entire import explicitly. Refresh after changing an import.
 
 The snapshot retains actual/estimated basis, source, scope, coverage and recording

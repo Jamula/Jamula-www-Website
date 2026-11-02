@@ -30,7 +30,11 @@ public static class Costs
         try
         {
             var import = JsonSerializer.Deserialize<CostImport>(await File.ReadAllTextAsync(path, cancellationToken),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web) { UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow });
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                {
+                    UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow,
+                    RespectRequiredConstructorParameters = true
+                });
             if (import is null || import.Repo != GitHub.Repo || import.Month != month.Value || import.Measurements is null)
                 throw new JsonException("Wrong import scope.");
             var keys = new HashSet<string>();

@@ -14,7 +14,7 @@ public sealed record ReviewMonth(string Value, DateTimeOffset Start, DateTimeOff
             !DateTimeOffset.TryParseExact(value + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture,
                 DateTimeStyles.AssumeUniversal, out var start) || start.Year is < 2000 or > 9998)
             throw new ArgumentException("Month must be YYYY-MM, between 2000-01 and 9998-12.");
-        return new(value, start, start.AddMonths(1));
+        return new(start.ToString("yyyy-MM", CultureInfo.InvariantCulture), start, start.AddMonths(1));
     }
 
     /// <summary>Tests a timestamp against the UTC half-open month and observation time.</summary>

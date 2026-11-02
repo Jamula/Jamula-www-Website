@@ -6,10 +6,6 @@ import vm from "node:vm";
 const script = await readFile(new URL("../wwwroot/dashboard.js", import.meta.url), "utf8");
 const html = await readFile(new URL("../wwwroot/index.html", import.meta.url), "utf8");
 const instant = "2026-11-02T03:00:00Z";
-class Clock extends Date {
-  constructor(...args) { super(...(args.length ? args : [instant])); }
-  static now() { return new Date(instant).getTime(); }
-}
 class Element {
   children = [];
   dataset = {};
@@ -35,7 +31,11 @@ const fixture = () => ({
   costs: { status: "unknown", detail: "No cost import.", measurements: [] }
 });
 const flush = () => new Promise(resolve => setImmediate(resolve));
-async function page(responses = [fixture()], search = "") {
+async function page(responses = [fixture()], search = "", clock = { now: instant }) {
+  class Clock extends Date {
+    constructor(...args) { super(...(args.length ? args : [clock.now])); }
+    static now() { return new Date(clock.now).getTime(); }
+  }
   const elements = new Map([...html.matchAll(/\bid="([^"]+)"/g)].map(([, id]) => [id, new Element()]));
   const get = id => {
     assert.ok(elements.has(id), `Element ${id} must exist in the actual page`);
@@ -172,7 +172,7 @@ test("untrusted item titles and evidence never reach executive HTML or displayed
   const { elements } = await page();
   const collect = element => [element.textContent, ...element.children.flatMap(collect)];
   const displayed = [...elements.values()].flatMap(collect).join(" ");
-  assert.doesNotMatch(displayed, /<img|onerror|javascript:|<script>|UTC|2026-11-02|0\.02 hours/);
+  assert.doesNotMatch(displayed, /<img|onerror|javascript:|<script>|UTC|2026-11-02|0\.02 hours/i);
 });
 test("refresh reads the current month with a protected POST and a concise success state", async () => {
   const { get, requests } = await page();
@@ -270,4 +270,41 @@ test("future months disclose absent observations and never label present backlog
   assert.equal(get("attention-title").textContent, "Needs attention now");
   assert.equal(get("merged-prs").textContent, "0");
   assert.equal(get("readout-title").textContent, "Current priority: the homepage inquiry path remains open.");
+});
+test("unselected month rolls over on refresh and changes the heading only after success", async () => {
+  const clock = { now: "2026-11-30T23:59:59Z" };
+  const november = fixture();
+  november.observedAt = clock.now;
+  const december = fixture();
+  december.month = "2026-12";
+  december.periodStart = "2026-12-01T00:00:00Z";
+  december.periodEnd = "2027-01-01T00:00:00Z";
+  december.observedAt = "2026-12-01T00:00:01Z";
+  const { get, requests } = await page([november, new Error("offline"), december], "", clock);
+  assert.equal(get("month-title").textContent, "November 2026");
+  clock.now = december.observedAt;
+  get("refresh").events.click();
+  await flush();
+  assert.equal(requests[1].url, "/api/refresh?month=2026-12");
+  assert.equal(get("month-title").textContent, "November 2026");
+  assert.equal(get("status").textContent, "Refresh failed. Showing the saved review; retry Refresh.");
+  get("refresh").events.click();
+  await flush();
+  assert.equal(requests[2].url, "/api/refresh?month=2026-12");
+  assert.equal(get("month-title").textContent, "December 2026");
+  assert.equal(get("coverage").textContent, "Month to date / repository activity");
+});
+test("explicit October review remains pinned when the current UTC month changes", async () => {
+  const october = fixture();
+  october.month = "2026-10";
+  october.periodStart = "2026-10-01T00:00:00Z";
+  october.periodEnd = "2026-11-01T00:00:00Z";
+  const clock = { now: "2026-11-30T23:59:59Z" };
+  const { get, requests } = await page([october], "?month=2026-10", clock);
+  clock.now = "2026-12-01T00:00:01Z";
+  get("refresh").events.click();
+  await flush();
+  assert.equal(requests[1].url, "/api/refresh?month=2026-10");
+  assert.equal(get("month-title").textContent, "October 2026");
+  assert.equal(get("coverage").textContent, "Full month / repository activity");
 });
