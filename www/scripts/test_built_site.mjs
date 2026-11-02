@@ -517,9 +517,15 @@ function validateSite(siteDirectory) {
         errors.push(`${path.basename(file)}: invalid internal link URL: ${href}`);
         continue;
       }
-      if (targetUrl.protocol !== "https:" || !ALLOWED_HOSTS.has(targetUrl.hostname.toLowerCase())) {
+      if (!ALLOWED_HOSTS.has(targetUrl.hostname.toLowerCase())) continue;
+      if (targetUrl.protocol === "http:") {
+        errors.push(
+          `${path.relative(root, file).split(path.sep).join("/")}: ` +
+            `internal link must use HTTPS: ${href}`
+        );
         continue;
       }
+      if (targetUrl.protocol !== "https:") continue;
       const route = normalizeRoute(targetUrl.pathname || new URL(canonical).pathname);
       const routePage = canonicalRoutes[route];
       const target = routePage?.file ?? localFile(root, file, targetUrl.pathname);
@@ -615,6 +621,77 @@ test("internal link validation rejects a missing fragment target", (t) => {
   );
 
   assert.match(validateSite(root).join("\n"), /internal fragment does not exist/);
+});
+
+test("internal link validation rejects HTTP on every approved Jamula host", async (t) => {
+  for (const host of ["jamula.net", "www.jamula.net", "jamula.com", "www.jamula.com"]) {
+    await t.test(host, (subtest) => {
+      const root = copyBuild(subtest);
+      const file = builtPage(root);
+      const href = `http://${host}/#synthesis`;
+      fs.writeFileSync(
+        file,
+        fs.readFileSync(file, "utf8").replace('href="#synthesis"', `href="${href}"`)
+      );
+
+      assert.deepEqual(validateSite(root), [`index.html: internal link must use HTTPS: ${href}`]);
+    });
+  }
+});
+
+test("internal link validation preserves HTTPS target and fragment checks on every Jamula host", async (t) => {
+  const cases = [
+    { name: "existing fragment", route: "/#synthesis", diagnostic: null },
+    {
+      name: "missing target",
+      route: "/missing-page/",
+      diagnostic: "internal link has no built target",
+    },
+    {
+      name: "missing fragment",
+      route: "/#missing-section",
+      diagnostic: "internal fragment does not exist",
+    },
+  ];
+  for (const host of ["jamula.net", "www.jamula.net", "jamula.com", "www.jamula.com"]) {
+    for (const { name, route, diagnostic } of cases) {
+      await t.test(`${host} ${name}`, (subtest) => {
+        const root = copyBuild(subtest);
+        const file = builtPage(root);
+        const href = `https://${host}${route}`;
+        fs.writeFileSync(
+          file,
+          fs.readFileSync(file, "utf8").replace('href="#synthesis"', `href="${href}"`)
+        );
+
+        assert.deepEqual(
+          validateSite(root),
+          diagnostic ? [`index.html: ${diagnostic}: ${href}`] : []
+        );
+      });
+    }
+  }
+});
+
+test("internal link validation still skips external hosts and intentional non-HTTPS schemes", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  const links = [
+    "http://example.invalid/missing/#missing",
+    "https://example.invalid/missing/#missing",
+    "http://jamula.net.example.invalid/missing/#missing",
+    "mailto:hello@example.invalid",
+    "tel:+15555550100",
+    "ftp://jamula.net/missing/",
+  ];
+  fs.writeFileSync(
+    file,
+    fs
+      .readFileSync(file, "utf8")
+      .replace("</body>", `${links.map((href) => `<a href="${href}">Link</a>`).join("")}</body>`)
+  );
+
+  assert.deepEqual(validateSite(root), []);
 });
 
 test("sitemap validation rejects a noncanonical and unknown route", (t) => {
