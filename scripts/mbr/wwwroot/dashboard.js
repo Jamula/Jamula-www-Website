@@ -1,0 +1,163 @@
+const $ = id => document.getElementById(id);
+const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const requestedMonth = new URLSearchParams(location.search).get("month");
+const currentMonth = () => requestedMonth ?? new Date().toISOString().slice(0, 7);
+const month = currentMonth();
+const validMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(month) &&
+  Number(month.slice(0, 4)) >= 2000 && Number(month.slice(0, 4)) <= 9998;
+const monthStart = new Date(`${month}-01T00:00:00Z`);
+let snapshot;
+let refreshFailed = false;
+let freshnessTimer;
+
+function text(id, value) { $(id).textContent = value; }
+if (validMonth) text("month-title", new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(monthStart));
+
+function render(data) {
+  snapshot = data;
+  text("month-title", new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" })
+    .format(new Date(`${data.month}-01T00:00:00Z`)));
+  $("dashboard").hidden = false;
+  const historical = new Date(data.periodEnd) <= new Date(data.observedAt);
+  const future = new Date(data.periodStart) > new Date(data.observedAt);
+  text("coverage", future ? "Future month / no activity observations yet"
+    : historical ? "Full month / repository activity" : "Month to date / repository activity");
+  text("open-coverage", historical ? "Current workload, not month-end backlog"
+    : future ? "Current workload, not a forecast" : "Current workload");
+  text("attention-title", historical || future ? "Needs attention now" : "Needs attention");
+  for (const [id, items] of [["merged-prs", data.pulls.completed], ["completed-issues", data.issues.completed],
+    ["active-prs", data.pulls.active], ["active-issues", data.issues.active]]) {
+    text(id, items ? number.format(items.length) : "Unknown");
+  }
+
+  // This business priority is explicitly scoped to the open, owner-authored contact-path issue.
+  const contactPathOpen = data.issues.active?.some(item => item.number === 86) ?? false;
+  const issuesKnown = data.issuesSource.status === "ok";
+  text("readout-title", !issuesKnown ? "Business priorities need current evidence."
+    : contactPathOpen ? historical || future ? "Current priority: the homepage inquiry path remains open."
+      : "The homepage inquiry path is still open work."
+    : "Repository activity is recorded. Business impact is not measured.");
+  text("readout", !issuesKnown ? "Issue data is unavailable; this review cannot confirm the commercial priority."
+    : contactPathOpen ? "Proposed focus: confirm the owner-approved contact destination and wording, then publish the inquiry path."
+    : "Merges and closed issues show activity, not customer outcomes or revenue.");
+
+  const measures = new Map(data.costs.measurements.map(m => [m.key, m]));
+  const value = (key, money = false) => {
+    const m = measures.get(key);
+    if (!m) return "Not connected";
+    const coverageEnd = Math.min(new Date(data.periodEnd).getTime(), new Date(data.observedAt).getTime());
+    const period = future ? "future period" : new Date(m.coveredFrom) > new Date(data.periodStart) ||
+      new Date(m.coveredThrough).getTime() < coverageEnd ? "partial period" : historical ? "full month" : "month to date";
+    const formatted = money ? m.value > 0 && m.value < 0.01 ? "< $0.01" : usd.format(m.value)
+      : number.format(m.value);
+    return `${formatted} (${m.basis}, ${period})`;
+  };
+  const tokenKeys = ["aiInputTokens", "aiOutputTokens", "aiCacheReadTokens", "aiCacheWriteTokens"];
+  const tokenLabels = ["input", "output", "cache read", "cache write"];
+  const recordedTokens = tokenKeys.filter(key => measures.has(key));
+  text("ai-tokens", recordedTokens.length
+    ? tokenKeys.map((key, index) => `${tokenLabels[index]}: ${value(key)}`).join("; ") : "No repository token source");
+  text("actions-minutes", measures.has("actionsRunnerMinutes")
+    ? `${value("actionsRunnerMinutes")} used; ${measures.has("actionsBillableMinutes")
+      ? `${value("actionsBillableMinutes")} after discounts` : "billed minutes unknown"}`
+    : measures.has("actionsBillableMinutes") ? `${value("actionsBillableMinutes")} billable`
+    : data.costs.actionsStatus === "unavailable" ? "Billing source unavailable"
+    : data.costs.actionsStatus === "ok" ? "No runner usage reported"
+    : data.costs.actionsStatus === "not-applicable" ? "No observations yet" : "Usage source not connected");
+  const moneyKeys = ["aiUsd", "actionsUsd", "hostingUsd", "domainUsd"];
+  const moneyLabels = ["AI", "Actions", "Hosting", "Domain"];
+  const hasMoney = moneyKeys.some(key => measures.has(key));
+  text("spend-summary", hasMoney ? "Reported spend; total unverified." : "Spend not measured.");
+  $("recorded-spend").hidden = !hasMoney;
+  text("recorded-spend", moneyKeys.flatMap((key, index) => measures.has(key)
+    ? [`${moneyLabels[index]}: ${value(key, true)}`] : []).join("; "));
+
+  const attention = [];
+  if (contactPathOpen) attention.push(["Commercial readiness",
+    "Confirm the approved contact path, then publish it."]);
+  if (data.pullsSource.status !== "ok" || !issuesKnown) attention.push(["Review coverage",
+    "Restore repository data and refresh before assessing progress."]);
+  if (data.costs.status === "invalid") attention.push(["Cost control",
+    "Correct the cost import; spend cannot be verified."]);
+  else if (!measures.has("aiUsd") || !measures.has("actionsUsd")) attention.push(["Cost control",
+    measures.has("actionsUsd") ? "Actions charges are reported. Connect repository AI usage to complete cost visibility."
+      : "Connect AI and Actions usage before confirming zero incremental spend."]);
+  else attention.push(["Cost control",
+    "Reconcile recorded spend and coverage before confirming the full cost."]);
+  if (attention.length < 3) attention.push(["Business impact",
+    "Customer inquiries and revenue impact are not measured in this review."]);
+  $("attention").replaceChildren();
+  for (const [heading, action] of attention.slice(0, 3)) {
+    const item = document.createElement("li");
+    const label = document.createElement("strong");
+    label.textContent = heading;
+    const detail = document.createElement("p");
+    detail.textContent = action;
+    item.append(label, detail);
+    $("attention").append(item);
+  }
+}
+
+function showStatus(refreshed) {
+  const partial = snapshot.pullsSource.status !== "ok" || snapshot.issuesSource.status !== "ok" ||
+    snapshot.costs.status === "invalid" || snapshot.costs.actionsStatus === "unavailable";
+  const stale = Date.now() - new Date(snapshot.observedAt).getTime() >= 86400000;
+  $("status").dataset.error = String(partial || stale || refreshFailed);
+  text("status", refreshFailed ? "Refresh failed. Showing the saved review; retry Refresh."
+    : partial ? stale ? "Partial saved review, at least a day old. Refresh to retry."
+      : "Partial review. Some data is unavailable."
+    : stale ? "Saved review is at least a day old. Refresh for current data."
+    : refreshed ? "Review updated." : "Saved review. Refresh for latest.");
+}
+
+function scheduleFreshness() {
+  clearTimeout(freshnessTimer);
+  if (!snapshot) return;
+  const remaining = new Date(snapshot.observedAt).getTime() + 86400000 - Date.now();
+  if (remaining > 0) freshnessTimer = setTimeout(() => {
+    if (!$("refresh").disabled) showStatus(false);
+    scheduleFreshness();
+  }, Math.min(remaining, 2147483647));
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && snapshot && !$("refresh").disabled) {
+    showStatus(false);
+    scheduleFreshness();
+  }
+});
+
+async function load(refresh) {
+  clearTimeout(freshnessTimer);
+  $("refresh").disabled = true;
+  text("status", refresh ? "Updating review..." : "Loading review...");
+  $("status").dataset.error = "false";
+  try {
+    const response = await fetch(`/api/${refresh ? "refresh" : "snapshot"}?month=${encodeURIComponent(currentMonth())}`,
+      refresh ? { method: "POST", headers: { "X-MBR-Refresh": "1" } } : {});
+    if (!response.ok) throw new Error("Review request failed.");
+    const data = await response.json();
+    render(data);
+    refreshFailed = false;
+    showStatus(refresh);
+  } catch {
+    refreshFailed = true;
+    if (snapshot) showStatus(false);
+    else {
+      $("dashboard").hidden = true;
+      $("status").dataset.error = "true";
+      text("status", "Review unavailable. Select Refresh to retry.");
+    }
+  } finally {
+    $("refresh").disabled = false;
+    scheduleFreshness();
+  }
+}
+$("refresh").addEventListener("click", () => void load(true));
+if (validMonth) void load(false);
+else {
+  $("refresh").disabled = true;
+  $("status").dataset.error = "true";
+  text("status", "Invalid review month. Use ?month=YYYY-MM in the page address.");
+}
