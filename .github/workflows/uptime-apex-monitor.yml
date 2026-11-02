@@ -31,7 +31,7 @@ concurrency:
 
 jobs:
   check:
-    name: DNS and HTTPS health
+    name: Apex DNS and approved hostname health
     runs-on: ubuntu-latest
     # .NET 10 LTS is supported through Nov 2028; install the SDK from global.json.
     # All dotnet steps run from scripts/monitor/ so global.json is on the discovery path.
@@ -55,13 +55,13 @@ jobs:
         working-directory: scripts/monitor
         run: dotnet build JamulaMonitor.csproj -c Release --nologo
 
-      - name: Run canonical-parser self-tests
+      - name: Run monitor self-tests
         working-directory: scripts/monitor
         run: >-
           dotnet run --project JamulaMonitor.csproj
           -c Release --no-build -- --self-test
 
-      - name: Check DNS apex A record and HTTPS canonical
+      - name: Check apex A record and all approved hostnames
         working-directory: scripts/monitor
         run: >-
           dotnet run --project JamulaMonitor.csproj
@@ -71,7 +71,7 @@ jobs:
         if: success()
         run: |
           {
-            echo "### ✅ Apex monitor passed"
+            echo "### ✅ Hostname monitor passed"
             echo "- \`jamula.net\` A record → approved Azure SWA IP verified"
-            echo "- \`https://jamula.net/\` → HTTP 200, canonical \`https://jamula.net/\` verified"
+            echo "- \`jamula.net\`, \`www.jamula.net\`, \`jamula.com\`, and \`www.jamula.com\` passed HTTPS, canonical URL, same-host HTTP upgrade, expected content, and 404 checks"
           } >> "$GITHUB_STEP_SUMMARY"
