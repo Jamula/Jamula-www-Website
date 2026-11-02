@@ -113,6 +113,10 @@ jobs:
         if: steps.changes.outputs.website == 'true'
         run: node scripts/test_built_site.mjs
 
+      - name: Test website behavior regressions
+        if: steps.changes.outputs.website == 'true'
+        run: node --test tests/*.test.mjs
+
       - name: Set up .NET SDK
         if: steps.changes.outputs.monitor == 'true'
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0

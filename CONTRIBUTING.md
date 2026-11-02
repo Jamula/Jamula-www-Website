@@ -17,9 +17,16 @@ npm ci
 npm run build
 cd ..
 node www/scripts/test_built_site.mjs
+node --test www/tests/*.test.mjs
 ```
 
 The generated-site checks cover metadata, canonical routes, internal links and fragments, sitemap/robots output, semantic landmarks, documented light/dark color-token contrast pairs, and the approved homepage Organization data. They are regression checks, not a complete WCAG conformance evaluation.
+
+The focused website tests also check consent-first analytics host selection,
+storage/version/purpose validation, GPC, withdrawal, minimized event configuration
+and consent markup. They intercept tag insertion rather than contacting Google;
+account-side settings and release checks remain in
+[`docs/privacy/data-lifecycle.md`](docs/privacy/data-lifecycle.md#public-website-analytics-implementation-and-activation-gate).
 
 HTML checks use parse5's HTML5 parser rather than stripping markup with regular
 expressions. Contrast checks use PostCSS to apply `:root` custom properties in

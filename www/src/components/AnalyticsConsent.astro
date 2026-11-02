@@ -1,0 +1,86 @@
+<div class="analytics">
+  <div class="analytics__controls">
+    <button
+      id="analytics-preferences"
+      type="button"
+      aria-controls="analytics-consent"
+      aria-expanded="false"
+      hidden
+    >
+      Analytics preferences
+    </button>
+    <button id="analytics-withdraw" type="button" hidden>
+      Withdraw analytics
+    </button>
+    <a href="/privacy/">Website analytics privacy</a>
+  </div>
+  <section id="analytics-consent" aria-labelledby="analytics-heading" hidden>
+    <h2 id="analytics-heading">Your analytics choice</h2>
+    <p>
+      With your permission, Google Analytics measures page views and contact-link clicks. A click
+      indicates interest, not a sent inquiry. Analytics is optional and off until you accept.
+      Rejecting does not affect the website.
+    </p>
+    <p>
+      Your choice applies only to this hostname and browser for up to 180 days. Withdraw at any time
+      below. No advertising or cross-domain tracking is requested.{" "}
+      <a href="/privacy/">Read about data, cookies, and withdrawal.</a>
+    </p>
+    <div class="analytics__controls">
+      <button id="analytics-accept" type="button">
+        Accept analytics
+      </button>
+      <button id="analytics-reject" type="button">
+        Reject analytics
+      </button>
+    </div>
+  </section>
+  <p id="analytics-status" role="status" aria-live="polite"></p>
+  <noscript>
+    <p>Optional analytics is off because JavaScript is disabled.</p>
+  </noscript>
+</div>
+<script is:inline type="module" src="/analytics-consent.js"></script>
+
+<style>
+  .analytics {
+    max-width: var(--j-max-width);
+    margin-inline: auto;
+    padding: var(--j-space-6);
+    font-size: var(--j-text-sm);
+  }
+
+  .analytics__controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--j-space-4);
+  }
+
+  button {
+    min-height: 44px;
+    padding: var(--j-space-2) var(--j-space-4);
+    border: 1px solid currentColor;
+    background: var(--j-color-bg);
+    color: var(--j-color-text);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  section,
+  p {
+    margin-block-start: var(--j-space-4);
+  }
+
+  h2 {
+    font-size: var(--j-text-lg);
+  }
+
+  section .analytics__controls {
+    margin-block-start: var(--j-space-4);
+  }
+</style>

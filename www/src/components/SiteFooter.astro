@@ -1,21 +1,18 @@
 ---
 /**
  * SiteFooter — letterpress colophon.
- * Legal baseline only. The previous placeholder Privacy/Legal links pointed
- * at routes that do not exist (/privacy, /legal) and are explicitly out of
- * scope for this issue, so they are omitted rather than shipped as dead
- * (404) links; add them back when approved legal/privacy pages exist.
+ * Includes origin-scoped analytics preferences and the related privacy notice.
  */
+import AnalyticsConsent from "./AnalyticsConsent.astro";
 const year = new Date().getFullYear();
 ---
 
 <footer class="site-footer">
   <div class="site-footer__inner">
     <p class="site-footer__mark specimen-label">Jamula</p>
-    <p class="site-footer__copy">
-      &copy; {year} Jamula, Inc. All rights reserved.
-    </p>
+    <p class="site-footer__copy">&copy; {year} Jamula, Inc. All rights reserved.</p>
   </div>
+  <AnalyticsConsent />
 </footer>
 
 <style>
