@@ -9,12 +9,22 @@
  * for the used/omitted claim ledger.
  */
 import BaseLayout from "../layouts/BaseLayout.astro";
+
+const organizationStructuredData = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "@id": "https://jamula.net/#organization",
+  name: "Jamula",
+  url: "https://jamula.net/",
+  logo: "https://jamula.net/apple-touch-icon.png",
+};
 ---
 
 <BaseLayout
   title="Home"
   description="Jamula works across AI strategy, custom software, and cloud consulting in a single engagement — so what we recommend is also what we build and run."
   canonicalUrl="https://jamula.net/"
+  structuredData={organizationStructuredData}
 >
   <div class="home">
     <!-- DESIGN CONTRACT — Homepage / The Standing Statement
@@ -53,7 +63,9 @@ import BaseLayout from "../layouts/BaseLayout.astro";
         <span class="standing__line">Custom software.</span>
         <span class="standing__line">Cloud consulting.</span>
       </p>
-      <p id="standing-close" class="standing__together">Together — not as separate projects.</p>
+      <p id="standing-close" class="standing__together">
+        Together — not as separate projects.
+      </p>
 
       <p class="masthead__lead">
         Organizations exploring AI often receive advice that stops before it reaches their systems.
@@ -66,7 +78,9 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     <div class="split" role="list" aria-label="What Jamula offers">
       <section class="specimen" role="listitem" aria-labelledby="offer-ai">
         <p class="specimen-label">One of three</p>
-        <h2 id="offer-ai" class="specimen__head">AI Strategy</h2>
+        <h2 id="offer-ai" class="specimen__head">
+          AI Strategy
+        </h2>
         <p>
           Artificial intelligence creates real choices &mdash; and real ways to get them wrong.
           Jamula helps organizations think clearly about AI: what it can do for your situation, what
@@ -88,7 +102,9 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
       <section class="specimen" role="listitem" aria-labelledby="offer-software">
         <p class="specimen-label">Two of three</p>
-        <h2 id="offer-software" class="specimen__head">Custom Software</h2>
+        <h2 id="offer-software" class="specimen__head">
+          Custom Software
+        </h2>
         <p>
           Off-the-shelf tools solve standard problems. When your problem isn&rsquo;t standard
           &mdash; or when you&rsquo;re building the capability that makes your organization
@@ -112,7 +128,9 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
       <section class="specimen" role="listitem" aria-labelledby="offer-cloud">
         <p class="specimen-label">Three of three</p>
-        <h2 id="offer-cloud" class="specimen__head">Cloud Consulting</h2>
+        <h2 id="offer-cloud" class="specimen__head">
+          Cloud Consulting
+        </h2>
         <p>
           Cloud infrastructure done well is invisible &mdash; it doesn&rsquo;t slow software down,
           it doesn&rsquo;t surprise you on a bill, and it doesn&rsquo;t create problems when you
@@ -136,10 +154,14 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     <!-- ── The recombine: three disciplines resolve into one ─────── -->
     <section class="rejoin" id="synthesis" aria-labelledby="rejoin-head">
       <div class="rejoin__corridors" aria-hidden="true">
-        <span></span><span></span><span></span>
+        <span></span>
+        <span></span>
+        <span></span>
       </div>
       <p class="specimen-label">The three, rejoined</p>
-      <h2 id="rejoin-head" class="rejoin__head">Three disciplines, one engagement</h2>
+      <h2 id="rejoin-head" class="rejoin__head">
+        Three disciplines, one engagement
+      </h2>
       <div class="rejoin__body">
         <p>
           The problem with separate AI, software, and cloud engagements is that strategy
@@ -160,7 +182,9 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     <!-- ── How we approach AI ───────────────────────────────────── -->
     <section class="passage" aria-labelledby="approach-head">
       <p class="specimen-label">Method</p>
-      <h2 id="approach-head" class="passage__head">How we approach AI</h2>
+      <h2 id="approach-head" class="passage__head">
+        How we approach AI
+      </h2>
       <div class="passage__body">
         <p>
           Jamula&rsquo;s work on AI starts from a practical question: what will this actually do,
@@ -183,7 +207,9 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     <!-- ── About Jamula ─────────────────────────────────────────── -->
     <section class="passage passage--about" aria-labelledby="about-head">
       <p class="specimen-label">About</p>
-      <h2 id="about-head" class="passage__head">About Jamula</h2>
+      <h2 id="about-head" class="passage__head">
+        About Jamula
+      </h2>
       <div class="passage__body">
         <p class="passage__lede">Cyrus Jamula founded Jamula.</p>
       </div>
@@ -192,7 +218,9 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     <!-- ── A quiet next step (on-page; no contact mechanism) ────── -->
     <section class="next" aria-labelledby="next-head">
       <p class="specimen-label">Where to start</p>
-      <h2 id="next-head" class="next__head">Read it as one engagement</h2>
+      <h2 id="next-head" class="next__head">
+        Read it as one engagement
+      </h2>
       <div class="next__body">
         <p>
           If you&rsquo;re weighing whether AI has a real application in your organization, or

@@ -6,6 +6,20 @@
 - Use a short-lived issue branch from protected `main`.
 - Production CI/CD is sourced only from `main`.
 
+## Website validation
+
+From the repository root, build the Astro site and test the generated output:
+
+```sh
+cd www
+npm ci
+npm run build
+cd ..
+node www/scripts/test_built_site.mjs
+```
+
+The generated-site checks cover metadata, canonical routes, internal links and fragments, sitemap/robots output, semantic landmarks, documented light/dark color-token contrast pairs, and the approved homepage Organization data. They are regression checks, not a complete WCAG conformance evaluation.
+
 ## Licensing
 
 Unless explicitly marked otherwise, a contributor who intentionally submits code or technical documentation represents that they have authority to do so and agrees to license the contribution under Apache License 2.0.
