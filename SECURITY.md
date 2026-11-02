@@ -1,21 +1,20 @@
 # Security Policy
 
-## Supported Versions
+## Supported versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+This repository does not publish versioned software releases or define
+supported-version branches. The website is built from the current `main`
+branch; report the affected commit or deployed page when describing a finding.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+## Reporting a vulnerability
 
-## Reporting a Vulnerability
+This repository does not currently document a private vulnerability-reporting
+channel or response-time commitment. Do not include exploit details, credentials,
+or personal data in a public GitHub issue. If GitHub's private vulnerability
+reporting option is available to you for this repository, use that channel.
+Otherwise, contact a repository maintainer through a private channel you already
+have and request a secure reporting route before sending sensitive details.
 
-Use this section to tell people how to report a vulnerability.
-
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+Maintainers should acknowledge and triage reports, coordinate a fix and
+disclosure with the reporter, and avoid publishing identifying or sensitive
+details without permission. No response deadline is promised by this policy.

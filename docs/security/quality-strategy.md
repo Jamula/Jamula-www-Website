@@ -38,7 +38,7 @@ These internal engineering targets are not customer contracts. Monthly availabil
 | Journey/indicator | Proposed objective | Window / measurement | Error-budget policy |
 |---|---:|---|---|
 | Phase 1 public Jamula.net pages | **99.9%** successful usable response; 5xx/timeout excluded from success | Rolling 30 days, 1-min synthetic plus RUM | 43.2 min/month; 2x 1-hour burn pauses release, 5x pages owner |
-| Jamula.com -> Jamula.net redirect | **99.95%** correct HTTPS status, canonical host, safe path/query preservation | Rolling 30 days, regional synthetic | Any certificate/security/path misroute is incident; no safety error budget |
+| Four-host public-site domain behavior | **99.95%** successful HTTPS response on all four approved hostnames, correct Jamula.net canonical metadata, and same-host HTTP-to-HTTPS upgrade | Rolling 30 days, regional synthetic | Any certificate/security/path misroute is incident; no safety error budget |
 | Contact submission acceptance | **99.5%** accepted exactly once when dependencies are healthy | Rolling 30 days, synthetic every 5 min | 216 min/month; duplicate/lost accepted request is data-integrity defect |
 | Contact notification/queue | **99% within 5 min**, **99.9% within 1 h** or visible retry/manual queue | Rolling 30 days | Never report “sent” from enqueue alone; sustained miss pauses content release affecting flow |
 | Phase 2 CRM/scheduling handoff | **99.5%** successful or explicitly recoverable without duplicate | Rolling 30 days | Reconciliation gap beyond 1 h is SEV-2+ |

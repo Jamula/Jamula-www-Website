@@ -1,15 +1,25 @@
 # Business and Product Requirements
 
-**Status:** Proposed / pending Cyrus exact-SHA approval
+**Status:** Historical Phase 1-5 requirements proposal; not a current implementation
+inventory, live status ledger, or authorization for unbuilt phases
 **Decision context:** [Parent #3](https://github.com/Jamula/Jamula-www-Website/issues/3) and children [#4](https://github.com/Jamula/Jamula-www-Website/issues/4)-[#9](https://github.com/Jamula/Jamula-www-Website/issues/9)
 **Token-custody revision owner:** Platform engineer, Platform Engineering (independent N-08 remediation)
 **Scheduling correction revision owner:** Experience lead (independent FCR-016 remediation; Platform engineer is locked out from this rejected revision)
 
 ## Product outcome and boundaries
 
-Jamula.net is the canonical public site for Jamula, Inc.; Jamula.com redirects over valid HTTPS to the matching safe path/query. The site supports AI-native technology consulting and custom-software discovery, a Microsoft-preferred but multi-cloud-capable delivery posture, and progressively stronger customer workflows without coupling every phase to one vendor.
+Jamula.net is the canonical public site for Jamula, Inc. The approved domain
+policy directly serves `jamula.net`, `www.jamula.net`, `jamula.com`, and
+`www.jamula.com` over HTTPS; Jamula.com does not redirect to Jamula.net. The
+site supports AI-native technology consulting and custom-software discovery, a
+Microsoft-preferred but multi-cloud-capable delivery posture, and progressively
+stronger customer workflows without coupling every phase to one vendor.
 
-`main` is the only persistent branch and sole production source. This package authorizes no production code, deployment, account, credential, registration, purchase, public claim, or professional conclusion.
+The repository's current public-site implementation and deployment configuration
+are described in the root [README](../../README.md) and
+[deployment record](../architecture/two-free-static-apps.md). This historical
+package did not authorize additional code, deployment, account, credential,
+registration, purchase, public claim, or professional conclusion.
 
 ## Audiences and measurable outcomes
 
@@ -52,7 +62,9 @@ Targets beyond process completeness require an approved baseline. No metric is a
 
 ## Non-goals and deferrals
 
-- No production implementation, live data, deployment, vendor account, OAuth/identity registration, paid resource, DNS change or payment test.
+- This package did not authorize production implementation of the proposed
+  CRM, portal, connector, customer-AI, payment, or optional public-AI phases.
+  Their presence here is not evidence that they exist.
 - No self-built customer passwords, custom Phase 2 scheduler, website financial ledger, raw card handling, broad connector shortcuts, autonomous AI action, or public AI in Phases 1-4.
 - No legal/tax/accounting/insurance conclusion, public conformance claim, or inferred founder/customer fact.
 - Builder/CMS options are not rejected because evidence is unavailable; blocked packets must close before scoring or selection.

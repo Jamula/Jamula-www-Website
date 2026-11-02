@@ -6,6 +6,13 @@
 tax/accounting conclusion or production recommendation
 **Context:** `Refs #3; child #8`; Cycle 3 consistency remediation
 
+**Freshness:** This is a dated August 2026 market-research snapshot. The current
+owner constraint is zero incremental paid operating-service spend for the
+website; existing domain renewals and CI allowances are separate. Do not treat
+the paid scenarios below as an approved budget or current plan. Free-tier quotas
+and lack of an SLA are constraints, and no trial or credit is a permanent
+no-cost operating plan.
+
 The controlling workload is
 [`reference-workloads.md`](reference-workloads.md)
 `RWL-2026-08-25.3`. Cyrus did not approve the rubric/workload before the initial
@@ -21,7 +28,10 @@ exact plan rates and usage formulas replace the reserves.
 
 Source IDs refer to
 [`../research/platform-source-register.md`](../research/platform-source-register.md).
-No purchase, account, live resource or deployment was made.
+The historical evaluation made no purchase or resource deployment. A public
+Astro site and its Azure deployment configuration now exist; this document does
+not verify current resource state, invoices, quota consumption, or operating
+cost.
 
 ## Cost taxonomy
 

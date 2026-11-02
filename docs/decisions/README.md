@@ -2,16 +2,18 @@
 
 ## Decision state
 
-**No ADR is accepted.** ADR-001 through ADR-006 are Cycle 2 remediated proposals
-pending final independent/domain/professional re-review, commit, issue
-closure/comment, draft PR, and Cyrus approval of the exact artifact blob OIDs and
-PR head commit SHA.
+The August 2026 ADR set is a historical proposal package. Its pending review,
+issue, PR, and exact-SHA workflow is not current: PR #10 merged. The repository
+now contains a static Astro site and two-Azure-Static-Web-Apps deployment
+configuration; see [the current deployment record](../architecture/two-free-static-apps.md).
+The historical ADRs are not a live implementation inventory or authority to
+migrate the site.
 
-The prior platform arithmetic is withdrawn exploratory output. Every exact
-platform/framework/host/plan combination is **unscored**. No weights, deductions,
-threshold, risk ceiling, fixture, vendor, or result is approved. The only current
-platform proposal is a **bounded symmetric evidence cycle with no platform
-selected**.
+No ADR in this set records approval of its proposed durable architecture.
+Blazor/build-time HTML articles have been discussed as a future direction, not
+implemented or authorized. The prior platform arithmetic remains withdrawn;
+dated market and cost findings below are not current quotes or a current
+comparison.
 
 [`RWL-2026-08-25.3`](../cost/reference-workloads.md) is the proposed controlling
 workload dictionary. It is not approved, forecast evidence, a vendor bill, or a
@@ -21,8 +23,8 @@ capacity promise.
 
 | ADR | Scope | Current disposition |
 |---|---|---|
-| [ADR-001](adr-001-rendering-and-content.md) | Rendering and content | Proposed symmetric method; no renderer/CMS selected |
-| [ADR-002](adr-002-hosting-dns-email-cicd.md) | Hosting, DNS, email and CI/CD | Proposed controls; no host/DNS/mail vendor selected |
+| [ADR-001](adr-001-rendering-and-content.md) | Rendering and content | Current runtime is Astro; historical proposal for a durable framework/CMS decision |
+| [ADR-002](adr-002-hosting-dns-email-cicd.md) | Hosting, DNS, email and CI/CD | Current two-SWA topology is documented separately; broader proposed controls are not all verified |
 | [ADR-003](adr-003-customer-platform-phases.md) | Customer-platform phases | Proposed boundaries; no CRM/scheduler/identity/connector/AI/payment vendor selected |
 | [ADR-004](adr-004-privacy-security-reliability.md) | Privacy, security and reliability | Proposed controls; professional gates and future tests pending |
 | [ADR-005](adr-005-cost-portability-and-lock-in.md) | Cost, portability and lock-in | Proposed method using RWL .3; no score or TCO decision |

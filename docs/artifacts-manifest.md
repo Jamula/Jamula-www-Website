@@ -1,32 +1,25 @@
 # Artifact Manifest
 
-**Ledger status:** Lifecycle evidence reconciliation. Reviewed incorporation
-commit `d02a2448a5438fb0e895c4c46166fe39c79ccb86` is recorded in [draft PR
-#10](https://github.com/Jamula/Jamula-www-Website/pull/10), which targets
-`main` from branch `u/cyrusjamula/3-website-platform-evaluation`. Issues
-[#4](https://github.com/Jamula/Jamula-www-Website/issues/4)
-through [#9](https://github.com/Jamula/Jamula-www-Website/issues/9) each
-received a comment naming that commit and PR, then were explicitly closed as
-completed on 2026-08-25. [Issue
-#3](https://github.com/Jamula/Jamula-www-Website/issues/3) remains open while
-PR #10 is draft.
+**Record scope:** Historical authorship, review, and lifecycle snapshot for the
+August 2026 platform-evaluation work package. The table below does not describe
+current issue, PR, implementation, or approval status.
 
-**C2 status:** `C2` means all six child workstreams #4-#9 are incorporated and
-their review corrections are present in the working tree. Fact Checker's
-terminal FCR-018 verdict is **CLEAR: 0 unresolved content findings / 0
+The evaluation package was incorporated by merged PR
+[#10](https://github.com/Jamula/Jamula-www-Website/pull/10); bootstrap PR
+[#2](https://github.com/Jamula/Jamula-www-Website/pull/2) is also merged.
+Issues [#4](https://github.com/Jamula/Jamula-www-Website/issues/4) through
+[#9](https://github.com/Jamula/Jamula-www-Website/issues/9) were closed as
+completed after incorporation. The evaluation's exact-head approval and review
+records below remain historical evidence, not current project authorization.
+
+**C2 snapshot:** `C2` means the six child workstreams #4-#9 and their review
+corrections were incorporated in the August 2026 package. Fact Checker's
+terminal FCR-018 verdict was **CLEAR: 0 unresolved content findings / 0
 unresolved ledger findings / 0 new findings**. The independent adversarial
-FCR-018 recheck is also **CLEAR: 0 unresolved content findings / 0 unresolved
-ledger findings / 0 new findings**. FCR-018 and the remaining N-11
-owner-provenance defect are resolved; prior Reject/Revise dispositions remain
-historical. Responsible AI reviewer's Green remains limited to its fingerprinted working-tree
-revision; material changes to those files reopen affected findings. Canonical
-Git blob OIDs for these changed ledger artifacts, the exact final PR-head SHA,
-Cyrus approval, and professional gates remain pending. PR #10 is intentionally
-stacked on unmerged draft PR #2
-(`cyrusjamula-jamula-website-platform-evaluation`) but targets `main`; its diff
-will narrow after PR #2 merges. Issue #1 and PR #2 were not part of the child
-closure action. No PR was merged and no production deployment occurred. `C2`
-does not mean accepted, implemented, deployed, or approved.
+FCR-018 recheck was also **CLEAR: 0 unresolved content findings / 0 unresolved
+ledger findings / 0 new findings**. Those verdicts apply to the reviewed
+historical revision only. Prior Reject/Revise dispositions remain review
+history. `C2` does not mean accepted, implemented, deployed, or approved.
 
 Durable child mapping is unchanged: **#4 Content lead content; #5 Experience lead experience; #6
 Identity/data engineer customer platform; #7 Quality/reliability engineer security/quality; #8 Platform engineer platform/cost; #9
@@ -37,7 +30,7 @@ owner, while every earlier owner remains historical provenance. The original
 author did not self-revise a locked artifact. No ownership entry implies review
 approval.
 
-| Artifact | Original author | Independent revision owner | Reviewers / approver | Issue and dependency | Current status | Index |
+| Artifact | Original author | Independent revision owner | Reviewers / approver | Issue and dependency | Status / review evidence in the historical record | Index |
 |---|---|---|---|---|---|---|
 | `docs/README.md` | Product lead (integration) | Fact Checker (Cycle 2); Work monitor (N-01/N-04); Legal researcher (N-11 ledger, then lifecycle evidence) | all owners; Cyrus | Refs #3 and #4-#9 | Incorporation commit, draft PR and child closure recorded; exact final head and approvals pending | [Integration](README.md#integration-and-governance) |
 | `docs/artifacts-manifest.md` | Product lead (integration) | Fact Checker (Cycle 2); Work monitor (N-01/N-04); Legal researcher (N-11, FCR-018 owner-provenance ledger, then lifecycle evidence) | all owners; Cyrus | Refs #3 and #4-#9 | FCR-018 and N-11 resolved; lifecycle evidence recorded; complete 60/60 docs inventory | [Integration](README.md#integration-and-governance) |
@@ -103,18 +96,18 @@ approval.
 
 ## Coverage rule
 
-All **61/61** Markdown artifacts currently under `docs/` are listed above and
-linked from `docs/README.md`. There are no intentionally unindexed documentation artifacts.
-Re-run coverage and local-link validation after any file is added, renamed, or
-removed.
+This is the historical evaluation-artifact inventory, not an exhaustive listing
+of current Markdown files under `docs/`. It has 61 rows, including this
+manifest, and does not include every later or current document (for example,
+`docs/architecture/two-free-static-apps.md`). Status entries combine records
+from different dates; consult each linked artifact for its exact date and
+context. For example, the #43 founder approval-in-principle was recorded on
+2026-08-29. Rebuild a current inventory separately when needed.
 
-## Remaining integration sequence
+## Current work status
 
-The reviewed incorporation commit, draft PR #10, child comments, and explicit
-#4-#9 closures are complete. Validate these ledger-only edits, commit and push
-them, then verify PR #10's exact head plus its draft and `main` base state. That
-next ledger-only commit becomes the candidate final head only after validation
-and push; resolve the four changed ledgers' canonical blob OIDs from it and
-record/report its exact full SHA externally for Cyrus. Keep #3 open. Do not
-merge or deploy. Every decision and named professional gate remains pending,
-and Cyrus must approve that exact full SHA.
+This manifest is not the active work ledger. Consult
+[`docs/README.md`](README.md) for current repository context and linked open
+issues. Verify GitHub issue/PR state before taking action; never treat a
+historical `Pending` entry here as a live blocker or a historical review verdict
+as approval of a later revision.
