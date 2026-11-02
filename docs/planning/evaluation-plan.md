@@ -1,5 +1,11 @@
 # Jamula Website Evaluation Plan
 
+**Record status:** Historical planning baseline from August 2026. Its
+pre-implementation instructions and Jamula.com-to-Jamula.net redirect assumption
+are superseded by the current Astro site and the approved direct-serving policy
+in [Two Free Azure Static Web Apps](../architecture/two-free-static-apps.md).
+Use [the documentation index](../README.md) for current repository status.
+
 **Maintenance note:** Framework bootstrap instructions have been retired. This
 plan retains the website evaluation scope and historical PR 1/PR 2 phase names;
 functional roles describe responsibilities, not installed agents or approved

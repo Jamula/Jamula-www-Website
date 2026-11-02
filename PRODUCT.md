@@ -26,17 +26,19 @@ demographic targeting profiles.
 ## Product Purpose
 
 Jamula.net is the canonical public website for Jamula, Inc. Its purpose is to
-explain what Jamula offers, why it is different, and how to get in touch, so that
-visitors can understand fit and choose a low-friction next step.
+explain what Jamula offers and how its disciplines fit together, so visitors can
+understand whether the services may fit their needs. An accessible contact path
+is a product goal, but the current homepage does not provide one.
 
-The current production homepage is intentionally minimal and does not yet explain
-the offering; this record exists so future homepage and content work does not have
-to re-infer audience, purpose, positioning, and evidence boundaries each time.
+The current homepage describes the AI strategy, custom software, and cloud
+consulting offer. It has no contact form or other contact mechanism. The remaining
+contact journey is tracked as follow-up work, not implemented functionality.
 
 Success for this phase is defined by task completion and qualified contact — a
 visitor understanding the offering and reaching an accessible contact path — not by
 any performance, popularity, or outcome metric. No metric is a customer outcome or
-public claim by itself.
+public claim by itself. The contact outcome is not yet supported by the current
+site.
 
 ## Positioning
 
@@ -65,19 +67,23 @@ claim.
   review-gated (Fact Checker, Legal researcher, Responsible AI reviewer, and Cyrus per
   `docs/content/content-strategy.md` and `docs/content/public-claims-register.md`).
 - **Company / public identity:** Jamula, operated by Jamula, Inc.
-- **Canonical domain:** `jamula.net`. The Azure site is currently served at
-  `www.jamula.net` while migration of the apex (`jamula.net`) is being evaluated;
-  the apex migration is not yet done. `Jamula.com` is intended to redirect to the
-  canonical domain.
+- **Domain policy:** `jamula.net` is canonical for indexing. The approved policy
+  serves `jamula.net`, `www.jamula.net`, `jamula.com`, and `www.jamula.com`
+  directly over HTTPS; HTTP upgrades on the same hostname. Jamula.com is not
+  configured as a blanket redirect to Jamula.net. See
+  [`docs/architecture/two-free-static-apps.md`](docs/architecture/two-free-static-apps.md).
+  Repository configuration documents this policy but does not establish live
+  DNS/TLS status.
 - **Current public-site implementation:** the public website is an Astro project
   with `output: "static"` (`www/astro.config.ts`, canonical `https://jamula.net`),
   deployed to Azure Static Web Apps via `.github/workflows/azure-static-web-apps.yml`.
-- **Durable platform selection remains open:** the long-term rendering/CMS/framework/
-  host choice is an unresolved evaluation (ADR-001, `docs/decisions/`), where custom
-  and turn-key options are still in scope and no platform is selected. The Astro/Azure
-  setup above is the current build-and-deploy reality, not a decided durable outcome.
-- **Deployment / branch model:** protected `main` is the sole production source and
-  the only persistent branch; pull-request previews are ephemeral and non-production.
+- **Current versus proposed technology:** Astro and Azure Static Web Apps are the
+  repository's current build/deploy implementation, not merely a proposal. A
+  longer-term framework, CMS, and hosting strategy remains a separate decision.
+  A Blazor-based site with build-time HTML articles has been discussed as a
+  future direction; it has not been implemented or authorized as a migration.
+- **Deployment / branch model:** protected `main` is the production source;
+  pull-request previews are isolated and non-production.
 - **Future secure customer portal is a separate product surface:** the planned
   customer portal (identity, CRM, storage connectors, customer AI, payments — see
   `docs/requirements/business-product-requirements.md`) is a separate deployment and
@@ -85,16 +91,20 @@ claim.
 
 ## Capabilities and Constraints
 
-**Confirmed for the public website (Phase 1):**
+**Present in the repository's current public-site implementation:**
 
-- A static, statically hosted public marketing/company website whose job is to
-  describe Jamula's offering categories and route visitors to contact.
+- A static public website that describes Jamula's offering categories. It has no
+  contact form or other contact mechanism.
 - The approved Jamula icon/brand asset is integrated (see Brand Commitments).
 
 **Durable constraints future work must preserve:**
 
 - Publish only owner-approved, review-gated content. No public claim ships without
   its required review gate and Cyrus's exact-version approval.
+- Keep incremental paid operating-service spend at zero. Existing domain renewals
+  and CI allowances are separate; free-tier quotas and lack of an SLA are real
+  constraints. Do not silently upgrade, rely on a trial/credit as a permanent
+  free solution, or imply unlimited availability.
 - Preserve a Microsoft-preferred, multi-cloud-capable posture stated as Jamula's own
   capability; never imply Microsoft (or any vendor) endorses, partners with, or is
   affiliated with Jamula.
@@ -105,10 +115,8 @@ claim.
 
 **Explicitly undecided (open decisions — do not resolve by inventing):**
 
-- The durable rendering/CMS/framework/host platform (ADR-001 evidence cycle is
-  unresolved).
-- Apex-domain (`jamula.net`) migration from the current `www.jamula.net` custom
-  hostname.
+- A future framework/CMS/hosting strategy and any migration from the current
+  Astro/Azure implementation.
 - Final public wording for offering categories, positioning, and any claim — pending
   editorial review and owner approval.
 - Later phases (CRM/scheduling, portal/storage/customer AI, payments, optional public

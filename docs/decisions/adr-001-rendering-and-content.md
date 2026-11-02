@@ -1,12 +1,22 @@
 # ADR-001: Rendering and Content Platform Evidence Cycle
 
-**Status:** Proposed
+**Status:** Historical proposal; no durable framework/CMS/hosting decision is
+recorded here
 **Date:** 2026-08-25
 **Approval:** Pending Cyrus approval of this exact artifact SHA; no rendering, CMS, framework, host, or plan is selected
 
 ## Context
 
-The Phase 1 public site needs accessible, performant, secure, observable, recoverable, portable publishing with Jamula.net canonical, an HTTPS path/query-preserving Jamula.com redirect, and protected `main` as the sole production source.
+The Phase 1 public site needs accessible, performant, secure, observable,
+recoverable, portable publishing with Jamula.net canonical for indexing,
+direct HTTPS serving on all four approved Jamula.net/.com apex and www
+hostnames, and protected `main` as the sole production source. HTTP upgrades
+remain on the same hostname.
+
+The current site is implemented in Astro with static output. This ADR records
+the earlier durable-platform evaluation proposal, not the current runtime or an
+authorization to migrate. A Blazor/build-time HTML article direction is also
+only a proposal.
 
 The prior assessment was exploratory. Cyrus did not preregister the rubric or shared workload before scoring, so every exact platform/framework/host/plan combination is unscored and no comparative result is decision-grade.
 

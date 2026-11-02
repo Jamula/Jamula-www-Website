@@ -1,10 +1,15 @@
 # Architecture Recommendation
 
-**Status:** Proposed / pending Cyrus exact-SHA approval
+**Status:** Historical proposal (2026-08-25); not the current implementation plan
 **Evidence date:** 2026-08-25
 **Decision scope:** What to do next, not which platform to buy or build
 
 ## Recommendation
+
+The repository's current public site is implemented in Astro. This historical
+recommendation predates that implementation and does not authorize replacing it.
+The later Blazor/build-time HTML article direction is also a proposal, not an
+approved migration.
 
 Do **not** select a platform, framework, host, CMS, CRM, scheduler, connector, or payment processor from the current exploratory record. Cyrus did not preregister the rubric and shared workload before exploratory scoring, so every exact platform/plan combination remains unscored.
 
@@ -15,7 +20,9 @@ Use the corrected `RWL-2026-08-25.3` common fixture in [platform portability](pl
 ## Invariants
 
 - Jamula.net is canonical.
-- Jamula.com redirects over HTTPS while preserving path and query.
+- The approved policy directly serves all four Jamula.net/.com apex and www
+  hostnames over HTTPS; Jamula.net is canonical for indexing, and HTTP upgrades
+  remain on the same hostname.
 - Protected `main` is the sole production source; each release retains artifact/SHA provenance, rollback, and evidence.
 - Phase boundaries in the [phase gates](../roadmap/phase-gates.md) remain exact.
 - No document, spike, vendor statement, or planning envelope is represented as production proof.

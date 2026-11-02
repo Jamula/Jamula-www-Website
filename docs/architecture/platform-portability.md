@@ -1,17 +1,22 @@
 # Platform Portability Contract and Symmetric Evaluation
 
-**Status:** Proposed research contract and disposable-fixture plan; no option is
-scored, selected, implemented or production-proven
+**Status:** Historical proposed research contract and disposable-fixture plan;
+not a current infrastructure inventory or production-verification record
 **Evidence cut-off:** 2026-08-25 Pacific
 **Context:** `Refs #3; child #8`; N-10 symmetry revision
 
-This contract applies equally to custom/static, WordPress and visual-builder
-shapes. No account, resource, credential, DNS change, deployment or spike exists.
+This contract was designed to apply equally to custom/static, WordPress and
+visual-builder shapes. The repository now contains an Astro site and Azure
+Static Web Apps deployment configuration; that implementation is documented in
+[Two Free Azure Static Web Apps](two-free-static-apps.md). This research
+contract does not inventory live accounts, resources, credentials, DNS, or
+deployment state, and it does not prove that a portability fixture or spike ran.
 
 ## Non-negotiable boundaries
 
-1. Jamula.net is canonical; Jamula.com redirects over valid HTTPS to the same safe
-   path/query. Failure pauses launch.
+1. The approved policy serves all four Jamula.net/.com apex and www hostnames
+   directly over HTTPS. Jamula.net is canonical for indexing; HTTP upgrades on
+   the same hostname. Failure pauses launch.
 2. Protected `main` is the only production source. PR previews are isolated and
    never promoted by DNS.
 3. One exact reviewed state produces checksum, lock/dependency manifest,
@@ -193,10 +198,12 @@ It runs domain, canonical, security-header, route and form smoke tests and rolls
 back on failure. Any CMS/dashboard publish must be disabled or reconciled into
 that reviewed main-bound state; inability to do so fails the publication gate.
 
-Before cutover, export DNS/mail records, verify recovery/admins, lower TTL, prove
-both-domain TLS, test root/deep/encoded/safe-query/404/canonical behavior, stage
-Jamula.net then Jamula.com, and pause/roll back on TLS, loop, path loss, canonical
-or DNSSEC failure.
+Before a future host cutover, export DNS/mail records, verify recovery/admins,
+lower TTL, test all four approved hostnames for HTTPS serving without
+cross-host redirects, same-host HTTP-to-HTTPS upgrades, root/deep/encoded/safe
+query/404 behavior, and canonical metadata. Pause or roll back on TLS, loop,
+path loss, canonical, or DNSSEC failure. These are future cutover tests, not
+evidence that the current live domains have been tested.
 
 ## Evidence classes, teardown and follow-up
 

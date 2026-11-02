@@ -1,12 +1,19 @@
 # Platform Decision Framework
 
-**Status:** Proposed method only; pending Cyrus approval of an exact artifact SHA; no platform, renderer, CMS, or host selected
+**Status:** Historical proposed method; not an approved durable platform decision
+or a description of the current implementation
 **Evidence date:** 2026-08-25
 **Scope:** Phase 1 public site platform, hosting, delivery, cost, portability, and exit evidence
 
 ## 1. Decision state
 
 Cyrus did not preregister or approve the candidate rubric and shared workload before the exploratory platform assessment was scored. Those exploratory results are therefore non-decisional. Every exact platform, framework, host, and plan combination is **unscored**, and this framework does not select a platform.
+
+The current public site is implemented in Astro and deployed through the
+repository's Azure Static Web Apps workflows. That operational implementation
+does not convert this unapproved comparison method into a durable architecture
+decision. A future Blazor/build-time article direction is also only a proposal;
+no migration is authorized here.
 
 The bounded proposal is to preregister and run a symmetric evidence cycle. Cyrus must approve the exact workload version, gates, weights, evidence deductions, minimum pass threshold, risk ceiling, fixtures, quotes, and decision rule before any comparative run. Post-run changes require a new version and a fresh run.
 
@@ -45,7 +52,8 @@ candidate retained and blocks selection without a score or penalty.
 
 The exact pass language remains subject to preregistration. At minimum, a fixture must demonstrate:
 
-- Jamula.net as canonical and an HTTPS Jamula.com redirect that preserves path and query;
+- direct HTTPS serving on all four Jamula.net/.com apex and www hostnames, with
+  Jamula.net canonical for indexing and same-host HTTP-to-HTTPS upgrades;
 - protected `main` as the only production source, with auditable artifact/SHA provenance and rollback;
 - current TLS, DNS ownership/recovery, domain-email authentication, least privilege, secret separation, logging, alerts, and recovery controls;
 - the applicable WCAG 2.2 AA journeys and Experience lead's sole normative [performance gate](../experience/accessibility-seo-performance.md#6-performance-gate);

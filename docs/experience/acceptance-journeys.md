@@ -334,7 +334,7 @@ Automation can catch regressions but cannot sign off a journey. Manual evidence 
 |---|---|
 | Any applicable WCAG 2.2 A/AA failure blocks a critical journey | Block affected phase |
 | Third-party critical barrier and no passing equivalent supported fallback | Block affected phase |
-| Jamula.com HTTPS/path/query redirect or Jamula.net canonical conflict | Block Phase 1 launch |
+| Any of the four approved hostnames fails HTTPS direct-serving, same-host HTTP upgrade, or Jamula.net canonical behavior | Block the affected Phase 1 launch/journey |
 | Private/customer route is publicly crawlable/indexable | Block affected phase and treat as security/privacy incident |
 | Any critical route exceeds a hard transfer or lab budget | Remediate before release; exception cannot waive field-CWV target |
 | Sufficient field data fails any good-CWV p75 threshold | Release remains out of performance compliance; remediate and remeasure |
