@@ -1,0 +1,67 @@
+<!doctype html>
+<!--
+THESIS: A small monthly operating sheet, with current inventory separate from delivered work.
+OWN-WORLD: Jamula press-green, square rules, readable system controls; no decorative charts.
+STORY: Choose a UTC month, refresh repository evidence, inspect linked work and cost gaps.
+FIRST VIEWPORT: Title and month/refresh controls, source status, four requested KPIs, work lists.
+FORM: Brief-pinned simple dashboard; responsive ledger, not the public marketing homepage.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Jamula repository MBR</title>
+  <link rel="stylesheet" href="/dashboard.css">
+  <script type="module" src="/dashboard.js"></script>
+</head>
+<body>
+  <a class="skip" href="#review">Skip to review</a>
+  <main id="review">
+    <header>
+      <div><h1>Monthly business review</h1><p>Jamula / Jamula-www-Website</p></div>
+      <form id="controls">
+        <label for="month">Review month <span>(UTC)</span><input id="month" name="month" type="month" min="2000-01" max="9998-12" required></label>
+        <button id="refresh" type="submit">Refresh data</button>
+      </form>
+    </header>
+    <p id="status" role="status" aria-live="polite">Loading saved snapshot...</p>
+    <section id="dashboard" hidden aria-label="Monthly review">
+      <p id="coverage"></p>
+      <dl class="kpis" aria-label="Key performance indicators">
+        <div><dt>Active PRs <small>Current backlog</small></dt><dd id="active-prs"></dd></div>
+        <div><dt>Merged PRs <small>Selected UTC month</small></dt><dd id="merged-prs"></dd></div>
+        <div><dt>Active issues <small>Current backlog</small></dt><dd id="active-issues"></dd></div>
+        <div><dt>Completed issues <small>Selected UTC month</small></dt><dd id="completed-issues"></dd></div>
+      </dl>
+      <p id="lead-time"></p>
+      <div class="work">
+        <section aria-labelledby="prs-title">
+          <div class="section-head"><h2 id="prs-title">Pull requests</h2><label>Show <select id="pr-filter" aria-label="Pull request status"><option value="active">Active now</option><option value="completed">Merged in month</option><option value="otherClosed">Closed, not merged in month</option></select></label></div>
+          <p id="pr-context" class="muted"></p><ul id="pr-list" class="work-list"></ul>
+        </section>
+        <section aria-labelledby="issues-title">
+          <div class="section-head"><h2 id="issues-title">Issues</h2><label>Show <select id="issue-filter" aria-label="Issue status"><option value="active">Active now</option><option value="completed">Completed in month</option><option value="otherClosed">Other closures in month</option></select></label></div>
+          <p id="issue-context" class="muted"></p><ul id="issue-list" class="work-list"></ul>
+        </section>
+      </div>
+      <section aria-labelledby="cost-title" class="costs">
+        <h2 id="cost-title">Usage &amp; costs</h2>
+        <p>Unmeasured is not free. Repository spend: <strong>Unknown</strong> (coverage is not exhaustive).</p>
+        <p id="cost-health"></p>
+        <dl class="cost-summary">
+          <div><dt>AI input / output tokens</dt><dd id="ai-tokens"></dd></div>
+          <div><dt>Actions billable runner minutes</dt><dd id="actions-minutes"></dd></div>
+          <div><dt>AI / Actions spend (USD)</dt><dd id="spend"></dd></div>
+        </dl>
+        <details><summary>All measurements, evidence &amp; coverage</summary>
+          <div class="table-scroll"><table><caption>Local manual imports only; no account-wide billing or session history is read.</caption><thead><tr><th scope="col">Measurement</th><th scope="col">Value</th><th scope="col">Evidence / UTC coverage</th></tr></thead><tbody id="cost-rows"></tbody></table></div>
+        </details>
+        <p class="muted">Elapsed job minutes are not billable minutes: runner types, multipliers, retries, free allowances and billing rules differ. Hosting plan configuration is not a verified bill.</p>
+      </section>
+      <details class="sources"><summary>Source health &amp; definitions</summary><ul id="sources"></ul><p>Backlog is observed now, even for past months; it is not reconstructed month-end inventory. Completed means merged PRs or issues whose latest state reason is completed. Reopened issues and changed closure reasons can revise past-month results. Median PR age is an open-to-merge proxy, not coding time. Review/CI blocked status is not queried.</p></details>
+    </section>
+    <footer>Read-only GitHub data. Local snapshots stay on this machine. Refresh replaces the selected month's saved observation.</footer>
+  </main>
+</body>
+</html>
