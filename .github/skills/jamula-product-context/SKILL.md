@@ -5,7 +5,9 @@ description: Jamula website goals, roadmap, decision boundaries, and approval ga
 
 # Jamula Product Context
 
-- Canonical site: `Jamula.net`; `Jamula.com` redirects.
+- Directly serve `jamula.net`, `www.jamula.net`, `jamula.com`, and
+  `www.jamula.com` over HTTPS. `jamula.net` is canonical for indexing; HTTP
+  upgrades to HTTPS on the same hostname while preserving path and query.
 - Company: AI-native technology consulting and custom software; Microsoft-preferred, multi-cloud capable.
 - Cost posture: genuinely free first only when commercially permitted, secure, credible, and portable.
 - Phase 1: public site, contact, social, GitHub, content, analytics/consent.
