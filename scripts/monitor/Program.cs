@@ -118,7 +118,7 @@ static class Monitor
         {
             throw;
         }
-        catch (Exception ex)
+        catch (SocketException ex)
         {
             Console.Error.WriteLine(
                 $"::error::DNS: resolution failed for {Config.ApexHost}: {ex.Message}");
