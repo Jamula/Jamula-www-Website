@@ -18,14 +18,18 @@ interface Props {
   description: string;
   canonicalUrl?: string;
   ogImage?: string;
+  structuredData?: Record<string, unknown>;
 }
 
 const SITE_NAME = "Jamula";
 const SITE_URL = "https://jamula.net";
 
-const { title, description, canonicalUrl = Astro.url.href, ogImage } = Astro.props;
+const { title, description, canonicalUrl = Astro.url.href, ogImage, structuredData } = Astro.props;
 
 const fullTitle = `${title} — ${SITE_NAME}`;
+const structuredDataJson = structuredData
+  ? JSON.stringify(structuredData)?.replace(/</g, "\\u003c")
+  : undefined;
 ---
 
 <!doctype html>
@@ -56,6 +60,7 @@ const fullTitle = `${title} — ${SITE_NAME}`;
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
     {ogImage && <meta name="twitter:image" content={ogImage} />}
+    {structuredDataJson && <script type="application/ld+json" set:html={structuredDataJson} />}
 
     <!-- Brand favicon set — approved Jamula logo (issue #35) -->
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32" />
@@ -68,7 +73,9 @@ const fullTitle = `${title} — ${SITE_NAME}`;
   </head>
   <body>
     <!-- Skip navigation link — must be the first focusable element -->
-    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <a class="skip-link" href="#main-content">
+      Skip to main content
+    </a>
 
     <SiteHeader />
 
