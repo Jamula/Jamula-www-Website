@@ -34,7 +34,9 @@ function render(data) {
     if (!m) return "Not tracked";
     const period = new Date(m.coveredFrom) > new Date(data.periodStart) ||
       new Date(m.coveredThrough) < new Date(data.observedAt) ? "partial period" : "month to date";
-    return `${money ? usd.format(m.value) : number.format(m.value)} (${m.basis}, ${period})`;
+    const formatted = money ? m.value > 0 && m.value < 0.01 ? "< $0.01" : usd.format(m.value)
+      : number.format(m.value);
+    return `${formatted} (${m.basis}, ${period})`;
   };
   const tokenKeys = ["aiInputTokens", "aiOutputTokens", "aiCacheReadTokens", "aiCacheWriteTokens"];
   const tokenLabels = ["input", "output", "cache read", "cache write"];

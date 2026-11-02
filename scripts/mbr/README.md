@@ -173,6 +173,8 @@ cover the month to date or only a partial period. AI input/output/cache categori
 stay separate and Actions minutes mean billable runner minutes, not elapsed
 workflow time. Missing usage is "Not tracked"; no recorded money is "Spend not
 measured". Recorded money is labeled partial spend, never total spend.
+Positive amounts below one cent display as `< $0.01`, not a rounded `$0.00`;
+an explicitly recorded zero still displays as `$0.00`.
 **Total repo spend always remains Unknown**
 because these optional categories do not establish exhaustive cost coverage.
 Free hosting configuration is not proof of a measured $0 bill. Actions elapsed

@@ -148,6 +148,17 @@ test("partial token evidence and elapsed-only minutes cannot masquerade as compl
   assert.equal(get("ai-tokens").textContent, "input: 5 (estimated, partial period); output: Not tracked; cache read: Not tracked; cache write: Not tracked");
   assert.equal(get("actions-minutes").textContent, "Not tracked");
 });
+test("nonzero sub-cent spend never displays as zero while documented zero stays zero", async () => {
+  for (const [value, expected] of [[0, "$0.00"], [0.004, "< $0.01"], [0.009, "< $0.01"], [0.01, "$0.01"]]) {
+    const data = fixture();
+    data.costs = { status: "imported", measurements: [{
+      key: "aiUsd", value, basis: "actual", coveredFrom: data.periodStart, coveredThrough: instant
+    }] };
+    const { get } = await page([data]);
+    assert.equal(get("recorded-spend").textContent, `AI: ${expected} (actual, month to date)`);
+    assert.equal(get("spend-summary").textContent, "Partial spend recorded; total unverified.");
+  }
+});
 test("invalid cost evidence surfaces a corrective action rather than hiding failure", async () => {
   const data = fixture();
   data.costs.status = "invalid";
