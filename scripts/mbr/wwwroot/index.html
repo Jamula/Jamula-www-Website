@@ -1,0 +1,67 @@
+<!doctype html>
+<!--
+THESIS: A business briefing, not an engineering tracker; constraints and next actions lead.
+OWN-WORLD: Jamula press-green and paper, pressed rules, generous space, no decorative charts.
+STORY: Understand commercial readiness, activity, cost visibility and management attention.
+FIRST VIEWPORT: Plain month, business readout, four subordinate counts, costs and three priorities.
+FORM: Brief-pinned executive one-page MBR; evidence stays in local snapshots and documentation.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Jamula repository MBR</title>
+  <link rel="stylesheet" href="/dashboard.css">
+  <script type="module" src="/dashboard.js"></script>
+</head>
+<body>
+  <a class="skip" href="#review">Skip to review</a>
+  <main id="review">
+    <header>
+      <div><h1 id="month-title">Monthly business review</h1><p>Jamula website <span aria-hidden="true">/</span> Monthly business review</p></div>
+      <button id="refresh" type="button">Refresh</button>
+    </header>
+    <p id="status" role="status" aria-live="polite">Loading review...</p>
+    <section id="dashboard" hidden aria-label="Monthly review">
+      <section class="readout" aria-labelledby="readout-title">
+        <h2 id="readout-title"></h2>
+        <p id="readout"></p>
+      </section>
+      <div class="activity">
+        <section aria-labelledby="delivery-title">
+          <h2 id="delivery-title">Delivery</h2>
+          <p id="coverage" class="muted"></p>
+          <dl class="metrics">
+            <div><dt>Pull requests merged</dt><dd id="merged-prs"></dd></div>
+            <div><dt>Issues completed</dt><dd id="completed-issues"></dd></div>
+          </dl>
+        </section>
+        <section aria-labelledby="open-title">
+          <h2 id="open-title">Open work</h2>
+          <p id="open-coverage" class="muted">Current workload</p>
+          <dl class="metrics">
+            <div><dt>Open pull requests</dt><dd id="active-prs"></dd></div>
+            <div><dt>Open issues</dt><dd id="active-issues"></dd></div>
+          </dl>
+        </section>
+      </div>
+      <div class="management">
+        <section aria-labelledby="cost-title">
+          <h2 id="cost-title">Costs</h2>
+          <p id="spend-summary" class="statement"></p>
+          <p id="recorded-spend" hidden></p>
+          <dl class="usage">
+            <div><dt>AI tokens</dt><dd id="ai-tokens"></dd></div>
+            <div><dt>Actions minutes</dt><dd id="actions-minutes"></dd></div>
+          </dl>
+        </section>
+        <section aria-labelledby="attention-title">
+          <h2 id="attention-title">Needs attention</h2>
+          <ul id="attention"></ul>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
