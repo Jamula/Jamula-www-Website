@@ -190,6 +190,15 @@ try
         Check(saved.Month == month.Value && saved.Coverage.StartsWith("writer-", StringComparison.Ordinal) &&
             saved.Costs.Measurements.Count == 3 && !Directory.EnumerateFiles(directory, "*.tmp").Any(),
             "concurrent snapshot writers publish complete JSON without shared temp files");
+        await using (var held = Snapshot.OpenRead(snapshotPath))
+        {
+            await (observed with { Coverage = "replacement" }).SaveAsync(snapshotPath, options);
+            using var reader = new StreamReader(held);
+            var oldSnapshot = JsonSerializer.Deserialize<Snapshot>(await reader.ReadToEndAsync(), options)!;
+            var replacement = JsonSerializer.Deserialize<Snapshot>(await File.ReadAllTextAsync(snapshotPath), options)!;
+            Check(oldSnapshot.Coverage == saved.Coverage && replacement.Coverage == "replacement",
+                "open snapshot reader permits replacement and retains complete old observation");
+        }
         var previous = await File.ReadAllTextAsync(snapshotPath);
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();

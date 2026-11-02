@@ -91,6 +91,8 @@ Concurrent server/CLI collectors use separate temporary files before atomic
 snapshot replacement; the last successful publication wins. A per-snapshot
 `.lock` file serializes publication across processes (bounded sharing-lock retry);
 it contains no data and remains in ignored local storage.
+API readers allow delete sharing, so a reader can finish the old observation
+while a collector publishes its replacement on Windows.
 
 Only fixed endpoints are exposed. A same-origin POST with `X-MBR-Refresh: 1`
 refreshes; GET only reads local data. Month input never becomes a shell command.

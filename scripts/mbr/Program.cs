@@ -82,7 +82,9 @@ app.MapGet("/api/snapshot", async (HttpContext context) =>
     catch (ArgumentException) { return Results.BadRequest(new { error = "Use an exact YYYY-MM month." }); }
     var path = Path.Combine(dataDirectory, $"snapshot-{month.Value}.json");
     if (!File.Exists(path)) return Results.NotFound(new { error = "No snapshot for this month. Select Refresh data to read GitHub." });
-    return Results.Text(await File.ReadAllTextAsync(path, context.RequestAborted), "application/json");
+    await using var stream = Snapshot.OpenRead(path);
+    using var reader = new StreamReader(stream);
+    return Results.Text(await reader.ReadToEndAsync(context.RequestAborted), "application/json");
 });
 app.MapPost("/api/refresh", async (HttpContext context) =>
 {
@@ -107,6 +109,11 @@ public sealed record Snapshot(string Repo, string Month, DateTimeOffset PeriodSt
     public int ExitCode => PullsSource.Status == "ok" && IssuesSource.Status == "ok" &&
         Costs.Status != "invalid" && Costs.ActionsStatus != "unavailable" ? 0 : 1;
 
+    /// <summary>Keeps the observed file readable while another collector atomically replaces its name.</summary>
+    public static FileStream OpenRead(string path) =>
+        new(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete,
+            bufferSize: 4096, useAsync: true);
+
     /// <summary>Publishes one complete observation without sharing a temporary file with other collectors.</summary>
     public async Task SaveAsync(string path, JsonSerializerOptions options, CancellationToken cancellationToken = default)
     {
@@ -125,7 +132,11 @@ public sealed record Snapshot(string Repo, string Month, DateTimeOffset PeriodSt
                     await Task.Delay(20, cancellationToken);
                     continue;
                 }
-                using (publicationLock) File.Move(temporary, path, overwrite: true);
+                using (publicationLock)
+                {
+                    if (File.Exists(path)) File.Replace(temporary, path, destinationBackupFileName: null);
+                    else File.Move(temporary, path);
+                }
                 break;
             }
         }
