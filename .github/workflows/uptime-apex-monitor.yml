@@ -33,8 +33,7 @@ jobs:
   check:
     name: DNS and HTTPS health
     runs-on: ubuntu-latest
-    # net10.0 LTS pre-installed on ubuntu-latest (ubuntu-24.04); active through Nov 2028.
-    # SDK pinned to .NET 10.x via scripts/monitor/global.json (latestMinor).
+    # .NET 10 LTS is supported through Nov 2028; install the SDK from global.json.
     # All dotnet steps run from scripts/monitor/ so global.json is on the discovery path.
     timeout-minutes: 5
     steps:
@@ -42,6 +41,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: scripts/monitor/global.json
 
       - name: Verify .NET SDK
         working-directory: scripts/monitor
