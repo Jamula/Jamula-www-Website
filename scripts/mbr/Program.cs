@@ -4,9 +4,9 @@ using JamulaMbr;
 
 var root = AppContext.BaseDirectory;
 // dotnet run uses the project directory; published output carries wwwroot beside the executable.
-if (Directory.Exists(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")))
+if (Directory.Exists(Path.Join(Directory.GetCurrentDirectory(), "wwwroot")))
     root = Directory.GetCurrentDirectory();
-var dataDirectory = Path.Combine(root, ".local");
+var dataDirectory = Path.Join(root, ".local");
 Directory.CreateDirectory(dataDirectory);
 var json = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true };
 using var refreshGate = new SemaphoreSlim(1);
@@ -19,14 +19,14 @@ async Task<Snapshot> Refresh(string value, CancellationToken cancellationToken)
     var issuesTask = GitHub.CollectAsync(false, cancellationToken);
     await Task.WhenAll(pullsTask, issuesTask);
     var now = DateTimeOffset.UtcNow;
-    var costs = await Costs.ReadAsync(Path.Combine(dataDirectory, $"costs-{month.Value}.json"), month, now, cancellationToken);
+    var costs = await Costs.ReadAsync(Path.Join(dataDirectory, $"costs-{month.Value}.json"), month, now, cancellationToken);
     costs = await Costs.CollectAsync(costs, month, now, cancellationToken);
     var snapshot = new Snapshot(GitHub.Repo, month.Value, month.Start, month.End, started, now,
         month.Start > now ? "Future period; no delivery observations yet" :
         month.End > now ? "Month to date (UTC)" : "Past UTC month; latest state, not an archived month-end snapshot",
         pullsTask.Result, issuesTask.Result, Metrics.Summarize(pullsTask.Result, month, now, true),
         Metrics.Summarize(issuesTask.Result, month, now, false), costs);
-    var path = Path.Combine(dataDirectory, $"snapshot-{month.Value}.json");
+    var path = Path.Join(dataDirectory, $"snapshot-{month.Value}.json");
     await snapshot.SaveAsync(path, json, cancellationToken);
     return snapshot;
 }
@@ -45,7 +45,7 @@ if (args.Length != 0)
 
 var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
 {
-    Args = [], ContentRootPath = root, WebRootPath = Path.Combine(root, "wwwroot")
+    Args = [], ContentRootPath = root, WebRootPath = Path.Join(root, "wwwroot")
 });
 builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, 0));
 var app = builder.Build();
@@ -74,13 +74,13 @@ app.Use(async (context, next) =>
     }
 });
 app.UseStaticFiles();
-app.MapGet("/", () => Results.File(Path.Combine(root, "wwwroot", "index.html"), "text/html"));
+app.MapGet("/", () => Results.File(Path.Join(root, "wwwroot", "index.html"), "text/html"));
 app.MapGet("/api/snapshot", async (HttpContext context) =>
 {
     ReviewMonth month;
     try { month = ReviewMonth.Parse(context.Request.Query["month"].ToString()); }
     catch (ArgumentException) { return Results.BadRequest(new { error = "Use an exact YYYY-MM month." }); }
-    var path = Path.Combine(dataDirectory, $"snapshot-{month.Value}.json");
+    var path = Path.Join(dataDirectory, $"snapshot-{month.Value}.json");
     if (!File.Exists(path)) return Results.NotFound(new { error = "No snapshot for this month. Select Refresh data to read GitHub." });
     await using var stream = Snapshot.OpenRead(path);
     using var reader = new StreamReader(stream);
