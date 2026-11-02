@@ -1,10 +1,17 @@
 # Phase Gates
 
-**Status:** Proposed / pending Cyrus exact-SHA approval
+**Status:** Historical proposed release gates; not evidence that a phase has
+passed or a current live deployment/test status
+
+The public Astro website and Azure deployment configuration now exist. The
+proposed Phase 1 criteria below remain a test plan, not a claim that the site
+passes every gate. The approved domain policy is direct serving on all four
+Jamula.net/.com apex and www hostnames; it is not a Jamula.com-to-Jamula.net
+redirect.
 
 | Phase/state | Minimum scope | Exit evidence | Permitted deferral / disclosure | Approval and downstream block |
 |---|---|---|---|---|
-| 1 Public | Canonical Jamula.net; Jamula.com redirect; services/work/insights/about/contact; consent/analytics; accessible media; security/monitoring/recovery | J-01-03, J-09-13; WCAG 2.2 AA complete journeys; budgets; SEC-01/02/03/17-22/24/25; DNS/email and restore/incident tests; no Critical/High | Optional content/social channels may defer; no unsupported claim. Free host only after all hard gates | Cyrus exact SHA; counsel/CPA/broker gates. Phase 2 production waits on stable Phase 1 controls |
+| 1 Public | Canonical Jamula.net indexing; direct HTTPS serving on all four approved hostnames; services/work/insights/about/contact; consent/analytics; accessible media; security/monitoring/recovery | J-01-03, J-09-13; WCAG 2.2 AA complete journeys; budgets; SEC-01/02/03/17-22/24/25; DNS/email and restore/incident tests; no Critical/High | Optional content/social channels may defer; no unsupported claim. Free host only after all hard gates | Cyrus exact SHA; counsel/CPA/broker gates. Phase 2 production waits on stable Phase 1 controls |
 | 2 CRM/scheduling | Exportable lead/history ownership; suppression; M365/Teams scheduling and supported fallback | Phase 1 stays passing; J-04; CRM export/delete/rollback; staff MFA/roles; duplicate/reconciliation/outage tests | Zoom or CRM-native scheduling may defer; recording/transcription off unless separately approved | Cyrus vendor/data decisions; privacy/marketing counsel. Phase 3 does not use CRM IDs as identity/tenant keys |
 | 3 Preview | Dedicated identity, tenant portal, read-only files/AI; only passing connector packets exposed | J-05-07 for each exposed provider; SEC-04-20/22/24; two-tenant zero-leak suite; ACL/revocation/deletion/restore; AI citations/no actions/egress/cost kill switch | Unpassed providers hidden with approved packet and disclosure; no manual impersonation | Cyrus + Quality/reliability engineer + Identity/data engineer + Legal researcher/Responsible AI reviewer/Fact Checker; GA blocked until all three pass |
 | 3 GA | Portal plus **OneDrive, Google Drive and Box**, read-only customer AI | All three connector gates, production evidence period, SLO review, deletion/recovery and cross-tenant suites | None of the three connectors may be waived or weakened | Cyrus exact SHA and professional contract/privacy gates; Phase 4 independent but cannot weaken identity/tenant controls |

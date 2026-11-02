@@ -152,8 +152,10 @@ keeps the font budget at zero and satisfies the site CSP (`font-src 'self'`).
   understandable in a single column and with motion disabled.
 - **The recombine:** a full-bleed `paper-deep` band whose top edge is a heavy
   rule, with three short green corridors converging into it (one at ≤52rem).
-- Verified free of horizontal overflow at 320px, 768px, and 1440px, and at
-  200% zoom.
+- The layout is designed to reflow at 320px, 768px, and 1440px and at 200% zoom.
+  Repeatable built-site accessibility, link, and contrast regression checks are
+  still tracked in [issue #87](https://github.com/Jamula/Jamula-www-Website/issues/87);
+  this design description is not test evidence.
 
 ## Elevation & Depth
 
@@ -175,9 +177,9 @@ none` with the tick drawn via `::before`.
   Wordmark set in letterspaced small-caps; not sticky, so the page masthead
   owns the top.
 - **Site footer** — legal-baseline colophon (small-caps mark + copyright)
-  above a heavy rule. The previous placeholder `/privacy` and `/legal` links
-  were removed because those routes do not exist and are out of scope; restore
-  them only when approved legal/privacy pages ship.
+  above a heavy rule. Placeholder `/privacy` and `/legal` links are omitted
+  because those routes do not exist. Add links only when the corresponding
+  approved legal/privacy pages exist.
 - **Masthead** — pressed maker's mark (the approved favicon `J`, ~1.75rem,
   `alt=""` since the wordmark is adjacent) + wordmark; then the standing
   statement; then the green `Together — not as separate projects.` close and a
@@ -225,7 +227,7 @@ none` with the tick drawn via `::before`.
 | CSS (all, 2 files) | ≤ 20 KB | 13.1 KB / 3.3 KB |
 | Client JS | **0 KB (hard)** | 0 KB |
 | Downloaded fonts | **0 (hard)** | 0 (system stack) |
-| Homepage images | ≤ 5 KB | 1.1 KB (favicon `J`, only image) |
+| In-page homepage image | ≤ 5 KB | 1.1 KB (`J`; browser icon files excluded) |
 | Third-party requests | **0 (hard)** | 0 |
 
 Static output only; compatible with the site CSP (`default-src 'self'`,

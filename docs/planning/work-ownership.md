@@ -2,7 +2,12 @@
 
 “PR 2 work package” is the evaluation-plan phase name, not GitHub PR #2.
 
-**Status:** All six child workstreams #4-#9 and their review corrections are
+**Record status:** Historical ownership and review snapshot for the August 2026
+evaluation package. PR #10 has since merged; these issue/PR states and proposed
+next steps are not the current work ledger. See the [documentation index](../README.md)
+for current project context.
+
+At the snapshot, all six child workstreams #4-#9 and their review corrections were
 incorporated in reviewed commit
 `d02a2448a5438fb0e895c4c46166fe39c79ccb86`. Fact Checker's terminal FCR-018
 verdict is
@@ -23,7 +28,7 @@ Cyrus exact-head approval, and professional gates remain pending.
 This ledger preserves issue-body ownership and reviewer lockouts. An original
 author did not self-revise a rejected artifact.
 
-## Current DAG and merge order
+## Historical DAG and merge order
 
 `#3 parent -> #4 content || #5 experience || #6 customer platform || #7
 security/quality || #8 platform/cost || #9 legal -> initial Product lead synthesis ->
@@ -42,7 +47,7 @@ The issue lifecycle recorded on 2026-08-25 is: #4, #5, #6, #7, #8, and #9 are
 PR #10 remains draft. Issue #1 and draft PR #2 were not part of this closure
 action.
 
-| Order | Issue and durable original owner | Exclusive scope from issue body | Required reviewers | Current state |
+| Order | Issue and durable original owner | Exclusive scope from issue body | Required reviewers | State at 2026-08-25 snapshot |
 |---:|---|---|---|---|
 | 1a | [#4 Content lead — content](https://github.com/Jamula/Jamula-www-Website/issues/4) | `docs/content/content-strategy.md`, `multimedia-social-plan.md`, `editorial-workflow.md`, `founder-profile-draft.md` | Experience lead, Legal researcher, Responsible AI reviewer, Fact Checker | Closed completed 2026-08-25 after commit/PR incorporation comment; approval gates remain |
 | 1b | [#5 Experience lead — experience](https://github.com/Jamula/Jamula-www-Website/issues/5) | `docs/experience/*` | Content lead, Quality/reliability engineer, Fact Checker | Closed completed 2026-08-25 after commit/PR incorporation comment; approval gates remain |

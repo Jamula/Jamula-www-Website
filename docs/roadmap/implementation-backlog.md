@@ -1,13 +1,16 @@
 # Draft Implementation Backlog
 
-**Status:** Docs-only proposal; do not create implementation issues or begin production work before Cyrus approves the recommendation and ownership matrix.
+**Status:** Historical Phase 1-5 proposal, not the current backlog or a live
+authorization. The Astro public site is implemented; website follow-ups are
+tracked in the current GitHub issues linked from [the documentation index](../README.md).
+The later customer-platform epics below remain proposals, not active assignments.
 
 | Order | Draft epic | Proposed owner / reviewers | Depends on | Acceptance summary |
 |---:|---|---|---|---|
 | 1 | Close platform evidence and quotes | Platform engineer / Product lead, Quality/reliability engineer, Fact Checker | Decision framework approval | Current terms/quotes; synthetic host portability and WordPress restore; teardown; recommendation rerun |
 | 2 | Content model and accessible design system | Experience lead / Content lead, Quality/reliability engineer | ADR-001 proposal | Stable routes/schema, responsive components, WCAG manual matrix, transfer budgets, no-script baseline |
 | 3 | Editorial, rights and claims workflow | Content lead / Experience lead, Legal researcher, Responsible AI reviewer, Fact Checker | Professional/public wording decisions | Approval hashes, asset ledger, expiry, correction/takedown, channel controls; no claim bypass |
-| 4 | Domain, DNS, mail and main-only delivery | Platform engineer / Quality/reliability engineer, Fact Checker | Host selection | Both-domain TLS/redirect, DNSSEC/CAA, mail authentication, immutable artifact/provenance, rollback |
+| 4 | Domain, DNS, mail and main-only delivery | Platform engineer / Quality/reliability engineer, Fact Checker | Host selection | Four-host HTTPS serving/canonical behavior, DNSSEC/CAA, mail authentication, immutable artifact/provenance, rollback |
 | 5 | Phase 1 contact, consent and observability | Platform engineer / Identity/data engineer, Experience lead, Quality/reliability engineer | 2-4 | Minimized form, anti-abuse/idempotency, reliable mail, GPC/consent, redacted telemetry, SLO/runbook |
 | 6 | Phase 1 security/recovery release gate | Quality/reliability engineer / all domain owners | 2-5 | SEC Phase 1 suite, clean-room restore, incident tabletop, accessibility/performance journeys |
 | 7 | CRM and scheduling adapters | Identity/data engineer / Platform engineer, Quality/reliability engineer, Legal researcher, Experience lead | Phase 1 GA, vendor approval | CRM export/delete/suppression, Bookings/Teams flow, accessible fallback, reconciliation |

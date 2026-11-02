@@ -1,18 +1,30 @@
 # Third-party Notices
 
-## Historical Squad CLI material
+## Squad CLI integration
 
-The Squad framework, agent, template, and workflow integration previously in
-this repository has been removed from the current working tree. This notice is
-retained for source and repository-history attribution.
+The current tree includes Squad-generated and Jamula-configured integration
+files. The repository history records the integration being reintroduced in
+[#82](https://github.com/Jamula/Jamula-www-Website/pull/82) and upgraded to
+`@bradygaster/squad-cli@1.1.0` in
+[#77](https://github.com/Jamula/Jamula-www-Website/pull/77); `.mcp.json` pins
+that package version. Current generated or adapted paths include `.squad/`,
+`.github/agents/squad.agent.md`, `.github/workflows/squad-*.yml`,
+`.github/workflows/sync-squad-labels.yml`, `.mcp.json`, `.gitattributes`, and
+`.vscode/settings.json`. The content is not all unmodified upstream material:
+team configuration, charters, project instructions, routing, workflow
+hardening, and privacy/security examples include Jamula-specific changes.
 
-- Package: `@bradygaster/squad-cli`
-- Version: `0.12.0`
-- Source: https://github.com/bradygaster/squad
-- Source tag commit: `54f699f252e826b385b1d406a611a14a5fba14d6`
-- License: MIT
-- Previously included or derived paths were `.squad/`, `.github/agents/squad.agent.md`, generic `.github/skills/`, Squad-specific `.github/workflows/`, `.github/copilot-instructions.md`, `.mcp.json`, `.gitattributes`, and `.vscode/settings.json`.
-- Previous Jamula modifications included project roster/routing/casting, main-only git guidance, project instructions, workflow hardening, machine-readable routing, secret/PII example sanitization, omission of an unused unsafe auth-isolation template, and project-specific governance.
+The Squad source project is https://github.com/bradygaster/squad and its
+generated material is distributed under MIT. Preserve its notices and the
+project-specific attribution when copying or redistributing these files. Some
+agent charter files separately identify their `agency-agents` source in their
+file headers.
+
+The earlier `@bradygaster/squad-cli` `0.12.0` integration was removed in
+[#79](https://github.com/Jamula/Jamula-www-Website/pull/79). Its historical
+source tag commit was `54f699f252e826b385b1d406a611a14a5fba14d6`; that version
+and its removed file set are repository-history provenance, not the current
+package pin.
 
 MIT License
 

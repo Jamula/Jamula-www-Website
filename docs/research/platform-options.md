@@ -1,13 +1,17 @@
 # Platform Options Research
 
-**Status:** Exploratory documented research; no score, rank, finalist or
-architecture decision is eligible
+**Status:** Historical exploratory research snapshot; no score, rank, finalist
+or durable architecture decision is eligible
 **Evidence cut-off:** 2026-08-24 Pacific
 **Context:** `Refs #3; child #8`; Cycle 2 remediation for FCR-001, FCR-002 and
 FCR-007
 
-No account, credential, live service, paid resource, deployment, production code
-or production proof was created.
+This research snapshot did not create an account, credential, live service, paid
+resource, deployment, or production proof. The repository has since acquired a
+current Astro website and Azure Static Web Apps deployment configuration; see
+the [current deployment record](../architecture/two-free-static-apps.md).
+Neither implementation nor configuration retroactively validates the market
+comparison or its unscored vendor claims.
 
 ## Method status and reviewer correction
 
@@ -47,8 +51,9 @@ combination may be scored only after evidence supports every gate:
    machine-readable export; DNS and URLs can move.
 6. **Delivery:** production is a reviewed immutable state derived from protected
    `main`; previews never become production.
-7. **Canonical routing:** Jamula.net is canonical and Jamula.com redirects over
-   valid HTTPS with safe path/query preservation.
+7. **Canonical routing:** directly serve all four approved Jamula.net/.com apex
+   and www hostnames over HTTPS; Jamula.net is canonical for indexing, and HTTP
+   upgrades remain on the same hostname.
 
 `Conditional` records a future test, not a pass. `Blocked` is unresolved. Design
 intent and vendor documentation are not mechanism or production evidence.
@@ -97,7 +102,7 @@ but no usable Standard USD amount was retrieved [S02].
 
 | Shape | Material unresolved hard-gate evidence | Disposition |
 |---|---|---|
-| Custom static + any named host/plan | Exact commercial terms; complete accessibility journey; Jamula.com redirect; restore/rollback; support cadence | **Unscored** |
+| Custom static + any named host/plan | Exact commercial terms; complete accessibility journey; four-host policy verification; restore/rollback; support cadence | **Unscored** |
 | WordPress.com Business | Exact price/terms; full export/restore; plugin/theme controls; equivalent protected-main publication; routing/accessibility | **Unscored** |
 | Named managed WordPress | Named plan/contract; security/update SLA; export/clean-host restore; main-only publication; accessibility/routing | **Unscored** |
 | Self-hosted WordPress | Exact host/operations model; patch/incident/recovery staffing; accessibility/routing | **Unscored** |
@@ -120,12 +125,13 @@ DNS audit and takeover checks. Namecheap documents free 2FA and custom-DNS DS
 management narrowly [S18-S19]; registry lock, renewals and exact mailbox prices
 remain quote items.
 
-Both domains need valid certificates. Jamula.net is canonical; Jamula.com needs a
-future end-to-end permanent redirect test. Azure documents custom domains,
-automatic TLS and configurable redirects, not Jamula path/query behavior
-[S22-S23]. Workforce and transactional mail remain separate; SPF, DKIM, staged
-DMARC and MTA-STS/TLS-RPT are future implementation tests. Prices remain blocked
-[S24-S25].
+All four approved hostnames need valid certificates and direct HTTPS serving;
+Jamula.net remains canonical for indexing. HTTP upgrades must stay on the
+requested hostname. The repository configuration does not prove live DNS/TLS or
+host behavior. Azure documents custom domains, automatic TLS and configurable
+redirects, not Jamula's live behavior [S22-S23]. Workforce and transactional
+mail remain separate; SPF, DKIM, staged DMARC and MTA-STS/TLS-RPT are future
+implementation tests. Prices remain blocked [S24-S25].
 
 ### Protected `main`, observability and sustainability
 

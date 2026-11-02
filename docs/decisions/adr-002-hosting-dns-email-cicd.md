@@ -1,9 +1,17 @@
 # ADR-002: Hosting, DNS, Email and CI/CD
 
-**Status:** Proposed / pending Cyrus exact-SHA approval
+**Status:** Historical proposal; the current deployment and domain policy are
+recorded separately
 
 ## Context
-Jamula.net must be canonical, Jamula.com must redirect, and only protected `main` may produce production.
+Jamula.net is canonical for indexing. The approved policy directly serves all
+four Jamula.net/.com apex and www hostnames over HTTPS; HTTP upgrades to HTTPS
+on the same hostname. Only protected `main` produces production. See the current
+[deployment and domain record](../architecture/two-free-static-apps.md).
+
+The current site uses two Azure Static Web Apps. This ADR's vendor-neutral
+evaluation proposal does not supersede that implementation or authorize a
+replacement.
 
 ## Options
 No provider is selected. Evaluate registrar, authoritative DNS, TLS/edge,
@@ -22,8 +30,9 @@ a checksum-bound content/configuration export, dependency/add-on inventory,
 automation record and platform release ID. Unreviewed dashboard publication must
 be disabled or reconciled into that main-bound release.
 
-Require HTTPS on both domains, permanent safe path/query redirect to Jamula.net,
-DNSSEC/DS, CAA, registrar lock/recovery, phishing-resistant MFA where supported,
+Require HTTPS direct serving on all four approved hostnames, Jamula.net
+canonical metadata, and same-host HTTP-to-HTTPS upgrades; do not redirect
+Jamula.com to Jamula.net. Also require DNSSEC/DS, CAA, registrar lock/recovery, phishing-resistant MFA where supported,
 SPF/DKIM/DMARC staged to enforcement, and MTA-STS/TLS-RPT evaluation. These gates
 apply to every retained platform fixture. Incomplete or inaccessible evidence
 blocks selection and cannot silently exclude or penalize a service or platform.
@@ -60,6 +69,6 @@ exit risk. Neither posture nor any provider has decision-grade comparative
 evidence.
 
 ## Reconsideration trigger
-Redirect/restore failure, terms/price change, DNS/mail recovery weakness,
+Four-host TLS/serving or restore failure, terms/price change, DNS/mail recovery weakness,
 non-main drift, release-record gaps, quota breach, or two workload metrics above
 band for two months.

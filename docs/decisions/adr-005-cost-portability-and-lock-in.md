@@ -1,12 +1,19 @@
 # ADR-005: Cost, Portability, and Lock-In Controls
 
-**Status:** Proposed
+**Status:** Historical cost/portability proposal; not a current pricing or
+infrastructure record
 **Date:** 2026-08-25
-**Approval:** Pending Cyrus approval of this exact artifact SHA; no platform or vendor is selected
+**Approval:** No durable platform or vendor decision is recorded in this
+historical proposal; current hosting is documented separately
 
 ## Context
 
 Sticker price omits labor, migration, renewal, verification, professional review, tax, overages, operations, and exit work. Portability claims also vary from downloadable content to a genuinely reproducible service. The prior exploratory platform scoring used a rubric and workload that Cyrus had not preregistered; every exact platform/plan combination therefore remains unscored.
+
+The public website is now implemented in Astro with Azure Static Web Apps
+deployment configuration. This ADR's fixture and cost analysis remain
+unexecuted proposals; do not infer a current bill, live-service condition, or
+verified free-tier eligibility from them.
 
 ## Options
 
@@ -33,7 +40,9 @@ These revised ranges are planning envelopes, not quotes, platform comparisons, o
 | Azure-aligned | $1,450-$3,875 | $29.4k-$113.5k | $67.0k-$230.5k |
 | Growth public site | $1,750-$12,700 | $39.0k-$267.4k | $85.0k-$604.2k |
 
-The cost model's no-live-service/free research state is a documented mechanism and research envelope, not a monthly production scenario.
+The cost model's dated research assumptions are not a monthly production
+scenario, current quote, or evidence that the present site has no operating
+costs.
 
 Each future quote packet must separately show implementation/migration, recurring vendor charges, maintenance and publishing labor, observability, backup/recovery, security/accessibility/privacy verification, professional review, registrar/DNS/email, renewal, tax, overage, contingency, and exit/migration labor.
 
@@ -71,7 +80,9 @@ The closed candidate register in the [decision framework](../architecture/decisi
 1. export Jamula-owned content, media, metadata, redirects, forms/leads where applicable, configuration, analytics history, audit/evidence, and billing/contract records;
 2. verify completeness, integrity, usable formats, relationships, timestamps, and licenses;
 3. rebuild or redeploy in an independent target from the retained artifact and documented dependencies;
-4. rehearse DNS cutover and rollback while preserving Jamula.net and the Jamula.com HTTPS path/query redirect;
+4. rehearse DNS cutover and rollback while preserving direct HTTPS serving on
+   all four approved hostnames, Jamula.net canonical metadata, and same-host
+   HTTP-to-HTTPS upgrades;
 5. measure elapsed time, specialist/vendor assistance, downtime, fees, manual remediation, and residual proprietary dependencies; and
 6. verify deletion, account closure, backup expiry, and retained legal/financial evidence.
 

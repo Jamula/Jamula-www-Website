@@ -10,7 +10,10 @@ Unless a path is identified below or carries its own notice, Jamula-authored sou
 
 Third-party files remain under their original licenses. See `THIRD_PARTY_NOTICES.md` and `docs/legal/license-inventory.md`.
 
-- Historical Squad-generated or derived files remain in repository history under their original terms; current-tree provenance is documented in `THIRD_PARTY_NOTICES.md`.
+- The current Squad-generated or adapted integration files remain under their
+  original MIT terms; the earlier 0.12.0 integration is retained only in
+  repository history. See `THIRD_PARTY_NOTICES.md` for current paths and source
+  history.
 - `.github/skills/cloud-solution-architect/` remains subject to Microsoft's MIT license.
 
 ## Reserved Jamula content

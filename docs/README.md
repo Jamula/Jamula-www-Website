@@ -1,164 +1,96 @@
 # Jamula Website Documentation
 
-**Maintenance note:** Responsibilities are expressed as functional roles rather
-than former agent personas. Historical issue links, commit identifiers, review
-findings, and approval gates are retained; role-name normalization is not a new
-review or approval of the current files. Historical exact-text revisions remain
-available through their recorded commits.
+This index separates the current website from the historical platform-evaluation
+package. The research, legal, cost, security, and roadmap materials below are
+dated planning records, not evidence that a control, vendor, phase, professional
+review, or public claim is current or approved. Check each artifact's status and
+source date before relying on it.
 
-## Status
+## Current project state
 
-All six child workstreams, [#4](https://github.com/Jamula/Jamula-www-Website/issues/4)
-through [#9](https://github.com/Jamula/Jamula-www-Website/issues/9), and their
-review corrections are incorporated in reviewed commit
-`d02a2448a5438fb0e895c4c46166fe39c79ccb86`. Each child received an
-incorporation comment naming that commit and [draft PR
-#10](https://github.com/Jamula/Jamula-www-Website/pull/10), then was explicitly
-closed as completed on 2026-08-25. Fact Checker's
-terminal FCR-018 verdict is **CLEAR: 0 unresolved content findings / 0
-unresolved ledger findings / 0 new findings**. The independent adversarial
-FCR-018 recheck is also **CLEAR: 0 unresolved content findings / 0 unresolved
-ledger findings / 0 new findings**. Prior Reject/Revise dispositions remain
-preserved as historical review evidence; FCR-018 and the remaining N-11
-owner-provenance defect are resolved.
+- The repository contains a static Astro site under `www/`; local commands are
+  in the root [README](../README.md).
+- The current deployment workflow builds the website from the repository. The
+  approved domain policy directly serves all four Jamula.net/.com apex and www
+  hostnames over HTTPS; `jamula.net` is canonical for indexing, and HTTP upgrades
+  on the same hostname. This is configuration and policy documentation, not
+  proof of live DNS, TLS, secret, or end-to-end availability.
+- The approved hosting configuration uses two Free Azure Static Web Apps. The
+  site must incur zero incremental paid operating-service spend; existing domain
+  renewals and CI allowances are separate. Free-tier quotas and absence of an
+  SLA remain constraints, not guarantees.
+- The homepage currently has no contact mechanism. The remaining homepage
+  title, contact path, built-site accessibility/SEO/link/contrast regression
+  checks, and four-host monitoring are tracked in open issues
+  [#86](https://github.com/Jamula/Jamula-www-Website/issues/86),
+  [#89](https://github.com/Jamula/Jamula-www-Website/issues/89),
+  [#87](https://github.com/Jamula/Jamula-www-Website/issues/87), and
+  [#88](https://github.com/Jamula/Jamula-www-Website/issues/88), respectively
+  (state checked 2026-11-01; check GitHub for current status).
+- Platform-evaluation PR [#10](https://github.com/Jamula/Jamula-www-Website/pull/10)
+  and bootstrap PR [#2](https://github.com/Jamula/Jamula-www-Website/pull/2)
+  are merged. Their historical drafts, review findings, and approval records
+  remain part of the archive; they are not current open PRs or work instructions.
+- A Blazor-based site with build-time HTML articles has been discussed as a
+  future direction. Astro remains the current implementation; no Blazor
+  migration or prototype is authorized by the proposal.
 
-Responsible AI reviewer's remediation re-review remains **Green: 4 resolved / 0 unresolved** only
-for the six fingerprinted working-tree artifacts. The original Red remains
-preserved as review history. Canonical Git blob OIDs for these changed ledger artifacts,
-the exact final PR-head SHA, Cyrus approval, and all professional gates remain
-pending; a material change to a fingerprinted file reopens its affected Responsible AI reviewer
-finding.
+## Current implementation and operating guidance
 
-[Issue #3](https://github.com/Jamula/Jamula-www-Website/issues/3) remains open
-while PR #10 is draft; issues #4-#9 are closed as completed. PR #10 targets
-`main` from branch `u/cyrusjamula/3-website-platform-evaluation` and is
-intentionally stacked on unmerged [draft PR
-#2](https://github.com/Jamula/Jamula-www-Website/pull/2)
-(`cyrusjamula-jamula-website-platform-evaluation`), so its diff will narrow
-after PR #2 merges. Issue #1 and PR #2 were not part of the child closure
-action. No PR was merged and no production deployment occurred. No platform,
-framework, host, CMS, CRM, scheduler, connector, payment processor, ADR, public
-claim, founder wording, legal text, professional conclusion, implementation, or
-deployment is accepted or approved.
+<a id="integration-and-governance"></a>
 
-## PR 2 synthesis
+- [Two Static Web Apps: domain and deployment boundary](architecture/two-free-static-apps.md)
+- [Platform portability and exit contract](architecture/platform-portability.md) —
+  research fixture only; not a current infrastructure inventory
+- [Acceptance journeys](experience/acceptance-journeys.md) and
+  [accessibility, SEO, and performance requirements](experience/accessibility-seo-performance.md) —
+  proposed requirements and test plans, not proof of passing results
+- [Security and quality strategy](security/quality-strategy.md) —
+  proposed controls and future tests
+- [Public claims register](content/public-claims-register.md) —
+  owner/reviewer approval is required before publication
+- [License and provenance inventory](legal/license-inventory.md) and
+  [repository license scope](../LICENSE_SCOPE.md)
 
-Here, “PR 2 work package” is the evaluation-plan phase name, not GitHub PR #2.
+## Historical evaluation and planning documents
 
-- [Business and product requirements](requirements/business-product-requirements.md)
-- [Decision framework](architecture/decision-framework.md) — proposed method;
-  every option remains unscored
-- [Neutral evidence-cycle recommendation](architecture/recommendation.md) — no
-  platform selected
-- [Proposed ADR index](decisions/README.md)
-- [Phase gates](roadmap/phase-gates.md)
-- [Draft implementation backlog](roadmap/implementation-backlog.md)
-- [Proposed ownership matrix](roadmap/ownership-matrix.md)
+<a id="pr-2-synthesis"></a>
+<a id="child-research"></a>
+<a id="proposed-adrs"></a>
 
-## Child research
+The evaluation work package was merged in August 2026. Its exact source dates
+and proposal statuses remain in each document. The prior Jamula.com-to-Jamula.net
+redirect assumption is superseded by the direct-serving policy in
+[Two Static Web Apps](architecture/two-free-static-apps.md). Do not use the
+historical redirect as a current requirement.
 
-The durable mapping remains [#4 Content lead
-content](https://github.com/Jamula/Jamula-www-Website/issues/4), [#5 Experience lead
-experience](https://github.com/Jamula/Jamula-www-Website/issues/5), [#6 Identity/data engineer
-customer platform](https://github.com/Jamula/Jamula-www-Website/issues/6), [#7
-Quality/reliability engineer security/quality](https://github.com/Jamula/Jamula-www-Website/issues/7),
-[#8 Platform engineer platform/cost](https://github.com/Jamula/Jamula-www-Website/issues/8),
-and [#9 Legal researcher
-legal](https://github.com/Jamula/Jamula-www-Website/issues/9). Independent revision
-ownership and lockouts are in [work ownership](planning/work-ownership.md).
-
-| Domain | Documents |
+| Area | Documents |
 |---|---|
-| Content | [strategy](content/content-strategy.md), [editorial workflow](content/editorial-workflow.md), [multimedia/social](content/multimedia-social-plan.md), [founder placeholder](content/founder-profile-draft.md), [homepage copy draft](content/homepage-copy-draft.md) |
-| Experience | [requirements](experience/experience-requirements.md), [accessibility/SEO/performance](experience/accessibility-seo-performance.md), [acceptance journeys](experience/acceptance-journeys.md) |
-| Customer platform | [options](research/customer-platform-options.md), [sources](research/customer-platform-source-register.md), [architecture](architecture/customer-platform.md), [data inventory](privacy/data-inventory.md), [lifecycle](privacy/data-lifecycle.md), [payments](payments/phase-4-evaluation.md) |
-| Connector packets | [index](spikes/connectors/README.md), [OneDrive](spikes/connectors/onedrive.md), [Google Drive](spikes/connectors/google-drive.md), [Box](spikes/connectors/box.md) — all blocked/deferred; no live mechanism spike |
-| Security/quality | [threat model](security/threat-model.md), [controls/tests](security/control-test-matrix.md), [incident response](security/incident-detection-response.md), [backup/recovery](security/backup-recovery.md), [supply chain](security/supply-chain.md), [quality](security/quality-strategy.md) |
-| Platform/cost | [options](research/platform-options.md), [sources](research/platform-source-register.md), [cost model](cost/cost-model.md), [reference workload RWL-2026-08-25.3](cost/reference-workloads.md), [portability](architecture/platform-portability.md) |
-| Legal | [jurisdictions](legal/jurisdiction-matrix.md), [checklist](legal/compliance-checklist.md), [legal-page requirements](legal/legal-pages-requirements.md), [content/IP](legal/content-ip-review.md), [phase gates](legal/phase-review-gates.md) |
+| Planning and requirements | [Evaluation plan](planning/evaluation-plan.md), [business and product requirements](requirements/business-product-requirements.md), [work ownership](planning/work-ownership.md), [phase gates](roadmap/phase-gates.md), [implementation backlog](roadmap/implementation-backlog.md), [ownership matrix](roadmap/ownership-matrix.md) |
+| Architecture and decisions | [Customer platform](architecture/customer-platform.md), [decision framework](architecture/decision-framework.md), [recommendation](architecture/recommendation.md), [decision index](decisions/README.md), [ADR-001](decisions/adr-001-rendering-and-content.md), [ADR-002](decisions/adr-002-hosting-dns-email-cicd.md), [ADR-003](decisions/adr-003-customer-platform-phases.md), [ADR-004](decisions/adr-004-privacy-security-reliability.md), [ADR-005](decisions/adr-005-cost-portability-and-lock-in.md), [ADR-006](decisions/adr-006-repository-content-and-legal-gates.md), [approval register](decisions/approvals.md) |
+| Content and company | [Operating principles](company/operating-principles.md), [public values draft](company/public-values-draft.md), [content strategy](content/content-strategy.md), [editorial workflow](content/editorial-workflow.md), [multimedia and social plan](content/multimedia-social-plan.md), [founder profile draft](content/founder-profile-draft.md), [founder source register](content/founder-source-register.md), [homepage copy draft](content/homepage-copy-draft.md) |
+| Experience | [Experience requirements](experience/experience-requirements.md), [acceptance journeys](experience/acceptance-journeys.md), [accessibility, SEO, and performance](experience/accessibility-seo-performance.md) |
+| Customer platform and privacy | [Customer-platform options](research/customer-platform-options.md), [customer-platform source register](research/customer-platform-source-register.md), [data inventory](privacy/data-inventory.md), [data lifecycle](privacy/data-lifecycle.md), [connector index](spikes/connectors/README.md), [OneDrive](spikes/connectors/onedrive.md), [Google Drive](spikes/connectors/google-drive.md), [Box](spikes/connectors/box.md), [payments evaluation](payments/phase-4-evaluation.md) |
+| Security and recovery | [Threat model](security/threat-model.md), [control/test matrix](security/control-test-matrix.md), [incident detection and response](security/incident-detection-response.md), [backup and recovery](security/backup-recovery.md), [supply chain](security/supply-chain.md), [quality strategy](security/quality-strategy.md) |
+| Platform and cost research | [Platform options](research/platform-options.md), [platform source register](research/platform-source-register.md), [cost model](cost/cost-model.md), [reference workloads](cost/reference-workloads.md), [portability](architecture/platform-portability.md) |
+| Legal issue spotting | [Jurisdiction matrix](legal/jurisdiction-matrix.md), [compliance checklist](legal/compliance-checklist.md), [legal-page requirements](legal/legal-pages-requirements.md), [content/IP review](legal/content-ip-review.md), [phase review gates](legal/phase-review-gates.md), [professional review register](legal/professional-review-register.md), [license inventory](legal/license-inventory.md) |
+<a id="shared-registers"></a>
+<a id="independent-reviews"></a>
 
-## Proposed ADRs
+| Review and provenance | [Artifact manifest](artifacts-manifest.md), [Fact Checker report](reviews/fact-check-report.md), [Responsible AI review](reviews/rai-review.md), [adversarial review](reviews/adversarial-review.md) |
 
-- [ADR-001 — rendering and content](decisions/adr-001-rendering-and-content.md)
-- [ADR-002 — hosting, DNS, email and CI/CD](decisions/adr-002-hosting-dns-email-cicd.md)
-- [ADR-003 — customer-platform phases](decisions/adr-003-customer-platform-phases.md)
-- [ADR-004 — privacy, security and reliability](decisions/adr-004-privacy-security-reliability.md)
-- [ADR-005 — cost, portability and lock-in](decisions/adr-005-cost-portability-and-lock-in.md)
-- [ADR-006 — repository, content and legal gates](decisions/adr-006-repository-content-and-legal-gates.md)
+## Freshness and approval limits
 
-All ADRs are proposed. None is accepted.
+<a id="core-governance"></a>
 
-## Independent reviews
+Research and source registers have evidence cut-offs in August 2026. Vendor
+prices, quotas, legal requirements, and public-source claims can change; those
+records are not live quotes or current legal advice. Verify the primary source
+again before relying on a time-sensitive claim. No source date, issue closure,
+review verdict, or merged documentation PR by itself approves a public claim,
+professional conclusion, migration, production action, or future product phase.
 
-- [Fact Checker report](reviews/fact-check-report.md) — original and intermediate
-  **REVISE** history preserved; terminal FCR-018 verdict **CLEAR**, with **0
-  unresolved content findings / 0 unresolved ledger findings / 0 new findings**
-- [Responsible AI review](reviews/rai-review.md) — original **REJECT** verdict
-  preserved; remediation re-review is **GREEN**, 4 resolved / 0 unresolved,
-  for the fingerprinted working-tree revision
-- [Adversarial rubber-duck findings/remediation register](reviews/adversarial-review.md)
-  — original **Reject** and intermediate **Revise** history preserved;
-  independent adversarial FCR-018 recheck **CLEAR**, with **0 unresolved content
-  findings / 0 unresolved ledger findings / 0 new findings**
-
-## Shared registers
-
-- [Approval register](decisions/approvals.md)
-- [Public claims](content/public-claims-register.md)
-- [Founder-source placeholder](content/founder-source-register.md)
-- [Professional review](legal/professional-review-register.md)
-- [Repository license/provenance inventory](legal/license-inventory.md)
-
-Every approval for this work package and every professional disposition remains
-pending.
-
-## Integration and governance
-
-- [Documentation index (this file)](README.md)
-- [Complete artifact manifest](artifacts-manifest.md)
-- [PR 2 work-package ownership, lockouts, issue state and residual actions](planning/work-ownership.md)
-
-The manifest covers every Markdown file under `docs/`; there are no intentionally
-unindexed documentation artifacts. Coverage is **61/61**.
-
-## Lifecycle sequence
-
-1. **Complete:** validate and incorporate the reviewed domain package in commit
-   `d02a2448a5438fb0e895c4c46166fe39c79ccb86`.
-2. **Complete:** open draft PR #10 to `main`; comment on #4-#9 with the reviewed
-   commit and PR, then explicitly close those child issues on 2026-08-25.
-3. **Pending:** validate these ledger-only edits, commit and push them. That next
-   ledger-only commit will become the candidate final head only after validation
-   and push; `d02a2448a5438fb0e895c4c46166fe39c79ccb86` is not the final PR head.
-4. **Pending:** verify PR #10's exact head, draft status, and `main` base; record
-   the changed ledger artifacts' canonical blob OIDs from that head and report
-   the exact full candidate-final-head SHA externally for Cyrus.
-5. **Pending:** keep #3 open and every decision and professional gate pending.
-   Cyrus must approve that exact full SHA. Do not merge or deploy.
-
-## Core governance
-
-- [Approved evaluation plan](planning/evaluation-plan.md) — historical plan
-  approval only; its legacy filesystem hash is not portable proof for this work
-  package
-- [Provisional operating principles](company/operating-principles.md)
-- [Draft public values](company/public-values-draft.md)
-
-## Approval identity
-
-After commit, canonical approval identifiers are each artifact's Git blob OID at
-the exact PR head plus the full PR head commit SHA. Raw filesystem SHA-256 values
-can differ across CRLF/LF checkouts and are not canonical. See the [approval
-register](decisions/approvals.md).
-
-## Operational exceptions
-
-Standard-location files remain indexed here: root `LICENSE`, `LICENSE_SCOPE.md`,
-`TRADEMARKS.md`, `CONTRIBUTING.md`, `THIRD_PARTY_NOTICES.md`; `.github/`.
-
-## Branch and deployment model
-
-`main` is the only persistent branch and sole production CI/CD source. A draft PR
-validates work and may create isolated ephemeral previews; it authorizes no
-production deployment. Jamula.net remains the proposed canonical domain and
-Jamula.com the matching redirect, subject to future DNS/TLS tests.
+`artifacts-manifest.md`, `planning/work-ownership.md`, and
+`decisions/approvals.md` retain the August evaluation package's authorship,
+review, and lifecycle history. Their historical status fields are not a live
+work ledger. GitHub issues are the current durable follow-up ledger.
