@@ -74,8 +74,12 @@ No customer or revenue analytics are collected.
 Exact source health, period bounds, observation times, item URLs, detailed cost
 provenance and median merge time remain in `.local\snapshot-YYYY-MM.json` and the
 read-only `/api/snapshot?month=YYYY-MM` endpoint. Use
-`dotnet run -- --snapshot YYYY-MM` for another month's audited data; there is no
-historical-month navigation on the executive page.
+`dotnet run -- --snapshot YYYY-MM` for another month's audited data. To view it,
+open `http://127.0.0.1:<port>/?month=YYYY-MM`, for example `?month=2026-10`.
+The page has no month-picker controls. Refresh stays scoped to the requested
+month. Completed months show full-month activity; their open-work counts and
+management priorities are explicitly current, not reconstructed historical
+backlog or a statement about which constraints existed during that month.
 
 Only fixed endpoints are exposed. A same-origin POST with `X-MBR-Refresh: 1`
 refreshes; GET only reads local data. Month input never becomes a shell command.

@@ -1,18 +1,23 @@
 const $ = id => document.getElementById(id);
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-const month = new Date().toISOString().slice(0, 7);
+const month = new URLSearchParams(location.search).get("month") ?? new Date().toISOString().slice(0, 7);
+const validMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(month) &&
+  Number(month.slice(0, 4)) >= 2000 && Number(month.slice(0, 4)) <= 9998;
 const monthStart = new Date(`${month}-01T00:00:00Z`);
 let snapshot;
 let refreshFailed = false;
 
 function text(id, value) { $(id).textContent = value; }
-text("month-title", new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(monthStart));
+if (validMonth) text("month-title", new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(monthStart));
 
 function render(data) {
   snapshot = data;
   $("dashboard").hidden = false;
-  text("coverage", "Month to date / repository activity");
+  const historical = new Date(data.periodEnd) <= new Date(data.observedAt);
+  text("coverage", historical ? "Full month / repository activity" : "Month to date / repository activity");
+  text("open-coverage", historical ? "Current workload, not month-end backlog" : "Current workload");
+  text("attention-title", historical ? "Needs attention now" : "Needs attention");
   for (const [id, items] of [["merged-prs", data.pulls.completed], ["completed-issues", data.issues.completed],
     ["active-prs", data.pulls.active], ["active-issues", data.issues.active]]) {
     text(id, items ? number.format(items.length) : "Unknown");
@@ -22,7 +27,8 @@ function render(data) {
   const contactPathOpen = data.issues.active?.some(item => item.number === 86) ?? false;
   const issuesKnown = data.issuesSource.status === "ok";
   text("readout-title", !issuesKnown ? "Business priorities need current evidence."
-    : contactPathOpen ? "The homepage inquiry path is still open work."
+    : contactPathOpen ? historical ? "Current priority: the homepage inquiry path remains open."
+      : "The homepage inquiry path is still open work."
     : "Repository activity is recorded. Business impact is not measured.");
   text("readout", !issuesKnown ? "Issue data is unavailable; this review cannot confirm the commercial priority."
     : contactPathOpen ? "Proposed focus: confirm the owner-approved contact destination and wording, then publish the inquiry path."
@@ -32,8 +38,9 @@ function render(data) {
   const value = (key, money = false) => {
     const m = measures.get(key);
     if (!m) return "Not tracked";
+    const coverageEnd = Math.min(new Date(data.periodEnd).getTime(), new Date(data.observedAt).getTime());
     const period = new Date(m.coveredFrom) > new Date(data.periodStart) ||
-      new Date(m.coveredThrough) < new Date(data.observedAt) ? "partial period" : "month to date";
+      new Date(m.coveredThrough).getTime() < coverageEnd ? "partial period" : historical ? "full month" : "month to date";
     const formatted = money ? m.value > 0 && m.value < 0.01 ? "< $0.01" : usd.format(m.value)
       : number.format(m.value);
     return `${formatted} (${m.basis}, ${period})`;
@@ -114,4 +121,9 @@ async function load(refresh) {
   }
 }
 $("refresh").addEventListener("click", () => void load(true));
-void load(false);
+if (validMonth) void load(false);
+else {
+  $("refresh").disabled = true;
+  $("status").dataset.error = "true";
+  text("status", "Invalid review month. Use ?month=YYYY-MM in the page address.");
+}

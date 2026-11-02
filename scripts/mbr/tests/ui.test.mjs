@@ -35,7 +35,7 @@ const fixture = () => ({
   costs: { status: "unknown", detail: "No cost import.", measurements: [] }
 });
 const flush = () => new Promise(resolve => setImmediate(resolve));
-async function page(responses = [fixture()]) {
+async function page(responses = [fixture()], search = "") {
   const elements = new Map([...html.matchAll(/\bid="([^"]+)"/g)].map(([, id]) => [id, new Element()]));
   const get = id => {
     assert.ok(elements.has(id), `Element ${id} must exist in the actual page`);
@@ -51,7 +51,8 @@ async function page(responses = [fixture()]) {
       if (response instanceof Error) throw response;
       return { ok: !response.error, status: response.error ? 404 : 200, json: async () => response };
     },
-    Intl, Date: Clock, Number, Math, Map, Object, Error, encodeURIComponent
+    Intl, Date: Clock, Number, Math, Map, Object, Error, encodeURIComponent,
+    URLSearchParams, location: { search }
   });
   await flush();
   const attention = () => get("attention").children.map(row => row.children.map(x => x.textContent).join(": "));
@@ -224,4 +225,34 @@ test("partial and stale saved data surface both limitations together", async () 
   const { get } = await page([data]);
   assert.equal(get("status").textContent, "Partial saved review, at least a day old. Refresh to retry.");
   assert.equal(get("status").dataset.error, "true");
+});
+test("October review requests the selected month and separates full-month delivery from current priorities", async () => {
+  const data = fixture();
+  data.month = "2026-10";
+  data.periodStart = "2026-10-01T00:00:00Z";
+  data.periodEnd = "2026-11-01T00:00:00Z";
+  data.costs = { status: "imported", measurements: [{
+    key: "aiUsd", value: 2, basis: "actual",
+    coveredFrom: data.periodStart, coveredThrough: data.periodEnd
+  }] };
+  const { get, requests } = await page([data], "?month=2026-10");
+  assert.equal(get("month-title").textContent, "October 2026");
+  assert.equal(requests[0].url, "/api/snapshot?month=2026-10");
+  assert.equal(get("coverage").textContent, "Full month / repository activity");
+  assert.equal(get("open-coverage").textContent, "Current workload, not month-end backlog");
+  assert.equal(get("readout-title").textContent, "Current priority: the homepage inquiry path remains open.");
+  assert.equal(get("attention-title").textContent, "Needs attention now");
+  assert.equal(get("recorded-spend").textContent, "AI: $2.00 (actual, full month)");
+  get("refresh").events.click();
+  await flush();
+  assert.equal(requests[1].url, "/api/refresh?month=2026-10");
+});
+test("invalid month addresses are rejected visibly without fetching another month's data", async () => {
+  for (const search of ["?month=2026-13", "?month=2026-1", "?month=../2026-10", "?month=", "?month=9999-12"]) {
+    const { get, requests } = await page([fixture()], search);
+    assert.equal(requests.length, 0);
+    assert.equal(get("dashboard").hidden, true);
+    assert.equal(get("refresh").disabled, true);
+    assert.equal(get("status").textContent, "Invalid review month. Use ?month=YYYY-MM in the page address.");
+  }
 });
