@@ -1,120 +1,115 @@
 const $ = id => document.getElementById(id);
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
-const date = value => new Date(value).toISOString().replace("T", " ").replace(".000Z", " UTC");
-const labels = {
-  aiInputTokens: "AI input tokens", aiOutputTokens: "AI output tokens",
-  aiCacheReadTokens: "AI cache-read tokens", aiCacheWriteTokens: "AI cache-write tokens",
-  actionsElapsedMinutes: "Actions elapsed job minutes (not billing)",
-  actionsBillableMinutes: "Actions billable runner minutes",
-  aiUsd: "AI spend (USD)", actionsUsd: "Actions spend (USD)",
-  hostingUsd: "Hosting spend (USD)", domainUsd: "Domain spend (USD)"
-};
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const month = new Date().toISOString().slice(0, 7);
+const monthStart = new Date(`${month}-01T00:00:00Z`);
 let snapshot;
-$("month").value = new Date().toISOString().slice(0, 7);
+let refreshFailed = false;
 
 function text(id, value) { $(id).textContent = value; }
-function list(kind) {
-  const pulls = kind === "pr";
-  const summary = pulls ? snapshot.pulls : snapshot.issues;
-  const filter = $(pulls ? "pr-filter" : "issue-filter").value;
-  const element = $(pulls ? "pr-list" : "issue-list");
-  element.replaceChildren();
-  text(pulls ? "pr-context" : "issue-context", filter === "active"
-    ? `Current backlog at ${date(snapshot.observedAt)}. Oldest first.`
-    : `${snapshot.month} UTC closures, latest state. Newest first.`);
-  const items = summary[filter];
-  if (!items?.length) {
-    const row = document.createElement("li");
-    row.textContent = items ? "No matching work." : "Unknown: source unavailable. See source health below.";
-    element.append(row);
-    return;
-  }
-  for (const item of items) {
-    const row = document.createElement("li");
-    const link = document.createElement("a");
-    // Never trust stored/imported URLs or render repository strings as HTML.
-    if (Number.isSafeInteger(item.number) && item.number > 0) {
-      link.href = `https://github.com/Jamula/Jamula-www-Website/${pulls ? "pull" : "issues"}/${item.number}`;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-    }
-    link.textContent = `#${item.number} ${item.title}`;
-    row.append(link);
-    const detail = document.createElement("small");
-    detail.textContent = filter === "active"
-      ? `${Math.max(0, Math.floor((new Date(snapshot.observedAt) - new Date(item.createdAt)) / 86400000))} days open${item.draft ? " / draft" : ""}`
-      : `${date((pulls && item.mergedAt) || item.closedAt)} / ${pulls ? item.mergedAt ? "merged" : "not merged" : item.reason || "reason unavailable"}`;
-    row.append(detail);
-    element.append(row);
-  }
-}
+text("month-title", new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(monthStart));
 
 function render(data) {
   snapshot = data;
   $("dashboard").hidden = false;
-  text("coverage", `${data.coverage}. Delivery window: ${date(data.periodStart)} to ${date(data.periodEnd)} (end exclusive).`);
-  for (const [id, items] of [["active-prs", data.pulls.active], ["merged-prs", data.pulls.completed],
-    ["active-issues", data.issues.active], ["completed-issues", data.issues.completed]]) {
+  text("coverage", "Month to date / repository activity");
+  for (const [id, items] of [["merged-prs", data.pulls.completed], ["completed-issues", data.issues.completed],
+    ["active-prs", data.pulls.active], ["active-issues", data.issues.active]]) {
     text(id, items ? number.format(items.length) : "Unknown");
   }
-  text("lead-time", `Median PR open-to-merge: ${data.pulls.medianMergeHours === null ? "Unknown" : `${number.format(data.pulls.medianMergeHours)} hours`} (n=${data.pulls.mergeSampleSize}). Elapsed-time proxy, not coding time.`);
-  list("pr");
-  list("issue");
+
+  // This business priority is explicitly scoped to the open, owner-authored contact-path issue.
+  const contactPathOpen = data.issues.active?.some(item => item.number === 86) ?? false;
+  const issuesKnown = data.issuesSource.status === "ok";
+  text("readout-title", !issuesKnown ? "Business priorities need current evidence."
+    : contactPathOpen ? "The homepage inquiry path is still open work."
+    : "Repository activity is recorded. Business impact is not measured.");
+  text("readout", !issuesKnown ? "Issue data is unavailable; this review cannot confirm the commercial priority."
+    : contactPathOpen ? "Proposed focus: confirm the owner-approved contact destination and wording, then publish the inquiry path."
+    : "Merges and closed issues show activity, not customer outcomes or revenue.");
+
   const measures = new Map(data.costs.measurements.map(m => [m.key, m]));
-  const value = key => {
+  const value = (key, money = false) => {
     const m = measures.get(key);
-    return m ? `${number.format(m.value)} (${m.basis})` : "Unknown";
+    if (!m) return "Not tracked";
+    const period = new Date(m.coveredFrom) > new Date(data.periodStart) ||
+      new Date(m.coveredThrough) < new Date(data.observedAt) ? "partial period" : "month to date";
+    return `${money ? usd.format(m.value) : number.format(m.value)} (${m.basis}, ${period})`;
   };
-  text("cost-health", `${data.costs.status}: ${data.costs.detail}`);
-  text("ai-tokens", `${value("aiInputTokens")} / ${value("aiOutputTokens")}`);
+  const tokenKeys = ["aiInputTokens", "aiOutputTokens", "aiCacheReadTokens", "aiCacheWriteTokens"];
+  const tokenLabels = ["input", "output", "cache read", "cache write"];
+  const recordedTokens = tokenKeys.filter(key => measures.has(key));
+  text("ai-tokens", recordedTokens.length
+    ? tokenKeys.map((key, index) => `${tokenLabels[index]}: ${value(key)}`).join("; ") : "Not tracked");
   text("actions-minutes", value("actionsBillableMinutes"));
-  text("spend", `${value("aiUsd")} / ${value("actionsUsd")}`);
-  $("cost-rows").replaceChildren();
-  for (const [key, label] of Object.entries(labels)) {
-    const m = measures.get(key);
-    const row = document.createElement("tr");
-    for (const content of [label, value(key), m
-      ? `${m.source} / scope: ${m.scope} / ${date(m.coveredFrom)} to ${date(m.coveredThrough)} (end exclusive); recorded ${date(m.asOf)}${m.pricingSource ? ` / pricing: ${m.pricingSource}, ${m.pricingDate}` : ""}`
-      : "No repository-attributed evidence imported."]) {
-      const cell = document.createElement("td");
-      cell.textContent = content;
-      row.append(cell);
-    }
-    $("cost-rows").append(row);
+  const moneyKeys = ["aiUsd", "actionsUsd", "hostingUsd", "domainUsd"];
+  const moneyLabels = ["AI", "Actions", "Hosting", "Domain"];
+  const hasMoney = moneyKeys.some(key => measures.has(key));
+  text("spend-summary", hasMoney ? "Partial spend recorded; total unverified." : "Spend not measured.");
+  $("recorded-spend").hidden = !hasMoney;
+  text("recorded-spend", moneyKeys.flatMap((key, index) => measures.has(key)
+    ? [`${moneyLabels[index]}: ${value(key, true)}`] : []).join("; "));
+
+  const attention = [];
+  if (contactPathOpen) attention.push(["Commercial readiness",
+    "Confirm the approved contact path, then publish it."]);
+  if (data.pullsSource.status !== "ok" || !issuesKnown) attention.push(["Review coverage",
+    "Restore repository data and refresh before assessing progress."]);
+  if (data.costs.status === "invalid") attention.push(["Cost control",
+    "Correct the cost import; spend cannot be verified."]);
+  else if (!measures.has("aiUsd") || !measures.has("actionsUsd")) attention.push(["Cost control",
+    "Record AI and Actions costs before confirming zero incremental spend."]);
+  else attention.push(["Cost control",
+    "Reconcile recorded spend and coverage before confirming the full cost."]);
+  if (attention.length < 3) attention.push(["Business impact",
+    "Customer inquiries and revenue impact are not measured in this review."]);
+  $("attention").replaceChildren();
+  for (const [heading, action] of attention.slice(0, 3)) {
+    const item = document.createElement("li");
+    const label = document.createElement("strong");
+    label.textContent = heading;
+    const detail = document.createElement("p");
+    detail.textContent = action;
+    item.append(label, detail);
+    $("attention").append(item);
   }
-  $("sources").replaceChildren();
-  for (const [name, source] of [["Pull requests", data.pullsSource], ["Issues", data.issuesSource]]) {
-    const row = document.createElement("li");
-    row.textContent = `${name}: ${source.status}. ${source.detail}`;
-    $("sources").append(row);
-  }
+}
+
+function showStatus(refreshed) {
+  const partial = snapshot.pullsSource.status !== "ok" || snapshot.issuesSource.status !== "ok" ||
+    snapshot.costs.status === "invalid";
+  const stale = Date.now() - new Date(snapshot.observedAt).getTime() >= 86400000;
+  $("status").dataset.error = String(partial || stale || refreshFailed);
+  text("status", refreshFailed ? "Refresh failed. Showing the saved review; retry Refresh."
+    : partial ? stale ? "Partial saved review, at least a day old. Refresh to retry."
+      : "Partial review. Some data is unavailable."
+    : stale ? "Saved review is at least a day old. Refresh for current data."
+    : refreshed ? "Review updated." : "Saved review. Refresh for latest.");
 }
 
 async function load(refresh) {
   $("refresh").disabled = true;
-  $("month").disabled = true;
-  $("dashboard").hidden = true;
+  text("status", refresh ? "Updating review..." : "Loading review...");
   $("status").dataset.error = "false";
-  text("status", refresh ? "Reading GitHub pages and saving a new snapshot..." : "Loading saved snapshot...");
   try {
-    const response = await fetch(`/api/${refresh ? "refresh" : "snapshot"}?month=${encodeURIComponent($("month").value)}`,
+    const response = await fetch(`/api/${refresh ? "refresh" : "snapshot"}?month=${encodeURIComponent(month)}`,
       refresh ? { method: "POST", headers: { "X-MBR-Refresh": "1" } } : {});
+    if (!response.ok) throw new Error("Review request failed.");
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || `Request failed (${response.status}). Retry Refresh data.`);
     render(data);
-    const partial = data.pullsSource.status !== "ok" || data.issuesSource.status !== "ok" || data.costs.status === "invalid";
-    $("status").dataset.error = String(partial);
-    text("status", `${partial ? "Partial data" : "Snapshot loaded"} / observed ${date(data.observedAt)} / collection began ${date(data.refreshStartedAt)}. Refresh for latest data.`);
-  } catch (error) {
-    $("status").dataset.error = "true";
-    text("status", error instanceof Error ? error.message : "Dashboard read failed. Retry Refresh data.");
+    refreshFailed = false;
+    showStatus(refresh);
+  } catch {
+    refreshFailed = true;
+    if (snapshot) showStatus(false);
+    else {
+      $("dashboard").hidden = true;
+      $("status").dataset.error = "true";
+      text("status", "Review unavailable. Select Refresh to retry.");
+    }
   } finally {
     $("refresh").disabled = false;
-    $("month").disabled = false;
   }
 }
-$("controls").addEventListener("submit", event => { event.preventDefault(); void load(true); });
-$("month").addEventListener("change", () => void load(false));
-$("pr-filter").addEventListener("change", () => snapshot && list("pr"));
-$("issue-filter").addEventListener("change", () => snapshot && list("issue"));
+$("refresh").addEventListener("click", () => void load(true));
 void load(false);

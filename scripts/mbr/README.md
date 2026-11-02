@@ -34,15 +34,48 @@ Copilot Browser canvas or an ordinary browser. It listens only on IPv4 loopback,
 ignores external URL bindings, and stops with Ctrl+C. Keep that process running
 while reviewing. There is no background service installation.
 
-The month defaults to the current **UTC** calendar month (November 2026 at initial
-delivery). Select another month to load its saved observation; select **Refresh
-data** to fetch every page and replace its snapshot. A missing snapshot presents
+The executive page defaults to the current **UTC** calendar month (November 2026
+at initial delivery), displayed simply as "November 2026" and "Month to date".
+Select **Refresh** to fetch every page and replace its snapshot. A missing snapshot presents
 a refresh prompt, not invented metrics. Source failure shows Unknown for that
 entire source; other successful sources remain usable. Snapshots and imports
 live in `scripts\mbr\.local\` when launched as above; do not commit or publish them.
 For a published executable or launch from another working directory, `.local`
 is beside the executable unless the working directory contains `wwwroot`.
 An interrupted refresh leaves the previous snapshot intact; retry refresh.
+
+## Executive view and audit access
+
+The page answers four business questions: what activity was delivered, what work
+is open, what cost is known, and what needs management attention. A short business
+readout leads; merged pull requests and completed issues remain **activity**, not
+features shipped, customer outcomes, revenue or proof of deployment. There is no
+invented overall health score, target, trend or approval/blocker state.
+
+The owner requested a CEO/CTO briefing rather than an engineering tracker.
+Accordingly, month inputs, filters, item links/lists, timestamps, median merge
+time, cost evidence tables and source-definition panels are absent from this
+view. One Refresh button remains. Saved, stale (at least 24 hours old), partial
+and failed-refresh states stay visible in plain language. Failed refreshes keep
+the previous review with a warning instead of silently presenting it as current.
+
+When open issue #86 is present, the readout highlights the unresolved homepage
+inquiry path and proposes confirming the owner-approved destination and wording
+before publication. This is a curated interpretation of that issue's scope,
+not an inference that approval is absent or that revenue was lost. On
+2026-11-02 UTC, issue #86 was open and a read of `https://jamula.net` showed
+only in-page navigation, not a contact destination. The dashboard does not
+continuously inspect the live site; it only retains this focus while #86 is
+open in its issue observation. It does not declare commercial readiness if the
+issue disappears. Attention is limited to three evidence-supported items:
+the contact-path work when open, data/cost gaps, and unmeasured business impact.
+No customer or revenue analytics are collected.
+
+Exact source health, period bounds, observation times, item URLs, detailed cost
+provenance and median merge time remain in `.local\snapshot-YYYY-MM.json` and the
+read-only `/api/snapshot?month=YYYY-MM` endpoint. Use
+`dotnet run -- --snapshot YYYY-MM` for another month's audited data; there is no
+historical-month navigation on the executive page.
 
 Only fixed endpoints are exposed. A same-origin POST with `X-MBR-Refresh: 1`
 refreshes; GET only reads local data. Month input never becomes a shell command.
@@ -55,9 +88,9 @@ read your local repository observations.
 
 | KPI | Definition |
 | --- | --- |
-| Active PRs | Currently open at refresh, including drafts; oldest first with observed age. |
+| Active PRs | Currently open at refresh, including drafts. |
 | Merged PRs | `merged_at` in the selected UTC month, through observation time. |
-| Closed, not merged | Separate list using `closed_at`; not counted as delivered PRs. |
+| Closed, not merged | Snapshot-only list using `closed_at`; not counted as delivered PRs. |
 | Active issues | Currently open issues; REST issue records with `pull_request` are excluded. |
 | Completed issues | Closed with latest `state_reason=completed`, `closed_at` in the month. |
 | Other issue closures | `not_planned` or unavailable/other state reason; never assumed completed. |
@@ -65,7 +98,7 @@ read your local repository observations.
 
 UTC windows are `[first day 00:00Z, next month first day 00:00Z)`. For example,
 October 31 at 18:00 Pacific daylight time belongs to November in UTC. Current
-months are month-to-date; future periods have no observations. The header includes
+months are month-to-date; future periods have no observations. The snapshot includes
 the exact window, observation timestamp and collection start. Requests are live
 and sequential within each source, not a transactional GitHub snapshot.
 
@@ -134,9 +167,13 @@ The importer validates structure/coverage, not the truth of user-supplied eviden
 Duplicate keys, negative values, unknown fields, wrong scope and invalid estimates
 reject the entire import explicitly. Refresh after changing an import.
 
-Each row displays actual/estimated basis, source, scope, coverage and recording
-time. A short coverage interval remains a short observation, never a full-month
-figure. Missing rows stay Unknown. **Total repo spend always remains Unknown**
+The snapshot retains actual/estimated basis, source, scope, coverage and recording
+time. Imported values on the executive page label their basis and whether they
+cover the month to date or only a partial period. AI input/output/cache categories
+stay separate and Actions minutes mean billable runner minutes, not elapsed
+workflow time. Missing usage is "Not tracked"; no recorded money is "Spend not
+measured". Recorded money is labeled partial spend, never total spend.
+**Total repo spend always remains Unknown**
 because these optional categories do not establish exhaustive cost coverage.
 Free hosting configuration is not proof of a measured $0 bill. Actions elapsed
 job minutes are not billable runner minutes: OS/runner multipliers, rounding,
@@ -155,8 +192,11 @@ python scripts\validate_governance.py
 The dependency-free .NET fixture runner covers page traversal and page failure,
 UTC boundaries (including Pacific conversion), merged versus abandoned PRs,
 completed versus not-planned issues, missing access, missing costs, scoped import
-validation and origin controls. Node's built-in runner checks DOM-safe rendering
-without installing packages. No fixtures write to GitHub or load live billing.
+validation and origin controls. Node's built-in runner checks the executive
+readout, truthful activity/usage summaries, bounded attention, plain month
+heading, refresh and stale/error states without installing packages. It also
+prevents engineering tracker controls/links from returning to the main page.
+No fixtures write to GitHub or load live billing.
 
 API definitions: [repository issues](https://docs.github.com/en/rest/issues/issues#list-repository-issues)
 and [pull requests](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests).
