@@ -21,6 +21,7 @@ function parsePage(html) {
   const ogUrls = [];
   const stylesheets = [];
   const inlineStyles = [];
+  const styleSources = [];
   const jsonLd = [];
   const resources = [];
   const title = [];
@@ -39,7 +40,10 @@ function parsePage(html) {
         .join("");
     tags.push([tag, attributes]);
     if (tag === "title") title.push(text().trim());
-    if (tag === "style") inlineStyles.push(text());
+    if (tag === "style") {
+      inlineStyles.push(text());
+      styleSources.push({ css: text(), media: attributes.media });
+    }
     if (attributes.id) ids.push(attributes.id);
     if (tag === "a") anchors.push(attributes.href ?? "");
 
@@ -55,7 +59,10 @@ function parsePage(html) {
     if (tag === "link") {
       const rel = new Set((attributes.rel ?? "").toLowerCase().split(/\s+/));
       if (rel.has("canonical")) canonicals.push(attributes.href ?? "");
-      if (rel.has("stylesheet")) stylesheets.push(attributes.href ?? "");
+      if (rel.has("stylesheet")) {
+        stylesheets.push(attributes.href ?? "");
+        styleSources.push({ href: attributes.href ?? "", media: attributes.media });
+      }
       if (["stylesheet", "preload", "modulepreload", "icon"].some((item) => rel.has(item))) {
         resources.push(attributes.href ?? "");
       }
@@ -84,6 +91,7 @@ function parsePage(html) {
     ogUrls,
     stylesheets,
     inlineStyles,
+    styleSources,
     jsonLd,
     resources,
     headingLevels,
@@ -277,6 +285,13 @@ function validateSitemaps(root, canonicalRoutes) {
     if (!lines.includes("User-agent: *") || !lines.includes("Allow: /")) {
       errors.push("robots.txt must allow public crawling for all user agents");
     }
+    const directives = lines.map((line) => line.split("#")[0].trim()).filter(Boolean);
+    if (
+      JSON.stringify(directives) !==
+      JSON.stringify(["User-agent: *", "Allow: /", `Sitemap: ${SITE_URL}/sitemap-index.xml`])
+    ) {
+      errors.push("robots.txt must match the approved public-crawling policy");
+    }
     if (JSON.stringify(sitemapLines) !== JSON.stringify([`${SITE_URL}/sitemap-index.xml`])) {
       errors.push("robots.txt must reference the Jamula.net sitemap index exactly once");
     }
@@ -388,8 +403,6 @@ function validateSite(siteDirectory) {
 
   const pages = new Map(htmlFiles.map((file) => [file, parsePage(fs.readFileSync(file, "utf8"))]));
   const canonicalRoutes = {};
-  const stylesheetPaths = new Set();
-  const styles = [];
   const errors = [];
 
   for (const [file, page] of pages) {
@@ -476,17 +489,12 @@ function validateSite(siteDirectory) {
       errors.push(...validateOrganizationSchema(page, prefix));
     }
 
-    for (const href of page.stylesheets) {
-      const target = localFile(root, file, href);
-      if (!target) errors.push(`${prefix}stylesheet does not resolve to a built file: ${href}`);
-      else stylesheetPaths.add(target);
-    }
-    styles.push(...page.inlineStyles);
-
+    const canonical = page.canonicals.length === 1 ? page.canonicals[0] : `${SITE_URL}/${relative}`;
+    const resourceTargets = new Map();
     for (const resource of page.resources) {
       let parsed;
       try {
-        parsed = new URL(resource, SITE_URL);
+        parsed = new URL(resource, canonical);
       } catch {
         errors.push(`${prefix}invalid network resource URL: ${resource}`);
         continue;
@@ -496,24 +504,26 @@ function validateSite(siteDirectory) {
         errors.push(`${prefix}third-party network resource is not allowed: ${resource}`);
         continue;
       }
-      if (parsed.protocol !== "https:" && parsed.origin !== SITE_URL) {
+      if (parsed.protocol !== "https:") {
         errors.push(`${prefix}network resource must use HTTPS: ${resource}`);
         continue;
       }
-      if (parsed.hostname === "jamula.net" && parsed.pathname.startsWith("/")) {
-        const target = localFile(root, file, parsed.pathname);
-        if (!target) errors.push(`${prefix}resource does not resolve to a built file: ${resource}`);
-      } else if (!parsed.hostname) {
-        const target = localFile(root, file, parsed.pathname);
-        if (!target) errors.push(`${prefix}resource does not resolve to a built file: ${resource}`);
-      }
+      const target = localFile(root, file, parsed.pathname);
+      if (!target) errors.push(`${prefix}resource does not resolve to a built file: ${resource}`);
+      else resourceTargets.set(resource, target);
     }
+    const styles = [];
+    for (const source of page.styleSources) {
+      let css = source.css;
+      if (source.href !== undefined) {
+        const target = resourceTargets.get(source.href);
+        if (!target) continue;
+        css = fs.readFileSync(target, "utf8");
+      }
+      styles.push(source.media ? `@media ${source.media}{${css}}` : css);
+    }
+    errors.push(...contrastErrors(styles).map((error) => `${prefix}${error}`));
   }
-
-  for (const stylesheet of stylesheetPaths) {
-    styles.push(fs.readFileSync(stylesheet, "utf8"));
-  }
-  errors.push(...contrastErrors(styles));
 
   for (const [file, page] of pages) {
     const canonical = page.canonicals.length === 1 ? page.canonicals[0] : `${SITE_URL}/`;
@@ -685,7 +695,9 @@ test("contrast checks include late unconditional and theme-specific root overrid
       const errors = validateSite(root);
       for (const theme of themes) {
         assert.ok(
-          errors.includes(`${theme} contrast --j-color-text on --j-color-bg is 1.00:1, below 4.5:1`)
+          errors.includes(
+            `index.html: ${theme} contrast --j-color-text on --j-color-bg is 1.00:1, below 4.5:1`
+          )
         );
       }
     });
@@ -733,6 +745,82 @@ test("metadata checks reject an empty title, missing description, and wrong cano
   assert.match(messages, /non-empty document title/);
   assert.match(messages, /meta description/);
   assert.match(messages, /canonical must be an absolute Jamula\.net HTTPS URL/);
+});
+
+test("robots checks reject crawler-specific blocking groups", (t) => {
+  const root = copyBuild(t);
+  fs.appendFileSync(path.join(root, "robots.txt"), "\nUser-agent: Googlebot\nDisallow: /\n");
+  assert.ok(
+    validateSite(root).includes("robots.txt must match the approved public-crawling policy")
+  );
+});
+
+test("resources on every approved host must resolve to built files", async (t) => {
+  for (const host of ["jamula.net", "www.jamula.net", "jamula.com", "www.jamula.com"]) {
+    await t.test(host, (subtest) => {
+      const root = copyBuild(subtest);
+      const file = builtPage(root);
+      const resource = `https://${host}/missing.png`;
+      fs.writeFileSync(
+        file,
+        fs.readFileSync(file, "utf8").replace("</body>", `<img src="${resource}" alt=""></body>`)
+      );
+      assert.deepEqual(validateSite(root), [
+        `index.html: resource does not resolve to a built file: ${resource}`,
+      ]);
+      fs.writeFileSync(
+        file,
+        fs.readFileSync(file, "utf8").replace(resource, `https://${host}/apple-touch-icon.png`)
+      );
+      assert.deepEqual(validateSite(root), []);
+    });
+  }
+});
+
+test("nested relative resources resolve against the page rather than the site root", (t) => {
+  const root = copyBuild(t);
+  const directory = path.join(root, "about");
+  fs.mkdirSync(directory);
+  const file = path.join(directory, "index.html");
+  const html = fs
+    .readFileSync(builtPage(root), "utf8")
+    .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/i, "")
+    .replaceAll('https://jamula.net/"', 'https://jamula.net/about/"')
+    .replace("</body>", '<img src="photo.png" alt=""></body>');
+  fs.writeFileSync(file, html);
+  const sitemap = path.join(root, "sitemap-0.xml");
+  fs.writeFileSync(
+    sitemap,
+    fs
+      .readFileSync(sitemap, "utf8")
+      .replace("</urlset>", "<url><loc>https://jamula.net/about/</loc></url></urlset>")
+  );
+  fs.copyFileSync(path.join(root, "apple-touch-icon.png"), path.join(directory, "photo.png"));
+  assert.deepEqual(validateSite(root), []);
+  fs.renameSync(path.join(directory, "photo.png"), path.join(root, "photo.png"));
+  assert.deepEqual(validateSite(root), [
+    "about/index.html: resource does not resolve to a built file: photo.png",
+  ]);
+});
+
+test("contrast checks preserve per-page inline and linked stylesheet order", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  const original = fs.readFileSync(file, "utf8");
+  const override = "<style>:root{--j-color-text:var(--j-color-bg)}</style>";
+  fs.writeFileSync(file, original.replace("</head>", `${override}</head>`));
+  const errors = validateSite(root);
+  assert.ok(
+    errors.includes(
+      "index.html: light contrast --j-color-text on --j-color-bg is 1.00:1, below 4.5:1"
+    )
+  );
+  assert.ok(errors.every((error) => error.startsWith("index.html: ")));
+  fs.writeFileSync(
+    file,
+    original.replace(/<link rel="stylesheet"/, `${override}<link rel="stylesheet"`)
+  );
+  assert.deepEqual(validateSite(root), []);
 });
 
 test("semantic checks reject a broken skip target and missing h1", (t) => {

@@ -29,6 +29,13 @@ nested `:root` rules fail explicitly; this is not a general computed-style or
 CSS-cascade audit. Both parsers are development-only dependencies and add no
 browser code or network requests to the website.
 
+Styles are evaluated independently per page in inline/linked document order;
+resource URLs resolve against the page URL and must exist on every approved
+Jamula host. The robots check enforces the current minimal public-crawling
+policy (`User-agent: *`, `Allow: /`, and the canonical sitemap index), rejecting
+additional directives or crawler-specific groups rather than inferring their
+effective behavior.
+
 ## Licensing
 
 Unless explicitly marked otherwise, a contributor who intentionally submits code or technical documentation represents that they have authority to do so and agrees to license the contribution under Apache License 2.0.
