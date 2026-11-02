@@ -39,7 +39,9 @@ function parsePage(html) {
         .map((child) => child.value)
         .join("");
     tags.push([tag, attributes]);
-    if (tag === "title") title.push(text().trim());
+    if (tag === "title" && node.namespaceURI === "http://www.w3.org/1999/xhtml") {
+      title.push(text().trim());
+    }
     if (tag === "style") {
       inlineStyles.push(text());
       styleSources.push({ css: text(), media: attributes.media });
@@ -188,8 +190,8 @@ function contrastErrors(styles) {
           return;
         }
         themes = themes.filter((value) => value === theme);
-        if (theme === "dark") hasDarkRoot = true;
       }
+      if (themes.length === 1 && themes[0] === "dark") hasDarkRoot = true;
       for (const declaration of rule.nodes) {
         if (declaration.type !== "decl" || !declaration.prop.startsWith("--")) continue;
         for (const theme of themes) {
@@ -608,6 +610,23 @@ test("HTML parsing preserves title text without multi-character tag stripping", 
   assert.deepEqual(page.anchors, ["/?a=1&b=2"]);
 });
 
+test("document titles exclude SVG titles but retain HTML titles in foreignObject", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  const original = fs.readFileSync(file, "utf8");
+  const icon = '<svg role="img"><title>Jamula mark</title></svg>';
+  fs.writeFileSync(file, original.replace("</body>", `${icon}</body>`));
+  assert.deepEqual(validateSite(root), []);
+  fs.writeFileSync(
+    file,
+    original.replace(
+      "</body>",
+      "<svg><foreignObject><title>Extra</title></foreignObject></svg></body>"
+    )
+  );
+  assert.ok(validateSite(root).includes("index.html: expected one non-empty document title"));
+});
+
 test("HTML parsing respects raw text and whitespace script closing tags", () => {
   const json = '{"name":"<h1 id=\\"fake\\">not a heading</h1>"}';
   const page = parsePage(
@@ -715,6 +734,38 @@ test("contrast checks preserve important root declarations over later normal dec
   );
 });
 
+test("contrast checks require jointly applicable dark media ancestors", async (t) => {
+  const sheet = postcss.parse(fs.readFileSync(baseStylesheet(BUILD_DIR), "utf8"));
+  sheet.walkAtRules("media", (rule) => rule.remove());
+  const lightOnly = sheet.toString();
+  for (const [name, outer, inner, expected] of [
+    [
+      "light outside dark",
+      "light",
+      "dark",
+      ["color tokens are missing a prefers-color-scheme: dark root"],
+    ],
+    [
+      "dark outside light",
+      "dark",
+      "light",
+      ["color tokens are missing a prefers-color-scheme: dark root"],
+    ],
+    ["matching dark ancestors", "dark", "dark", []],
+  ]) {
+    await t.test(name, () => {
+      const color = outer === inner ? "var(--j-ink)" : "var(--j-color-bg)";
+      const nested =
+        `@media(prefers-color-scheme:${outer}){` +
+        `@media(prefers-color-scheme:${inner}){:root{--j-color-text:${color}}}}`;
+      assert.deepEqual(contrastErrors([lightOnly, nested]), expected);
+    });
+  }
+  assert.deepEqual(contrastErrors([lightOnly]), [
+    "color tokens are missing a prefers-color-scheme: dark root",
+  ]);
+});
+
 test("contrast checks report unsupported root conditions and cyclic color tokens", () => {
   const css = fs.readFileSync(baseStylesheet(BUILD_DIR), "utf8");
   assert.ok(
@@ -807,6 +858,22 @@ test("contrast checks preserve per-page inline and linked stylesheet order", (t)
   const root = copyBuild(t);
   const file = builtPage(root);
   const original = fs.readFileSync(file, "utf8");
+  const directory = path.join(root, "about");
+  fs.mkdirSync(directory);
+  fs.writeFileSync(
+    path.join(directory, "index.html"),
+    original
+      .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/i, "")
+      .replaceAll('https://jamula.net/"', 'https://jamula.net/about/"')
+  );
+  const sitemap = path.join(root, "sitemap-0.xml");
+  fs.writeFileSync(
+    sitemap,
+    fs
+      .readFileSync(sitemap, "utf8")
+      .replace("</urlset>", "<url><loc>https://jamula.net/about/</loc></url></urlset>")
+  );
+  assert.deepEqual(validateSite(root), []);
   const override = "<style>:root{--j-color-text:var(--j-color-bg)}</style>";
   fs.writeFileSync(file, original.replace("</head>", `${override}</head>`));
   const errors = validateSite(root);

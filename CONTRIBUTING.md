@@ -24,7 +24,9 @@ The generated-site checks cover metadata, canonical routes, internal links and f
 HTML checks use parse5's HTML5 parser rather than stripping markup with regular
 expressions. Contrast checks use PostCSS to apply `:root` custom properties in
 source order, including later overrides and `!important`, for unconditional
-rules and exact light/dark color-scheme media queries. Other conditional or
+rules and exact light/dark color-scheme media queries. Nested queries must all
+apply to the same theme; contradictory light/dark ancestors neither apply tokens
+nor satisfy the required dark root. Other conditional or
 nested `:root` rules fail explicitly; this is not a general computed-style or
 CSS-cascade audit. Both parsers are development-only dependencies and add no
 browser code or network requests to the website.
