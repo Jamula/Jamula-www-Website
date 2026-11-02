@@ -22,8 +22,8 @@ source date before relying on it.
 - The homepage currently has no contact mechanism. The remaining homepage
   title, contact path, built-site accessibility/SEO/link/contrast regression
   checks, and four-host monitoring are tracked in open issues
-  [#86](https://github.com/Jamula/Jamula-www-Website/issues/86),
   [#89](https://github.com/Jamula/Jamula-www-Website/issues/89),
+  [#86](https://github.com/Jamula/Jamula-www-Website/issues/86),
   [#87](https://github.com/Jamula/Jamula-www-Website/issues/87), and
   [#88](https://github.com/Jamula/Jamula-www-Website/issues/88), respectively
   (state checked 2026-11-01; check GitHub for current status).

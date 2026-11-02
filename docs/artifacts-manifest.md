@@ -30,7 +30,7 @@ owner, while every earlier owner remains historical provenance. The original
 author did not self-revise a locked artifact. No ownership entry implies review
 approval.
 
-| Artifact | Original author | Independent revision owner | Reviewers / approver | Issue and dependency | Status at 2026-08-25 snapshot | Index |
+| Artifact | Original author | Independent revision owner | Reviewers / approver | Issue and dependency | Status / review evidence in the historical record | Index |
 |---|---|---|---|---|---|---|
 | `docs/README.md` | Product lead (integration) | Fact Checker (Cycle 2); Work monitor (N-01/N-04); Legal researcher (N-11 ledger, then lifecycle evidence) | all owners; Cyrus | Refs #3 and #4-#9 | Incorporation commit, draft PR and child closure recorded; exact final head and approvals pending | [Integration](README.md#integration-and-governance) |
 | `docs/artifacts-manifest.md` | Product lead (integration) | Fact Checker (Cycle 2); Work monitor (N-01/N-04); Legal researcher (N-11, FCR-018 owner-provenance ledger, then lifecycle evidence) | all owners; Cyrus | Refs #3 and #4-#9 | FCR-018 and N-11 resolved; lifecycle evidence recorded; complete 60/60 docs inventory | [Integration](README.md#integration-and-governance) |
@@ -96,10 +96,13 @@ approval.
 
 ## Coverage rule
 
-The table lists the 61 other Markdown documents under `docs/`, including
-`docs/README.md`; this manifest is the only file excluded from its own table.
-Re-run coverage and local-link validation after any file is added, renamed, or
-removed.
+This is the historical evaluation-artifact inventory, not an exhaustive listing
+of current Markdown files under `docs/`. It has 61 rows, including this
+manifest, and does not include every later or current document (for example,
+`docs/architecture/two-free-static-apps.md`). Status entries combine records
+from different dates; consult each linked artifact for its exact date and
+context. For example, the #43 founder approval-in-principle was recorded on
+2026-08-29. Rebuild a current inventory separately when needed.
 
 ## Current work status
 
