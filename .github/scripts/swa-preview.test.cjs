@@ -3,6 +3,8 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { test } = require("node:test");
+const { spawnSync } = require("node:child_process");
+const vm = require("node:vm");
 const { selectPreview, writePreviewEvent } = require("./swa-preview.cjs");
 
 function fixture() {
@@ -196,5 +198,208 @@ test("deployment event always identifies the selected PR, not main", async () =>
   } finally {
     fs.rmSync(path.join(directory, "event.json"), { force: true });
     fs.rmdirSync(directory);
+  }
+});
+
+const productionWorkflow = fs
+  .readFileSync(
+    path.join(__dirname, "../workflows/azure-static-web-apps.yml"),
+    "utf8",
+  )
+  .replace(/\r\n/g, "\n");
+const productionJobs = Object.fromEntries(
+  [
+    ...productionWorkflow
+      .split("\njobs:\n")[1]
+      .matchAll(
+        /^  ([a-z][a-z0-9-]*):\n([\s\S]*?)(?=^  [a-z][a-z0-9-]*:\n|(?![\s\S]))/gm,
+      ),
+  ].map((match) => [match[1], match[2]]),
+);
+
+function jobEnabled(
+  name,
+  event,
+  ref,
+  shouldDeploy = "true",
+  action = "synchronize",
+  fork = false,
+) {
+  const expression = productionJobs[name].match(
+    /^    if: >-\n((?:      .*\n)+)/m,
+  );
+  assert.ok(expression, `${name} must have an explicit event/ref guard`);
+  return vm.runInNewContext(expression[1].trim(), {
+    github: {
+      event_name: event,
+      ref,
+      repository: "Jamula/Jamula-www-Website",
+      event: {
+        action,
+        pull_request: {
+          head: {
+            repo: {
+              full_name: fork ? "fork/site" : "Jamula/Jamula-www-Website",
+            },
+          },
+        },
+      },
+    },
+    needs: { prepare: { outputs: { should_deploy: shouldDeploy } } },
+  });
+}
+
+test("manual production trigger has no revision override inputs", () => {
+  assert.match(productionWorkflow, /^on:\n  workflow_dispatch:\n  push:/m);
+  assert.match(productionWorkflow, /DEPLOYMENT_SHA:.*\|\| github\.sha/);
+  assert.match(productionWorkflow, /group: >-\n[\s\S]*?\|\| 'production'/);
+});
+
+for (const event of ["push", "workflow_dispatch"]) {
+  test(`${event} production jobs require main and a selected artifact`, () => {
+    assert.equal(jobEnabled("prepare", event, "refs/heads/main"), true);
+    for (const ref of ["refs/heads/feature", "refs/tags/main"]) {
+      assert.equal(jobEnabled("prepare", event, ref), false);
+    }
+    for (const name of ["deploy", "deploy-com"]) {
+      assert.equal(jobEnabled(name, event, "refs/heads/main"), true);
+      assert.equal(jobEnabled(name, event, "refs/heads/main", "false"), false);
+      for (const ref of ["refs/heads/feature", "refs/tags/main"]) {
+        assert.equal(jobEnabled(name, event, ref), false);
+      }
+      assert.match(productionJobs[name], /^    environment: swa-deployment$/m);
+      assert.match(
+        productionJobs[name],
+        /name: swa-site-\$\{\{ env\.DEPLOYMENT_SHA \}\}/,
+      );
+    }
+  });
+
+  for (const [scenario, ref, latest, expected] of [
+    ["current main", "refs/heads/main", "a".repeat(40), "true"],
+    ["stale main", "refs/heads/main", "b".repeat(40), "false"],
+    [
+      "non-main with matching SHA",
+      "refs/heads/feature",
+      "a".repeat(40),
+      "false",
+    ],
+    ["tag with matching SHA", "refs/tags/main", "a".repeat(40), "false"],
+  ]) {
+    test(`${event} gate selects ${scenario} as ${expected}`, () => {
+      const directory = fs.mkdtempSync(
+        path.join(os.tmpdir(), "swa-production-"),
+      );
+      try {
+        const script = productionJobs.prepare
+          .match(/        run: \|\n([\s\S]*)/)[1]
+          .replace(/^          /gm, "");
+        const result = spawnSync(
+          "bash",
+          [
+            "-c",
+            `
+          gh() {
+            [[ "$*" == "api repos/Jamula/Jamula-www-Website/git/ref/heads/main --jq .object.sha" ]] || return 90
+            printf '%s\\n' "$TEST_LATEST_MAIN"
+          }
+          git() { echo "Production must not use the PR diff gate" >&2; return 91; }
+          ${script}
+        `,
+          ],
+          {
+            cwd: directory,
+            encoding: "utf8",
+            env: {
+              ...process.env,
+              GITHUB_EVENT_NAME: event,
+              GITHUB_REF: ref,
+              GITHUB_SHA: "a".repeat(40),
+              GITHUB_REPOSITORY: "Jamula/Jamula-www-Website",
+              GITHUB_OUTPUT: "output.txt",
+              TEST_LATEST_MAIN: latest,
+            },
+          },
+        );
+        assert.ifError(result.error);
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(
+          fs.readFileSync(path.join(directory, "output.txt"), "utf8").trim(),
+          `should_deploy=${expected}`,
+        );
+      } finally {
+        fs.rmSync(path.join(directory, "output.txt"), { force: true });
+        fs.rmdirSync(directory);
+      }
+    });
+  }
+}
+
+for (const event of ["push", "workflow_dispatch"]) {
+  test(`${event} gate fails closed when latest main cannot be read`, () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-production-"));
+    try {
+      const script = productionJobs.prepare
+        .match(/        run: \|\n([\s\S]*)/)[1]
+        .replace(/^          /gm, "");
+      const result = spawnSync(
+        "bash",
+        ["-c", `gh() { return 92; }\n${script}`],
+        {
+          cwd: directory,
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            GITHUB_EVENT_NAME: event,
+            GITHUB_REF: "refs/heads/main",
+            GITHUB_REPOSITORY: "Jamula/Jamula-www-Website",
+            GITHUB_OUTPUT: "output.txt",
+          },
+        },
+      );
+      assert.ifError(result.error);
+      assert.equal(result.status, 92, result.stderr);
+      assert.equal(fs.existsSync(path.join(directory, "output.txt")), false);
+    } finally {
+      fs.rmSync(path.join(directory, "output.txt"), { force: true });
+      fs.rmdirSync(directory);
+    }
+  });
+}
+
+test("PR validation stays isolated and unrelated events cannot deploy production", () => {
+  assert.equal(
+    jobEnabled("prepare", "pull_request", "refs/pull/1/merge"),
+    true,
+  );
+  assert.equal(
+    jobEnabled(
+      "prepare",
+      "pull_request",
+      "refs/pull/1/merge",
+      "true",
+      "closed",
+    ),
+    false,
+  );
+  assert.equal(
+    jobEnabled(
+      "prepare",
+      "pull_request",
+      "refs/pull/1/merge",
+      "true",
+      "synchronize",
+      true,
+    ),
+    false,
+  );
+  for (const event of ["pull_request", "workflow_run", "schedule"]) {
+    for (const name of ["deploy", "deploy-com"]) {
+      assert.equal(jobEnabled(name, event, "refs/heads/main"), false);
+    }
+  }
+  assert.equal(jobEnabled("prepare", "workflow_run", "refs/heads/main"), false);
+  for (const name of ["prepare", "build"]) {
+    assert.doesNotMatch(productionJobs[name], /secrets\.|environment:/);
   }
 });

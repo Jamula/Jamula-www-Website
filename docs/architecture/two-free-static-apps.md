@@ -11,7 +11,17 @@ and response behavior independently before claiming operational success.
 
 The production workflow builds one artifact and deploys it to both apps. Pull request previews remain on the original .net app only. Deployment jobs use the `swa-deployment` GitHub environment, restricted to the `main` branch. The .net token is environment secret `SWA_NET_DEPLOYMENT_TOKEN`; the .com token is `SWA_COM_DEPLOYMENT_TOKEN`. Never commit their values.
 
-PR builds in `azure-static-web-apps.yml` do not deploy or consume deployment secrets, including for Dependabot. Production jobs in that workflow require both a `push` event and the main-only deployment environment; a PR cannot unlock that environment by editing a job condition. `azure-static-web-apps-preview.yml` runs from the default branch after a successful build and uses the same restricted environment. It resolves the current same-repository PR, checks the workflow identity and head SHA, verifies the artifact's GitHub SHA-256 digest, rejects unsafe archive entries, and requires `staticwebapp.config.json` to match the trusted default branch. It never installs dependencies or executes PR scripts. A trusted PR event passed to the pinned Azure action selects the numbered PR environment; the returned URL must match that environment before live verification. Closed PRs and PRs with no remaining deployable changes remove their previews through this same trusted workflow.
+PR builds in `azure-static-web-apps.yml` do not deploy or consume deployment secrets, including for Dependabot. Production jobs require a `push` or `workflow_dispatch` event on `refs/heads/main`, the latest-main SHA gate, and the main-only deployment environment; a PR cannot unlock that environment by editing a job condition. `azure-static-web-apps-preview.yml` runs from the default branch after a successful build and uses the same restricted environment. It resolves the current same-repository PR, checks the workflow identity and head SHA, verifies the artifact's GitHub SHA-256 digest, rejects unsafe archive entries, and requires `staticwebapp.config.json` to match the trusted default branch. It never installs dependencies or executes PR scripts. A trusted PR event passed to the pinned Azure action selects the numbered PR environment; the returned URL must match that environment before live verification. Closed PRs and PRs with no remaining deployable changes remove their previews through this same trusted workflow.
+
+For an authorized manual release, run
+`gh workflow run azure-static-web-apps.yml --ref main --repo Jamula/Jamula-www-Website`.
+The trigger has no revision or artifact override inputs. It rebuilds the exact
+event SHA and deploys the shared verified artifact to both existing apps through
+the normal production concurrency group and environment protections. Non-main
+refs and runs whose SHA is already stale at selection are not deployable. If
+selection skips a stale run, dispatch again on current `main`; never bypass the
+gate or promote a preview artifact. A successful dispatch request alone is not
+release evidence: await both deployment jobs and verify all four live hosts.
 
 Cyrus selected this existing-app boundary for issue #32: no new preview app.
 `SWA_NET_DEPLOYMENT_TOKEN` remains app-scoped, not preview-only. The protection
