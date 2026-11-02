@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "id": "048593fd-6467-4f1b-9a63-e70b7c070958",
+    "class": "DECISION",
+    "loadGuidance": "ALWAYS",
+    "title": "Shared SWA token accepted for issue #32",
+    "path": ".squad\\decisions\\inbox\\cyrus-jamula-via-copilot-shared-swa-token-accepted-for-issue-32-048593fd.md",
+    "status": "active",
+    "createdAt": "2026-11-02T00:36:45.989Z",
+    "updatedAt": "2026-11-02T00:36:45.989Z"
+  }
+]
