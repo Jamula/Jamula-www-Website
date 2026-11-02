@@ -164,10 +164,72 @@ var invalidImport = await Costs.CollectAsync(emptyCosts with { Status = "invalid
 Check(invalidImport.Status == "invalid" && invalidImport.ActionsStatus == "ok",
     "successful billing never hides invalid supplemental import");
 
+var observed = new Snapshot(GitHub.Repo, month.Value, month.Start, month.End, now, now, "Fixture",
+    new([], "ok", ""), new([], "ok", ""), empty, empty, automatic);
+Check(observed.ExitCode == 0, "CLI complete automatic billing succeeds");
+Check((observed with { Costs = denied }).ExitCode == 1, "CLI automatic billing failure returns nonzero");
+Check((observed with { Costs = importedFallback }).ExitCode == 1,
+    "CLI imported fallback does not conceal automatic source failure");
+Check((observed with { Costs = futureCosts }).ExitCode == 0, "CLI future billing not-applicable succeeds");
+Check((observed with { Costs = invalidImport }).ExitCode == 1, "CLI invalid cost import returns nonzero");
+Check((observed with { PullsSource = new(null, "unavailable", "") }).ExitCode == 1 &&
+    (observed with { IssuesSource = new(null, "unavailable", "") }).ExitCode == 1,
+    "CLI work-item source failures return nonzero");
+
 var directory = Path.Combine(Path.GetTempPath(), "jamula-mbr-tests-" + Guid.NewGuid());
 Directory.CreateDirectory(directory);
 try
 {
+    var snapshotPath = Path.Combine(directory, "snapshot.json");
+    var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+    try
+    {
+        await Task.WhenAll(Enumerable.Range(0, 12).Select(index =>
+            (observed with { Coverage = $"writer-{index}" }).SaveAsync(snapshotPath, options)));
+        var saved = JsonSerializer.Deserialize<Snapshot>(await File.ReadAllTextAsync(snapshotPath), options)!;
+        Check(saved.Month == month.Value && saved.Coverage.StartsWith("writer-", StringComparison.Ordinal) &&
+            saved.Costs.Measurements.Count == 3 && !Directory.EnumerateFiles(directory, "*.tmp").Any(),
+            "concurrent snapshot writers publish complete JSON without shared temp files");
+        var previous = await File.ReadAllTextAsync(snapshotPath);
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        try
+        {
+            await observed.SaveAsync(snapshotPath, options, cancelled.Token);
+            throw new Exception("Cancelled write succeeded.");
+        }
+        catch (OperationCanceledException)
+        {
+            Check(await File.ReadAllTextAsync(snapshotPath) == previous &&
+                !Directory.EnumerateFiles(directory, "*.tmp").Any(),
+                "cancelled snapshot write preserves saved observation and cleans temp file");
+        }
+        var occupied = Path.Combine(directory, "occupied");
+        Directory.CreateDirectory(occupied);
+        try
+        {
+            try
+            {
+                await observed.SaveAsync(occupied, options);
+                throw new Exception("Moved snapshot over directory.");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Check(!Directory.EnumerateFiles(directory, "*.tmp").Any(),
+                    "failed snapshot publication surfaces error and cleans temp file");
+            }
+        }
+        finally
+        {
+            Directory.Delete(occupied);
+            File.Delete(occupied + ".lock");
+        }
+    }
+    finally
+    {
+        File.Delete(snapshotPath);
+        File.Delete(snapshotPath + ".lock");
+    }
     var path = Path.Combine(directory, "costs.json");
     var cost = await Costs.ReadAsync(path, month, now);
     Check(cost.Status == "unknown" && cost.Measurements.Count == 0, "missing costs unknown, not zero");

@@ -9,6 +9,7 @@ const validMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(month) &&
 const monthStart = new Date(`${month}-01T00:00:00Z`);
 let snapshot;
 let refreshFailed = false;
+let freshnessTimer;
 
 function text(id, value) { $(id).textContent = value; }
 if (validMonth) text("month-title", new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(monthStart));
@@ -59,7 +60,7 @@ function render(data) {
     ? tokenKeys.map((key, index) => `${tokenLabels[index]}: ${value(key)}`).join("; ") : "No repository token source");
   text("actions-minutes", measures.has("actionsRunnerMinutes")
     ? `${value("actionsRunnerMinutes")} used; ${measures.has("actionsBillableMinutes")
-      ? `${number.format(measures.get("actionsBillableMinutes").value)} after discounts` : "billed minutes unknown"}`
+      ? `${value("actionsBillableMinutes")} after discounts` : "billed minutes unknown"}`
     : measures.has("actionsBillableMinutes") ? `${value("actionsBillableMinutes")} billable`
     : data.costs.actionsStatus === "unavailable" ? "Billing source unavailable"
     : data.costs.actionsStatus === "ok" ? "No runner usage reported"
@@ -110,7 +111,25 @@ function showStatus(refreshed) {
     : refreshed ? "Review updated." : "Saved review. Refresh for latest.");
 }
 
+function scheduleFreshness() {
+  clearTimeout(freshnessTimer);
+  if (!snapshot) return;
+  const remaining = new Date(snapshot.observedAt).getTime() + 86400000 - Date.now();
+  if (remaining > 0) freshnessTimer = setTimeout(() => {
+    if (!$("refresh").disabled) showStatus(false);
+    scheduleFreshness();
+  }, Math.min(remaining, 2147483647));
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && snapshot && !$("refresh").disabled) {
+    showStatus(false);
+    scheduleFreshness();
+  }
+});
+
 async function load(refresh) {
+  clearTimeout(freshnessTimer);
   $("refresh").disabled = true;
   text("status", refresh ? "Updating review..." : "Loading review...");
   $("status").dataset.error = "false";
@@ -132,6 +151,7 @@ async function load(refresh) {
     }
   } finally {
     $("refresh").disabled = false;
+    scheduleFreshness();
   }
 }
 $("refresh").addEventListener("click", () => void load(true));

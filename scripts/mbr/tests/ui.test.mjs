@@ -43,11 +43,22 @@ async function page(responses = [fixture()], search = "", clock = { now: instant
   };
   get("dashboard").hidden = true;
   const requests = [];
+  const timers = new Map();
+  const events = {};
+  const document = { getElementById: get, createElement: () => new Element(),
+    visibilityState: "visible", addEventListener: (name, callback) => { events[name] = callback; } };
+  let nextTimer = 0;
   vm.runInNewContext(script, {
-    document: { getElementById: get, createElement: () => new Element() },
+    document,
+    setTimeout: (callback, delay) => {
+      timers.set(++nextTimer, { callback, at: Clock.now() + delay });
+      return nextTimer;
+    },
+    clearTimeout: id => timers.delete(id),
     fetch: async (url, options) => {
-      const response = responses[Math.min(requests.length, responses.length - 1)];
+      const pending = responses[Math.min(requests.length, responses.length - 1)];
       requests.push({ url, options });
+      const response = await pending;
       if (response instanceof Error) throw response;
       return { ok: !response.error, status: response.error ? 404 : 200, json: async () => response };
     },
@@ -56,7 +67,13 @@ async function page(responses = [fixture()], search = "", clock = { now: instant
   });
   await flush();
   const attention = () => get("attention").children.map(row => row.children.map(x => x.textContent).join(": "));
-  return { get, requests, attention, elements };
+  const runTimers = () => {
+    for (const [id, timer] of [...timers]) if (timer.at <= Clock.now()) {
+      timers.delete(id);
+      timer.callback();
+    }
+  };
+  return { get, requests, attention, elements, runTimers, events, document, timers };
 }
 test("executive page has four business sections and no tracker controls or work-item links", () => {
   for (const heading of ["Delivery", "Open work", "Costs", "Needs attention"])
@@ -157,11 +174,21 @@ test("connected Actions billing shows used minutes, discounts and money without 
     { key: "actionsUsd", value: 0, basis: "actual", coveredFrom: data.periodStart, coveredThrough: instant }
   ] };
   const { get, attention } = await page([data]);
-  assert.equal(get("actions-minutes").textContent, "798 (actual, month to date) used; 0 after discounts");
+  assert.equal(get("actions-minutes").textContent, "798 (actual, month to date) used; 0 (actual, month to date) after discounts");
   assert.equal(get("recorded-spend").textContent, "Actions: $0.00 (actual, month to date)");
   assert.equal(get("ai-tokens").textContent, "No repository token source");
   assert.equal(get("spend-summary").textContent, "Reported spend; total unverified.");
   assert.ok(attention().includes("Cost control: Actions charges are reported. Connect repository AI usage to complete cost visibility."));
+});
+test("mixed Actions rows retain each measure's basis and coverage", async () => {
+  const data = fixture();
+  data.costs = { status: "imported", measurements: [
+    { key: "actionsRunnerMinutes", value: 798, basis: "actual", coveredFrom: data.periodStart, coveredThrough: instant },
+    { key: "actionsBillableMinutes", value: 0, basis: "estimated", coveredFrom: "2026-11-02T00:00:00Z", coveredThrough: instant }
+  ] };
+  const { get } = await page([data]);
+  assert.equal(get("actions-minutes").textContent,
+    "798 (actual, month to date) used; 0 (estimated, partial period) after discounts");
 });
 test("billing access failure is visible without inventing zero or concealing the partial source", async () => {
   const data = fixture();
@@ -263,6 +290,41 @@ test("partial and stale saved data surface both limitations together", async () 
   const { get } = await page([data]);
   assert.equal(get("status").textContent, "Partial saved review, at least a day old. Refresh to retry.");
   assert.equal(get("status").dataset.error, "true");
+});
+test("an open review becomes stale at expiry without fetching or waiting for interaction", async () => {
+  const clock = { now: instant };
+  const { get, runTimers, requests, timers } = await page([fixture()], "", clock);
+  clock.now = "2026-11-03T02:59:59.999Z";
+  runTimers();
+  assert.equal(get("status").textContent, "Saved review. Refresh for latest.");
+  clock.now = "2026-11-03T03:00:00Z";
+  runTimers();
+  assert.equal(get("status").textContent, "Saved review is at least a day old. Refresh for current data.");
+  assert.equal(get("status").dataset.error, "true");
+  assert.equal(requests.length, 1);
+  assert.equal(timers.size, 0);
+});
+test("visibility rechecks stale data without overwriting an in-flight refresh", async () => {
+  const clock = { now: instant };
+  let finish;
+  const pending = new Promise(resolve => { finish = resolve; });
+  const { get, events, runTimers, requests } = await page([fixture(), pending], "", clock);
+  get("refresh").events.click();
+  clock.now = "2026-11-03T03:00:00Z";
+  events.visibilitychange();
+  runTimers();
+  assert.equal(get("status").textContent, "Updating review...");
+  assert.equal(get("refresh").disabled, true);
+  const updated = fixture();
+  updated.observedAt = clock.now;
+  finish(updated);
+  await flush();
+  assert.equal(get("status").textContent, "Review updated.");
+  clock.now = "2026-11-04T03:00:00Z";
+  events.visibilitychange();
+  assert.equal(get("status").textContent, "Saved review is at least a day old. Refresh for current data.");
+  assert.equal(get("status").dataset.error, "true");
+  assert.equal(requests.length, 2);
 });
 test("October review requests the selected month and separates full-month delivery from current priorities", async () => {
   const data = fixture();

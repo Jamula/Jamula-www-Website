@@ -27,9 +27,7 @@ async Task<Snapshot> Refresh(string value, CancellationToken cancellationToken)
         pullsTask.Result, issuesTask.Result, Metrics.Summarize(pullsTask.Result, month, now, true),
         Metrics.Summarize(issuesTask.Result, month, now, false), costs);
     var path = Path.Combine(dataDirectory, $"snapshot-{month.Value}.json");
-    var temporary = path + ".tmp";
-    await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(snapshot, json), cancellationToken);
-    File.Move(temporary, path, overwrite: true);
+    await snapshot.SaveAsync(path, json, cancellationToken);
     return snapshot;
 }
 
@@ -37,8 +35,7 @@ if (args.Length == 2 && args[0] == "--snapshot")
 {
     var snapshot = await Refresh(args[1], CancellationToken.None);
     Console.WriteLine(JsonSerializer.Serialize(snapshot, json));
-    return snapshot.PullsSource.Status == "ok" && snapshot.IssuesSource.Status == "ok" &&
-        snapshot.Costs.Status != "invalid" ? 0 : 1;
+    return snapshot.ExitCode;
 }
 if (args.Length != 0)
 {
@@ -103,7 +100,38 @@ return 0;
 /// <summary>A persisted, repository-only observation with explicit source health.</summary>
 public sealed record Snapshot(string Repo, string Month, DateTimeOffset PeriodStart, DateTimeOffset PeriodEnd,
     DateTimeOffset RefreshStartedAt, DateTimeOffset ObservedAt, string Coverage,
-    SourceResult PullsSource, SourceResult IssuesSource, WorkSummary Pulls, WorkSummary Issues, CostResult Costs);
+    SourceResult PullsSource, SourceResult IssuesSource, WorkSummary Pulls, WorkSummary Issues, CostResult Costs)
+{
+    /// <summary>Missing automatic sources and invalid evidence make CLI collection incomplete.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int ExitCode => PullsSource.Status == "ok" && IssuesSource.Status == "ok" &&
+        Costs.Status != "invalid" && Costs.ActionsStatus != "unavailable" ? 0 : 1;
+
+    /// <summary>Publishes one complete observation without sharing a temporary file with other collectors.</summary>
+    public async Task SaveAsync(string path, JsonSerializerOptions options, CancellationToken cancellationToken = default)
+    {
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(this, options), cancellationToken);
+            // Windows can reject simultaneous replacements even with distinct temporary files.
+            for (var attempt = 0; ; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                FileStream publicationLock;
+                try { publicationLock = new FileStream(path + ".lock", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None); }
+                catch (IOException ex) when (attempt < 100 && (ex.HResult & 0xFFFF) is 11 or 32 or 33)
+                {
+                    await Task.Delay(20, cancellationToken);
+                    continue;
+                }
+                using (publicationLock) File.Move(temporary, path, overwrite: true);
+                break;
+            }
+        }
+        finally { File.Delete(temporary); }
+    }
+}
 
 /// <summary>Prevents cross-site requests to the authenticated loopback collector.</summary>
 public static class RequestPolicy

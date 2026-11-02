@@ -85,6 +85,12 @@ not a forecast.
 Without an explicit `?month=`, Refresh follows the current UTC month even if the
 page was left open across a month boundary. An explicit month stays pinned.
 The heading changes only after data for the requested month loads successfully.
+Freshness is rechecked at the 24-hour boundary and when the page becomes visible,
+without fetching GitHub or replacing an in-progress refresh message.
+Concurrent server/CLI collectors use separate temporary files before atomic
+snapshot replacement; the last successful publication wins. A per-snapshot
+`.lock` file serializes publication across processes (bounded sharing-lock retry);
+it contains no data and remains in ignored local storage.
 
 Only fixed endpoints are exposed. A same-origin POST with `X-MBR-Refresh: 1`
 refreshes; GET only reads local data. Month input never becomes a shell command.
@@ -208,6 +214,10 @@ Successful automatic billing takes precedence over matching imported keys;
 other imports (including AI) are retained. If billing fails, valid imported
 measurements remain visible with the source warning. An invalid supplemental
 import remains an explicit error even when automatic billing succeeds.
+The snapshot CLI exits nonzero for unavailable automatic billing as well as
+work-item source failures or invalid imports. Future billing marked not-applicable
+does not fail collection. The snapshot is still saved for inspection on partial
+collection.
 
 The snapshot retains actual/estimated basis, source, scope, coverage and recording
 time. Imported values on the executive page label their basis and whether they
@@ -216,6 +226,8 @@ stay separate and Actions minutes distinguish usage before and after discounts,
 not elapsed workflow time. Missing usage identifies its unconnected/unavailable
 source; no recorded money is "Spend not measured". Recorded money is labeled
 "Reported spend; total unverified", never total spend.
+Each imported Actions minute row retains its own basis and coverage on the page;
+an estimated partial-period net value cannot inherit an actual full-period label.
 Positive amounts below one cent display as `< $0.01`, not a rounded `$0.00`;
 an explicitly recorded zero still displays as `$0.00`.
 **Total repo spend always remains Unknown**
