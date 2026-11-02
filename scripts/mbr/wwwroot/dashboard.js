@@ -15,9 +15,12 @@ function render(data) {
   snapshot = data;
   $("dashboard").hidden = false;
   const historical = new Date(data.periodEnd) <= new Date(data.observedAt);
-  text("coverage", historical ? "Full month / repository activity" : "Month to date / repository activity");
-  text("open-coverage", historical ? "Current workload, not month-end backlog" : "Current workload");
-  text("attention-title", historical ? "Needs attention now" : "Needs attention");
+  const future = new Date(data.periodStart) > new Date(data.observedAt);
+  text("coverage", future ? "Future month / no activity observations yet"
+    : historical ? "Full month / repository activity" : "Month to date / repository activity");
+  text("open-coverage", historical ? "Current workload, not month-end backlog"
+    : future ? "Current workload, not a forecast" : "Current workload");
+  text("attention-title", historical || future ? "Needs attention now" : "Needs attention");
   for (const [id, items] of [["merged-prs", data.pulls.completed], ["completed-issues", data.issues.completed],
     ["active-prs", data.pulls.active], ["active-issues", data.issues.active]]) {
     text(id, items ? number.format(items.length) : "Unknown");
@@ -27,7 +30,7 @@ function render(data) {
   const contactPathOpen = data.issues.active?.some(item => item.number === 86) ?? false;
   const issuesKnown = data.issuesSource.status === "ok";
   text("readout-title", !issuesKnown ? "Business priorities need current evidence."
-    : contactPathOpen ? historical ? "Current priority: the homepage inquiry path remains open."
+    : contactPathOpen ? historical || future ? "Current priority: the homepage inquiry path remains open."
       : "The homepage inquiry path is still open work."
     : "Repository activity is recorded. Business impact is not measured.");
   text("readout", !issuesKnown ? "Issue data is unavailable; this review cannot confirm the commercial priority."
@@ -39,7 +42,7 @@ function render(data) {
     const m = measures.get(key);
     if (!m) return "Not tracked";
     const coverageEnd = Math.min(new Date(data.periodEnd).getTime(), new Date(data.observedAt).getTime());
-    const period = new Date(m.coveredFrom) > new Date(data.periodStart) ||
+    const period = future ? "future period" : new Date(m.coveredFrom) > new Date(data.periodStart) ||
       new Date(m.coveredThrough).getTime() < coverageEnd ? "partial period" : historical ? "full month" : "month to date";
     const formatted = money ? m.value > 0 && m.value < 0.01 ? "< $0.01" : usd.format(m.value)
       : number.format(m.value);

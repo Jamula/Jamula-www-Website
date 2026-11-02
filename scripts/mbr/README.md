@@ -80,6 +80,8 @@ The page has no month-picker controls. Refresh stays scoped to the requested
 month. Completed months show full-month activity; their open-work counts and
 management priorities are explicitly current, not reconstructed historical
 backlog or a statement about which constraints existed during that month.
+Future months explicitly have no activity observations yet; present workload is
+not a forecast.
 
 Only fixed endpoints are exposed. A same-origin POST with `X-MBR-Refresh: 1`
 refreshes; GET only reads local data. Month input never becomes a shell command.

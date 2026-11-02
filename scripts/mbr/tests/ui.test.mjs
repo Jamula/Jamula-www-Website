@@ -256,3 +256,18 @@ test("invalid month addresses are rejected visibly without fetching another mont
     assert.equal(get("status").textContent, "Invalid review month. Use ?month=YYYY-MM in the page address.");
   }
 });
+test("future months disclose absent observations and never label present backlog as a forecast", async () => {
+  const data = fixture();
+  data.month = "2026-12";
+  data.periodStart = "2026-12-01T00:00:00Z";
+  data.periodEnd = "2027-01-01T00:00:00Z";
+  data.pulls.completed = [];
+  data.issues.completed = [];
+  const { get } = await page([data], "?month=2026-12");
+  assert.equal(get("month-title").textContent, "December 2026");
+  assert.equal(get("coverage").textContent, "Future month / no activity observations yet");
+  assert.equal(get("open-coverage").textContent, "Current workload, not a forecast");
+  assert.equal(get("attention-title").textContent, "Needs attention now");
+  assert.equal(get("merged-prs").textContent, "0");
+  assert.equal(get("readout-title").textContent, "Current priority: the homepage inquiry path remains open.");
+});
