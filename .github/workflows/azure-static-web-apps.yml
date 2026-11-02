@@ -1,6 +1,7 @@
 name: Azure Static Web Apps
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -32,9 +33,13 @@ jobs:
   prepare:
     name: Select deployment
     if: >-
-      github.event_name == 'push'
+      (
+        (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        && github.ref == 'refs/heads/main'
+      )
       || (
-        github.event.action != 'closed'
+        github.event_name == 'pull_request'
+        && github.event.action != 'closed'
         && github.event.pull_request.head.repo.full_name == github.repository
       )
     runs-on: ubuntu-latest
@@ -57,12 +62,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "push" || "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
             latest_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
-            if [[ "$latest_main" == "$GITHUB_SHA" ]]; then
+            if [[ "$GITHUB_REF" == "refs/heads/main" && "$latest_main" == "$GITHUB_SHA" ]]; then
               echo "should_deploy=true" >> "$GITHUB_OUTPUT"
             else
-              echo "Skipping stale production revision $GITHUB_SHA; main is $latest_main."
+              echo "Skipping non-main or stale production revision $GITHUB_SHA on $GITHUB_REF; main is $latest_main."
               echo "should_deploy=false" >> "$GITHUB_OUTPUT"
             fi
           elif git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- \
@@ -155,7 +160,10 @@ jobs:
   deploy:
     name: Deploy and verify
     needs: [prepare, build]
-    if: needs.prepare.outputs.should_deploy == 'true' && github.event_name == 'push'
+    if: >-
+      needs.prepare.outputs.should_deploy == 'true'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: swa-deployment
     steps:
@@ -289,7 +297,10 @@ jobs:
   deploy-com:
     name: Deploy and verify .com app
     needs: [prepare, build]
-    if: needs.prepare.outputs.should_deploy == 'true' && github.event_name == 'push'
+    if: >-
+      needs.prepare.outputs.should_deploy == 'true'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: swa-deployment
     steps:
