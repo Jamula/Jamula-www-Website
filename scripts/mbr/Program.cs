@@ -20,6 +20,7 @@ async Task<Snapshot> Refresh(string value, CancellationToken cancellationToken)
     await Task.WhenAll(pullsTask, issuesTask);
     var now = DateTimeOffset.UtcNow;
     var costs = await Costs.ReadAsync(Path.Combine(dataDirectory, $"costs-{month.Value}.json"), month, now, cancellationToken);
+    costs = await Costs.CollectAsync(costs, month, now, cancellationToken);
     var snapshot = new Snapshot(GitHub.Repo, month.Value, month.Start, month.End, started, now,
         month.Start > now ? "Future period; no delivery observations yet" :
         month.End > now ? "Month to date (UTC)" : "Past UTC month; latest state, not an archived month-end snapshot",

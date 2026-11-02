@@ -73,7 +73,7 @@ test("business readout leads with the open contact-path priority, not activity a
   assert.equal(get("readout").textContent, "Proposed focus: confirm the owner-approved contact destination and wording, then publish the inquiry path.");
   assert.deepEqual(attention(), [
     "Commercial readiness: Confirm the approved contact path, then publish it.",
-    "Cost control: Record AI and Actions costs before confirming zero incremental spend.",
+    "Cost control: Connect AI and Actions usage before confirming zero incremental spend.",
     "Business impact: Customer inquiries and revenue impact are not measured in this review."
   ]);
 });
@@ -113,8 +113,8 @@ test("unavailable sources stay unknown and attention remains bounded with an exp
 test("missing costs never imply free operation or measured zero", async () => {
   const { get } = await page();
   assert.equal(get("spend-summary").textContent, "Spend not measured.");
-  assert.equal(get("ai-tokens").textContent, "Not tracked");
-  assert.equal(get("actions-minutes").textContent, "Not tracked");
+  assert.equal(get("ai-tokens").textContent, "No repository token source");
+  assert.equal(get("actions-minutes").textContent, "Usage source not connected");
   assert.equal(get("recorded-spend").hidden, true);
   assert.equal(get("recorded-spend").textContent, "");
 });
@@ -133,8 +133,8 @@ test("imported usage preserves separate token categories, basis and partial cove
   ] };
   const { get, attention } = await page([data]);
   assert.equal(get("ai-tokens").textContent, "input: 120 (actual, month to date); output: 0 (actual, month to date); cache read: 50 (actual, month to date); cache write: 20 (actual, month to date)");
-  assert.equal(get("actions-minutes").textContent, "0 (actual, month to date)");
-  assert.equal(get("spend-summary").textContent, "Partial spend recorded; total unverified.");
+  assert.equal(get("actions-minutes").textContent, "0 (actual, month to date) billable");
+  assert.equal(get("spend-summary").textContent, "Reported spend; total unverified.");
   assert.equal(get("recorded-spend").textContent, "AI: $1.50 (estimated, partial period); Actions: $0.00 (actual, month to date); Domain: $2.00 (actual, month to date)");
   assert.equal(get("recorded-spend").hidden, false);
   assert.ok(attention().includes("Cost control: Reconcile recorded spend and coverage before confirming the full cost."));
@@ -146,8 +146,46 @@ test("partial token evidence and elapsed-only minutes cannot masquerade as compl
     { key: "actionsElapsedMinutes", value: 90, basis: "actual", coveredFrom: data.periodStart, coveredThrough: instant }
   ] };
   const { get } = await page([data]);
-  assert.equal(get("ai-tokens").textContent, "input: 5 (estimated, partial period); output: Not tracked; cache read: Not tracked; cache write: Not tracked");
-  assert.equal(get("actions-minutes").textContent, "Not tracked");
+  assert.equal(get("ai-tokens").textContent, "input: 5 (estimated, partial period); output: Not connected; cache read: Not connected; cache write: Not connected");
+  assert.equal(get("actions-minutes").textContent, "Usage source not connected");
+});
+test("connected Actions billing shows used minutes, discounts and money without inventing AI usage", async () => {
+  const data = fixture();
+  data.costs = { status: "collected", actionsStatus: "ok", measurements: [
+    { key: "actionsRunnerMinutes", value: 798, basis: "actual", coveredFrom: data.periodStart, coveredThrough: instant },
+    { key: "actionsBillableMinutes", value: 0, basis: "actual", coveredFrom: data.periodStart, coveredThrough: instant },
+    { key: "actionsUsd", value: 0, basis: "actual", coveredFrom: data.periodStart, coveredThrough: instant }
+  ] };
+  const { get, attention } = await page([data]);
+  assert.equal(get("actions-minutes").textContent, "798 (actual, month to date) used; 0 after discounts");
+  assert.equal(get("recorded-spend").textContent, "Actions: $0.00 (actual, month to date)");
+  assert.equal(get("ai-tokens").textContent, "No repository token source");
+  assert.equal(get("spend-summary").textContent, "Reported spend; total unverified.");
+  assert.ok(attention().includes("Cost control: Actions charges are reported. Connect repository AI usage to complete cost visibility."));
+});
+test("billing access failure is visible without inventing zero or concealing the partial source", async () => {
+  const data = fixture();
+  data.costs.actionsStatus = "unavailable";
+  const { get } = await page([data]);
+  assert.equal(get("actions-minutes").textContent, "Billing source unavailable");
+  assert.equal(get("status").textContent, "Partial review. Some data is unavailable.");
+  assert.equal(get("status").dataset.error, "true");
+});
+test("storage-only billing does not imply zero runner minutes or an unconnected source", async () => {
+  const data = fixture();
+  data.costs.actionsStatus = "ok";
+  data.costs.measurements = [
+    { key: "actionsUsd", value: 0.001, basis: "actual", coveredFrom: data.periodStart, coveredThrough: instant }
+  ];
+  const { get } = await page([data]);
+  assert.equal(get("actions-minutes").textContent, "No runner usage reported");
+  assert.equal(get("recorded-spend").textContent, "Actions: < $0.01 (actual, month to date)");
+});
+test("future billing has no observations rather than zero usage", async () => {
+  const data = fixture();
+  data.costs.actionsStatus = "not-applicable";
+  const { get } = await page([data]);
+  assert.equal(get("actions-minutes").textContent, "No observations yet");
 });
 test("nonzero sub-cent spend never displays as zero while documented zero stays zero", async () => {
   for (const [value, expected] of [[0, "$0.00"], [0.004, "< $0.01"], [0.009, "< $0.01"], [0.01, "$0.01"]]) {
@@ -157,7 +195,7 @@ test("nonzero sub-cent spend never displays as zero while documented zero stays 
     }] };
     const { get } = await page([data]);
     assert.equal(get("recorded-spend").textContent, `AI: ${expected} (actual, month to date)`);
-    assert.equal(get("spend-summary").textContent, "Partial spend recorded; total unverified.");
+    assert.equal(get("spend-summary").textContent, "Reported spend; total unverified.");
   }
 });
 test("invalid cost evidence surfaces a corrective action rather than hiding failure", async () => {

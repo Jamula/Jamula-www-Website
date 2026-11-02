@@ -47,7 +47,7 @@ public static class GitHub
         throw new InvalidOperationException("Safety limit reached; completeness cannot be established.");
     }
 
-    private static async Task<string> RunGhAsync(string endpoint, CancellationToken cancellationToken)
+    internal static async Task<string> RunGhAsync(string endpoint, CancellationToken cancellationToken)
     {
         var info = new ProcessStartInfo("gh")
         {
@@ -55,7 +55,7 @@ public static class GitHub
             CreateNoWindow = true
         };
         foreach (var argument in new[] { "api", "--hostname", "github.com", "--method", "GET",
-            "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28", endpoint })
+            "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2026-03-10", endpoint })
             info.ArgumentList.Add(argument);
         info.Environment["GH_PROMPT_DISABLED"] = "1";
         info.Environment["GH_PAGER"] = "cat";

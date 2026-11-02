@@ -122,13 +122,40 @@ page; no GitHub search 1,000-result cap or CLI default list limit. Any page fail
 discards that source, preventing partial counts. A 200-page safety ceiling reports
 Unavailable rather than claiming completeness. Large repositories incur more
 read calls. Review status, CI blocking and Actions job history are not queried.
+Actions billing uses one additional, repository-filtered monthly summary request.
 
 ## AI tokens, Actions minutes and money
 
-Costs start **Unknown**, not zero. GitHub work-item APIs do not expose repository
-AI tokens. This tool deliberately does not read user-wide Copilot session history,
-organization billing or unrelated repositories. It does not interpret Copilot
-usage multipliers as dollars or whole-session aggregates as monthly usage.
+Refresh automatically reads the **repository-filtered Actions billing summary**:
+`GET /organizations/Jamula/settings/billing/usage/summary?year=YYYY&month=M&repository=Jamula%2FJamula-www-Website&product=actions`.
+It never falls back to organization-wide billing or another repository. Existing
+`gh` credentials must already have access (the endpoint requires organization
+administrator access); the dashboard never requests additional permissions.
+If access, network, schema or attribution checks fail, the page reports
+"Billing source unavailable" and a partial review, not zero. Future months
+are not queried. Empty reports do not establish measured zero.
+
+The summary must confirm repository, organization, product and selected month.
+Runner minutes sum minute-denominated SKUs' `grossQuantity` before discounts;
+`netQuantity` is shown separately after discounts. Reported net Actions USD sums
+`netAmount` across runner and storage rows. Storage quantities never become minutes.
+These are GitHub-reported usage and charges, **not job wall time or a final invoice**;
+reporting can lag, including after month end. Unknown units or malformed rows
+make the source unavailable rather than silently dropping costs.
+
+Official source: GitHub, [REST API billing usage / organization summary](https://docs.github.com/en/rest/billing/usage#get-billing-usage-summary-for-an-organization),
+verified 2026-11-02 UTC against API version `2026-03-10`. This endpoint is public
+preview. The live October 2026 filtered response confirmed the repository scope,
+798 gross runner minutes, zero net minutes after discounts, and USD 0 net
+reported Actions charges (including storage). This dated observation is not a
+promise of future free operation.
+
+AI tokens remain **unknown**, not zero, until a repository-attributed provider
+export is imported. The UI says "No repository token source", not "Not tracked".
+GitHub AI credits/premium requests are not input/output/cache token counts.
+This tool deliberately does not read user-wide Copilot session history or
+unrelated accounts. It does not interpret Copilot usage multipliers as dollars
+or whole-session aggregates as monthly usage.
 
 Use an optional, manually sourced `.local\costs-YYYY-MM.json`. Only attribute data
 to this repo when your evidence supports that scope. Do not copy raw invoices,
@@ -163,7 +190,8 @@ Supported keys:
 - `aiInputTokens`, `aiOutputTokens`, `aiCacheReadTokens`, `aiCacheWriteTokens`:
   separate nonnegative integer counts; do not double-count cache categories.
 - `actionsElapsedMinutes`: summed elapsed **job** time, if independently sourced.
-- `actionsBillableMinutes`: known billable runner usage, not workflow wall time.
+- `actionsRunnerMinutes`: reported runner usage before discounts.
+- `actionsBillableMinutes`: reported runner usage after discounts, not workflow wall time.
 - `aiUsd`, `actionsUsd`, `hostingUsd`, `domainUsd`: independently attributed amounts.
 
 `basis` is `actual` or `estimated`. Every row needs a source, exact repository
@@ -176,13 +204,18 @@ The importer validates structure/coverage, not the truth of user-supplied eviden
 Missing required fields (including an omitted amount), duplicate keys, negative
 values, unknown fields, wrong scope and invalid estimates
 reject the entire import explicitly. Refresh after changing an import.
+Successful automatic billing takes precedence over matching imported keys;
+other imports (including AI) are retained. If billing fails, valid imported
+measurements remain visible with the source warning. An invalid supplemental
+import remains an explicit error even when automatic billing succeeds.
 
 The snapshot retains actual/estimated basis, source, scope, coverage and recording
 time. Imported values on the executive page label their basis and whether they
 cover the month to date or only a partial period. AI input/output/cache categories
-stay separate and Actions minutes mean billable runner minutes, not elapsed
-workflow time. Missing usage is "Not tracked"; no recorded money is "Spend not
-measured". Recorded money is labeled partial spend, never total spend.
+stay separate and Actions minutes distinguish usage before and after discounts,
+not elapsed workflow time. Missing usage identifies its unconnected/unavailable
+source; no recorded money is "Spend not measured". Recorded money is labeled
+"Reported spend; total unverified", never total spend.
 Positive amounts below one cent display as `< $0.01`, not a rounded `$0.00`;
 an explicitly recorded zero still displays as `$0.00`.
 **Total repo spend always remains Unknown**

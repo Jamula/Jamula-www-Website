@@ -86,6 +86,84 @@ Check(!RequestPolicy.Allows("POST", "https://evil.example", "cross-site", "1", "
     !RequestPolicy.Allows("GET", "", "cross-site", "", "127.0.0.1:42") &&
     !RequestPolicy.Allows("POST", "http://127.0.0.1:42", "same-origin", "", "127.0.0.1:42"), "cross-site and simple refresh denied");
 
+string Billing() => """
+{"organization":"Jamula","repository":"Jamula/Jamula-www-Website","product":"Actions",
+"timePeriod":{"year":2026,"month":11},"usageItems":[
+{"product":"Actions","unitType":"minutes","grossQuantity":798,"netQuantity":0,"netAmount":0},
+{"product":"Actions","unitType":"minutes","grossQuantity":2,"netQuantity":1,"netAmount":0.006},
+{"product":"Actions","unitType":"gigabyte-hours","grossQuantity":0.5,"netQuantity":0,"netAmount":0}]}
+""";
+var billing = Costs.ReadActions(Billing(), month, now);
+Check(billing.Single(m => m.Key == "actionsRunnerMinutes").Value == 800 &&
+    billing.Single(m => m.Key == "actionsBillableMinutes").Value == 1 &&
+    billing.Single(m => m.Key == "actionsUsd").Value == 0.006m,
+    "Actions sums runner SKUs and separates gross minutes, discounted minutes and net dollars");
+Check(billing.All(m => m.Scope == GitHub.Repo && m.AsOf == now && m.CoveredFrom == month.Start &&
+    m.CoveredThrough == now && m.Basis == "actual" && m.Source.Contains("repository-filtered")),
+    "Actions preserves repository source and month-to-date coverage");
+var october = ReviewMonth.Parse("2026-10");
+Check(Costs.ReadActions(Billing().Replace("\"month\":11", "\"month\":10"), october, now)
+    .All(m => m.CoveredThrough == october.End), "Actions historical coverage stops at month end");
+foreach (var (bad, label) in new[]
+{
+    (Billing().Replace(GitHub.Repo, "other/repo"), "wrong repository"),
+    (Billing().Replace("\"organization\":\"Jamula\"", "\"organization\":\"other\""), "wrong organization"),
+    (Billing().Replace("\"month\":11", "\"month\":10"), "wrong period"),
+    (Billing().Replace("\"year\":2026", "\"year\":2025"), "wrong year"),
+    (Billing().Replace("\"month\":11", "\"month\":11,\"day\":1"), "daily instead of monthly"),
+    (Billing().Replace("\"product\":\"Actions\"", "\"product\":\"Copilot\""), "wrong product"),
+    (Billing().Replace("\"minutes\"", "\"credits\""), "unknown units"),
+    (Billing().Replace("\"netAmount\":0.006", "\"netAmount\":-1"), "negative amount"),
+    (Billing().Replace("\"netAmount\":0.006", "\"unexpected\":0.006"), "missing amount"),
+    (Billing().Replace("\"netQuantity\":1", "\"netQuantity\":3"), "net exceeds gross"),
+    (Billing().Replace("\"grossQuantity\":2", "\"grossQuantity\":-2"), "negative usage"),
+    (Billing().Replace("\"grossQuantity\":2", "\"grossQuantity\":\"two\""), "malformed usage"),
+    ("""{"organization":"Jamula","repository":"Jamula/Jamula-www-Website","product":"Actions","timePeriod":{"year":2026,"month":11},"usageItems":[]}""", "no usage evidence")
+})
+{
+    try { Costs.ReadActions(bad, month, now); throw new Exception("Accepted unverified billing."); }
+    catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+    { Check(true, "Actions rejects " + label); }
+}
+var storageOnly = Costs.ReadActions("""
+{"organization":"Jamula","repository":"Jamula/Jamula-www-Website","product":"Actions",
+"timePeriod":{"year":2026,"month":11},"usageItems":[
+{"product":"Actions","unitType":"gigabyte-hours","grossQuantity":1,"netQuantity":1,"netAmount":0.001}]}
+""", month, now);
+Check(storageOnly.Count == 1 && storageOnly[0].Key == "actionsUsd", "storage-only report never invents zero runner minutes");
+var emptyCosts = new CostResult("unknown", "Fixture", []);
+var automatic = await Costs.CollectAsync(emptyCosts, month, now, read: endpoint =>
+{
+    Check(endpoint.Contains("repository=Jamula%2FJamula-www-Website&product=actions") &&
+        endpoint.Contains("year=2026&month=11"), "Actions request is fixed-repository filtered before fetching");
+    return Task.FromResult(Billing());
+});
+Check(automatic.ActionsStatus == "ok" && automatic.Status == "collected" &&
+    automatic.Measurements.Count == 3, "Actions successful collection exposes real measurements");
+var denied = await Costs.CollectAsync(emptyCosts, month, now, read: _ => throw new IOException("private account detail"));
+Check(denied.ActionsStatus == "unavailable" && denied.Measurements.Count == 0 &&
+    !denied.ActionsDetail!.Contains("private account detail"), "Actions access failure stays unknown and sanitizes errors");
+var malformedBilling = await Costs.CollectAsync(emptyCosts, month, now, read: _ => Task.FromResult("{}"));
+Check(malformedBilling.ActionsStatus == "unavailable" && malformedBilling.Measurements.Count == 0,
+    "Actions malformed billing cannot produce success-shaped zero");
+var futureCosts = await Costs.CollectAsync(emptyCosts, ReviewMonth.Parse("2026-12"), now,
+    read: _ => throw new Exception("Future billing should not be queried."));
+Check(futureCosts.ActionsStatus == "not-applicable", "Actions future month makes no billing request");
+var importedCosts = new CostResult("imported", "Fixture", [
+    new("aiInputTokens", 100, "actual", "Fixture", GitHub.Repo, now, month.Start, now),
+    new("actionsUsd", 999, "actual", "Fixture", GitHub.Repo, now, month.Start, now)]);
+var combined = await Costs.CollectAsync(importedCosts, month, now, read: _ => Task.FromResult(Billing()));
+Check(combined.Measurements.Single(m => m.Key == "aiInputTokens").Value == 100 &&
+    combined.Measurements.Single(m => m.Key == "actionsUsd").Value == 0.006m,
+    "automatic billing supersedes matching imported keys without losing AI evidence");
+var importedFallback = await Costs.CollectAsync(importedCosts, month, now, read: _ => throw new IOException());
+Check(importedFallback.Measurements.SequenceEqual(importedCosts.Measurements) &&
+    importedFallback.ActionsStatus == "unavailable", "billing failure preserves explicit imports with source warning");
+var invalidImport = await Costs.CollectAsync(emptyCosts with { Status = "invalid" }, month, now,
+    read: _ => Task.FromResult(Billing()));
+Check(invalidImport.Status == "invalid" && invalidImport.ActionsStatus == "ok",
+    "successful billing never hides invalid supplemental import");
+
 var directory = Path.Combine(Path.GetTempPath(), "jamula-mbr-tests-" + Guid.NewGuid());
 Directory.CreateDirectory(directory);
 try

@@ -44,7 +44,7 @@ function render(data) {
   const measures = new Map(data.costs.measurements.map(m => [m.key, m]));
   const value = (key, money = false) => {
     const m = measures.get(key);
-    if (!m) return "Not tracked";
+    if (!m) return "Not connected";
     const coverageEnd = Math.min(new Date(data.periodEnd).getTime(), new Date(data.observedAt).getTime());
     const period = future ? "future period" : new Date(m.coveredFrom) > new Date(data.periodStart) ||
       new Date(m.coveredThrough).getTime() < coverageEnd ? "partial period" : historical ? "full month" : "month to date";
@@ -56,12 +56,18 @@ function render(data) {
   const tokenLabels = ["input", "output", "cache read", "cache write"];
   const recordedTokens = tokenKeys.filter(key => measures.has(key));
   text("ai-tokens", recordedTokens.length
-    ? tokenKeys.map((key, index) => `${tokenLabels[index]}: ${value(key)}`).join("; ") : "Not tracked");
-  text("actions-minutes", value("actionsBillableMinutes"));
+    ? tokenKeys.map((key, index) => `${tokenLabels[index]}: ${value(key)}`).join("; ") : "No repository token source");
+  text("actions-minutes", measures.has("actionsRunnerMinutes")
+    ? `${value("actionsRunnerMinutes")} used; ${measures.has("actionsBillableMinutes")
+      ? `${number.format(measures.get("actionsBillableMinutes").value)} after discounts` : "billed minutes unknown"}`
+    : measures.has("actionsBillableMinutes") ? `${value("actionsBillableMinutes")} billable`
+    : data.costs.actionsStatus === "unavailable" ? "Billing source unavailable"
+    : data.costs.actionsStatus === "ok" ? "No runner usage reported"
+    : data.costs.actionsStatus === "not-applicable" ? "No observations yet" : "Usage source not connected");
   const moneyKeys = ["aiUsd", "actionsUsd", "hostingUsd", "domainUsd"];
   const moneyLabels = ["AI", "Actions", "Hosting", "Domain"];
   const hasMoney = moneyKeys.some(key => measures.has(key));
-  text("spend-summary", hasMoney ? "Partial spend recorded; total unverified." : "Spend not measured.");
+  text("spend-summary", hasMoney ? "Reported spend; total unverified." : "Spend not measured.");
   $("recorded-spend").hidden = !hasMoney;
   text("recorded-spend", moneyKeys.flatMap((key, index) => measures.has(key)
     ? [`${moneyLabels[index]}: ${value(key, true)}`] : []).join("; "));
@@ -74,7 +80,8 @@ function render(data) {
   if (data.costs.status === "invalid") attention.push(["Cost control",
     "Correct the cost import; spend cannot be verified."]);
   else if (!measures.has("aiUsd") || !measures.has("actionsUsd")) attention.push(["Cost control",
-    "Record AI and Actions costs before confirming zero incremental spend."]);
+    measures.has("actionsUsd") ? "Actions charges are reported. Connect repository AI usage to complete cost visibility."
+      : "Connect AI and Actions usage before confirming zero incremental spend."]);
   else attention.push(["Cost control",
     "Reconcile recorded spend and coverage before confirming the full cost."]);
   if (attention.length < 3) attention.push(["Business impact",
@@ -93,7 +100,7 @@ function render(data) {
 
 function showStatus(refreshed) {
   const partial = snapshot.pullsSource.status !== "ok" || snapshot.issuesSource.status !== "ok" ||
-    snapshot.costs.status === "invalid";
+    snapshot.costs.status === "invalid" || snapshot.costs.actionsStatus === "unavailable";
   const stale = Date.now() - new Date(snapshot.observedAt).getTime() >= 86400000;
   $("status").dataset.error = String(partial || stale || refreshFailed);
   text("status", refreshFailed ? "Refresh failed. Showing the saved review; retry Refresh."
