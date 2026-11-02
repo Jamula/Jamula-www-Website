@@ -45,7 +45,7 @@ static class Config
     public const string ApexHost = "jamula.net";
     public const string ApprovedIp = "48.192.33.154"; // approved Azure Static Web Apps inbound IP
     public const string ExpectedCanonical = "https://jamula.net/";
-    public const string ExpectedHomeTitle = "Home — Jamula";
+    public const string ExpectedHomeTitle = "AI Strategy, Custom Software & Cloud Consulting — Jamula";
     public const string ExpectedHomeContent = "AI strategy.";
     public const string ExpectedNotFoundContent = "Page not found";
     public const string UpgradePath = "/__jamula_monitor_path_check__";
@@ -360,7 +360,7 @@ static class Monitor
 static class SelfTests
 {
     private const string HomeHtml =
-        "<html><head><title>Home — Jamula</title>"
+        "<html><head><title>AI Strategy, Custom Software &amp; Cloud Consulting — Jamula</title>"
         + "<link rel=\"canonical\" href=\"https://jamula.net/\"></head>"
         + "<body><p>AI strategy.</p></body></html>";
     private const string NotFoundHtml =
@@ -419,6 +419,16 @@ static class SelfTests
                 : DefaultResponse(request, _),
             4,
             "jamula.net: HTTPS:");
+
+        await AssertScenarioAsync(
+            "StaleHomeTitle_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttps && request.AbsolutePath == "/"
+                ? HtmlResponse(HttpStatusCode.OK, HomeHtml.Replace(
+                    "AI Strategy, Custom Software &amp; Cloud Consulting — Jamula",
+                    "Home — Jamula", StringComparison.Ordinal))
+                : DefaultResponse(request, _),
+            9,
+            "jamula.net: page content:");
 
         await AssertScenarioAsync(
             "UnexpectedHomeContent_IsRejected",

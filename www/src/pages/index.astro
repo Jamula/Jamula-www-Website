@@ -4,8 +4,9 @@
  *
  * Letterpress type-specimen homepage for Jamula.net (issue #48, parent #39).
  * Copy is the reviewer-cleared homepage draft; blocked claims (#43-H-006,
- * #43-H-007 Microsoft/Azure sentences, founder technical background, and any
- * contact mechanism) are intentionally absent. See root DESIGN.md and the PR
+ * #43-H-007 Microsoft/Azure sentences and founder technical background) are
+ * intentionally absent. The contact path is owner-approved in issue #86.
+ * See root DESIGN.md and the PR
  * for the used/omitted claim ledger.
  */
 import BaseLayout from "../layouts/BaseLayout.astro";
@@ -21,7 +22,7 @@ const organizationStructuredData = {
 ---
 
 <BaseLayout
-  title="Home"
+  title="AI Strategy, Custom Software & Cloud Consulting"
   description="Jamula works across AI strategy, custom software, and cloud consulting in a single engagement — so what we recommend is also what we build and run."
   canonicalUrl="https://jamula.net/"
   structuredData={organizationStructuredData}
@@ -215,7 +216,7 @@ const organizationStructuredData = {
       </div>
     </section>
 
-    <!-- ── A quiet next step (on-page; no contact mechanism) ────── -->
+    <!-- ── A quiet next step ───────────────────────────────────── -->
     <section class="next" aria-labelledby="next-head">
       <p class="specimen-label">Where to start</p>
       <h2 id="next-head" class="next__head">
@@ -233,6 +234,13 @@ const organizationStructuredData = {
         </p>
         <p class="next__action">
           <a href="#synthesis">Re-read how the three disciplines combine</a>
+        </p>
+        <p class="next__action">
+          <a href="mailto:spam@jamula.net">Contact Jamula, Inc.</a>
+        </p>
+        <p>
+          If the email link does not open your mail app, copy this address:{" "}
+          <span class="next__email">spam@jamula.net</span>
         </p>
       </div>
     </section>
@@ -473,10 +481,15 @@ const organizationStructuredData = {
     margin-block-start: var(--j-space-2);
   }
   .next__action a {
+    display: inline-block;
+    padding-block: var(--j-space-2);
     font-variant-caps: all-small-caps;
     letter-spacing: 0.08em;
     font-size: var(--j-text-lg);
     text-decoration-thickness: 2px;
+  }
+  .next__email {
+    overflow-wrap: anywhere;
   }
 
   /* ── Responsive: specimens stack, corridors read top-to-bottom ── */
