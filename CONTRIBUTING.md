@@ -21,6 +21,14 @@ node www/scripts/test_built_site.mjs
 
 The generated-site checks cover metadata, canonical routes, internal links and fragments, sitemap/robots output, semantic landmarks, documented light/dark color-token contrast pairs, and the approved homepage Organization data. They are regression checks, not a complete WCAG conformance evaluation.
 
+HTML checks use parse5's HTML5 parser rather than stripping markup with regular
+expressions. Contrast checks use PostCSS to apply `:root` custom properties in
+source order, including later overrides and `!important`, for unconditional
+rules and exact light/dark color-scheme media queries. Other conditional or
+nested `:root` rules fail explicitly; this is not a general computed-style or
+CSS-cascade audit. Both parsers are development-only dependencies and add no
+browser code or network requests to the website.
+
 ## Licensing
 
 Unless explicitly marked otherwise, a contributor who intentionally submits code or technical documentation represents that they have authority to do so and agrees to license the contribution under Apache License 2.0.

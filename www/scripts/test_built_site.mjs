@@ -4,20 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { parse } from "parse5";
+import postcss from "postcss";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const BUILD_DIR = path.resolve(scriptDirectory, "..", "dist");
 const SITE_URL = "https://jamula.net";
 const ALLOWED_HOSTS = new Set(["jamula.net", "www.jamula.net", "jamula.com", "www.jamula.com"]);
-
-function parseAttributes(source) {
-  const attributes = {};
-  const expression = /([^\s=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
-  for (const match of source.matchAll(expression)) {
-    attributes[match[1].toLowerCase()] = match[2] ?? match[3] ?? match[4] ?? "";
-  }
-  return attributes;
-}
 
 function parsePage(html) {
   const tags = [];
@@ -27,18 +20,26 @@ function parsePage(html) {
   const descriptions = [];
   const ogUrls = [];
   const stylesheets = [];
-  const inlineStyles = [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map(
-    (match) => match[1]
-  );
+  const inlineStyles = [];
   const jsonLd = [];
   const resources = [];
-  const titleMatches = [...html.matchAll(/<title\b[^>]*>([\s\S]*?)<\/title>/gi)];
-  const title = titleMatches.map((match) => match[1].replace(/<[^>]*>/g, "").trim());
+  const title = [];
 
-  for (const match of html.matchAll(/<([a-z][\w:-]*)\b([^>]*)>/gi)) {
-    const tag = match[1].toLowerCase();
-    const attributes = parseAttributes(match[2]);
+  function visit(node) {
+    if (!node.tagName) {
+      for (const child of node.childNodes ?? []) visit(child);
+      return;
+    }
+    const tag = node.tagName;
+    const attributes = Object.fromEntries(node.attrs.map(({ name, value }) => [name, value]));
+    const text = () =>
+      (node.childNodes ?? [])
+        .filter((child) => child.nodeName === "#text")
+        .map((child) => child.value)
+        .join("");
     tags.push([tag, attributes]);
+    if (tag === "title") title.push(text().trim());
+    if (tag === "style") inlineStyles.push(text());
     if (attributes.id) ids.push(attributes.id);
     if (tag === "a") anchors.push(attributes.href ?? "");
 
@@ -63,11 +64,12 @@ function parsePage(html) {
     if (["script", "img", "iframe", "video", "audio", "source"].includes(tag)) {
       if (attributes.src) resources.push(attributes.src);
       if (tag === "script" && attributes.type?.toLowerCase() === "application/ld+json") {
-        const script = html.slice(match.index + match[0].length);
-        jsonLd.push(script.match(/^[\s\S]*?<\/script>/i)?.[0].replace(/<\/script>$/i, "") ?? "");
+        jsonLd.push(text());
       }
     }
+    for (const child of node.childNodes ?? []) visit(child);
   }
+  visit(parse(html));
 
   const headingLevels = tags
     .map(([tag]) => (/^h[1-6]$/.test(tag) ? Number(tag[1]) : null))
@@ -137,40 +139,13 @@ function contrastRatio(first, second) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-function declarations(css) {
-  return Object.fromEntries(
-    [...css.matchAll(/(--[\w-]+)\s*:\s*([^;{}]+)\s*(?:;|$)/g)].map((match) => [
-      match[1],
-      match[2].trim(),
-    ])
-  );
-}
-
-function darkRootBlock(css) {
-  const media = /@media\s*\(prefers-color-scheme\s*:\s*dark\)\s*\{/i.exec(css);
-  if (!media) return null;
-  const root = /:root\s*\{/i.exec(css.slice(media.index + media[0].length));
-  if (!root) return null;
-  const opening = media.index + media[0].length + root.index + root[0].length - 1;
-  let depth = 1;
-  for (let index = opening + 1; index < css.length; index += 1) {
-    if (css[index] === "{") depth += 1;
-    if (css[index] === "}") depth -= 1;
-    if (depth === 0) {
-      return {
-        declarations: css.slice(opening + 1, index),
-        mediaStart: media.index,
-      };
-    }
-  }
-  return null;
-}
-
-function resolveColor(token, variables) {
+function resolveColor(token, variables, seen = new Set()) {
+  if (seen.has(token)) throw new Error(`cyclic color token ${token}`);
+  seen.add(token);
   const value = variables[token];
   if (!value) throw new Error(`missing color token ${token}`);
   const reference = value.match(/^var\((--[\w-]+)\)$/);
-  if (reference) return resolveColor(reference[1], variables);
+  if (reference) return resolveColor(reference[1], variables, seen);
   if (!/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(value)) {
     throw new Error(`${token} does not resolve to a hex color`);
   }
@@ -178,11 +153,46 @@ function resolveColor(token, variables) {
 }
 
 function contrastErrors(styles) {
-  const css = styles.join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
-  const dark = darkRootBlock(css);
-  if (!dark) return ["color tokens are missing a prefers-color-scheme: dark root"];
-  const lightVariables = declarations(css.slice(0, dark.mediaStart));
-  const darkVariables = { ...lightVariables, ...declarations(dark.declarations) };
+  const variables = { light: {}, dark: {} };
+  const important = { light: new Set(), dark: new Set() };
+  const errors = [];
+  let hasDarkRoot = false;
+  for (const css of styles) {
+    let sheet;
+    try {
+      sheet = postcss.parse(css);
+    } catch (error) {
+      errors.push(`cannot parse stylesheet for contrast checks: ${error.message}`);
+      continue;
+    }
+    sheet.walkRules((rule) => {
+      if (rule.selector !== ":root") return;
+      let themes = ["light", "dark"];
+      for (let parent = rule.parent; parent.type !== "root"; parent = parent.parent) {
+        const theme =
+          parent.type === "atrule" && parent.name === "media"
+            ? parent.params
+                .match(/^\(prefers-color-scheme\s*:\s*(light|dark)\)$/i)?.[1]
+                ?.toLowerCase()
+            : null;
+        if (!theme) {
+          errors.push("unsupported conditional or nested :root rule in contrast checks");
+          return;
+        }
+        themes = themes.filter((value) => value === theme);
+        if (theme === "dark") hasDarkRoot = true;
+      }
+      for (const declaration of rule.nodes) {
+        if (declaration.type !== "decl" || !declaration.prop.startsWith("--")) continue;
+        for (const theme of themes) {
+          if (important[theme].has(declaration.prop) && !declaration.important) continue;
+          variables[theme][declaration.prop] = declaration.value.trim();
+          if (declaration.important) important[theme].add(declaration.prop);
+        }
+      }
+    });
+  }
+  if (!hasDarkRoot) errors.push("color tokens are missing a prefers-color-scheme: dark root");
   const pairs = [
     ["--j-color-text", "--j-color-bg", 4.5],
     ["--j-color-text", "--j-color-surface", 4.5],
@@ -195,16 +205,12 @@ function contrastErrors(styles) {
     ["--j-color-skip-link-fg", "--j-color-skip-link-bg", 4.5],
     ["--j-color-focus-ring", "--j-color-bg", 3],
   ];
-  const errors = [];
-  for (const [theme, variables] of [
-    ["light", lightVariables],
-    ["dark", darkVariables],
-  ]) {
+  for (const [theme, values] of Object.entries(variables)) {
     for (const [foreground, background, minimum] of pairs) {
       try {
         const ratio = contrastRatio(
-          resolveColor(foreground, variables),
-          resolveColor(background, variables)
+          resolveColor(foreground, values),
+          resolveColor(background, values)
         );
         if (ratio < minimum) {
           errors.push(
@@ -414,6 +420,9 @@ function validateSite(siteDirectory) {
         errors.push(`${prefix}canonical must be an absolute Jamula.net HTTPS URL`);
       } else {
         const route = normalizeRoute(canonical.pathname);
+        if (localFile(root, file, canonical.pathname) !== file) {
+          errors.push(`${prefix}canonical path does not resolve to this built page`);
+        }
         if (path.basename(file) !== "404.html") {
           if (canonicalRoutes[route]) {
             errors.push(`${prefix}canonical route duplicates ${canonicalRoutes[route].file}`);
@@ -463,7 +472,7 @@ function validateSite(siteDirectory) {
     if (new Set(page.ids).size !== page.ids.length) {
       errors.push(`${prefix}duplicate id attributes are present`);
     }
-    if (path.basename(file) === "index.html") {
+    if (file === path.join(root, "index.html")) {
       errors.push(...validateOrganizationSchema(page, prefix));
     }
 
@@ -579,6 +588,133 @@ function baseStylesheet(root) {
 
 test("built output satisfies SEO, accessibility, privacy, and schema contracts", () => {
   assert.deepEqual(validateSite(BUILD_DIR), []);
+});
+
+test("HTML parsing preserves title text without multi-character tag stripping", () => {
+  const page = parsePage(
+    '<title>&lt;script&gt; &amp; <scr<script>ipt></title><a href="/?a=1&amp;b=2">Link</a>'
+  );
+  assert.deepEqual(page.title, ["<script> & <scr<script>ipt>"]);
+  assert.deepEqual(page.anchors, ["/?a=1&b=2"]);
+});
+
+test("HTML parsing respects raw text and whitespace script closing tags", () => {
+  const json = '{"name":"<h1 id=\\"fake\\">not a heading</h1>"}';
+  const page = parsePage(
+    `<script type="application/ld+json">${json}</script \n>` +
+      '<style>/* <h2 id="fake-style"> */</style \t>' +
+      '<a href="/?value=>">Link</a>'
+  );
+  assert.deepEqual(page.jsonLd, [json]);
+  assert.deepEqual(page.headingLevels, []);
+  assert.deepEqual(page.ids, []);
+  assert.deepEqual(page.anchors, ["/?value=>"]);
+  assert.deepEqual(page.inlineStyles, ['/* <h2 id="fake-style"> */']);
+});
+
+test("semantic checks reject a required heading hidden inside an HTML comment", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  fs.writeFileSync(
+    file,
+    fs.readFileSync(file, "utf8").replace(/<h1\b[\s\S]*?<\/h1>/i, "<!-- $& -->")
+  );
+  assert.ok(validateSite(root).includes("index.html: expected exactly one h1 heading"));
+});
+
+test("Organization schema accepts whitespace in its HTML closing tag", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace("</script>", "</script \n>"));
+  assert.deepEqual(validateSite(root), []);
+});
+
+test("canonical validation rejects a nonexistent route even when metadata and sitemap agree", (t) => {
+  const root = copyBuild(t);
+  const file = builtPage(root);
+  fs.writeFileSync(
+    file,
+    fs.readFileSync(file, "utf8").replaceAll('https://jamula.net/"', 'https://jamula.net/missing/"')
+  );
+  const sitemap = path.join(root, "sitemap-0.xml");
+  fs.writeFileSync(
+    sitemap,
+    fs.readFileSync(sitemap, "utf8").replace("https://jamula.net/", "https://jamula.net/missing/")
+  );
+  assert.ok(
+    validateSite(root).includes("index.html: canonical path does not resolve to this built page")
+  );
+});
+
+test("nested directory routes do not require homepage Organization data", (t) => {
+  const root = copyBuild(t);
+  const directory = path.join(root, "about");
+  fs.mkdirSync(directory);
+  const html = fs
+    .readFileSync(builtPage(root), "utf8")
+    .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/i, "")
+    .replaceAll('https://jamula.net/"', 'https://jamula.net/about/"');
+  fs.writeFileSync(path.join(directory, "index.html"), html);
+  const sitemap = path.join(root, "sitemap-0.xml");
+  fs.writeFileSync(
+    sitemap,
+    fs
+      .readFileSync(sitemap, "utf8")
+      .replace("</urlset>", "<url><loc>https://jamula.net/about/</loc></url></urlset>")
+  );
+  assert.deepEqual(validateSite(root), []);
+});
+
+test("contrast checks include late unconditional and theme-specific root overrides", async (t) => {
+  for (const [name, css, themes] of [
+    ["unconditional", ":root{--j-color-text:var(--j-color-bg)}", ["light", "dark"]],
+    [
+      "dark",
+      "@media(prefers-color-scheme:dark){:root{--j-color-text:var(--j-color-bg)}}",
+      ["dark"],
+    ],
+    [
+      "light",
+      "@media(prefers-color-scheme:light){:root{--j-color-text:var(--j-color-bg)}}",
+      ["light"],
+    ],
+  ]) {
+    await t.test(name, (subtest) => {
+      const root = copyBuild(subtest);
+      fs.appendFileSync(baseStylesheet(root), css);
+      const errors = validateSite(root);
+      for (const theme of themes) {
+        assert.ok(
+          errors.includes(`${theme} contrast --j-color-text on --j-color-bg is 1.00:1, below 4.5:1`)
+        );
+      }
+    });
+  }
+});
+
+test("contrast checks preserve important root declarations over later normal declarations", () => {
+  const css = fs.readFileSync(baseStylesheet(BUILD_DIR), "utf8");
+  assert.deepEqual(
+    contrastErrors([
+      css,
+      ":root{--j-color-text:var(--j-ink)!important}" + ":root{--j-color-text:var(--j-color-bg)}",
+    ]),
+    []
+  );
+});
+
+test("contrast checks report unsupported root conditions and cyclic color tokens", () => {
+  const css = fs.readFileSync(baseStylesheet(BUILD_DIR), "utf8");
+  assert.ok(
+    contrastErrors([css, "@media(min-width:1px){:root{--j-color-text:#fff}}"]).includes(
+      "unsupported conditional or nested :root rule in contrast checks"
+    )
+  );
+  assert.ok(
+    contrastErrors([css, ":root{--j-color-text:var(--j-color-text)}"]).includes(
+      "light contrast: cyclic color token --j-color-text"
+    )
+  );
 });
 
 test("metadata checks reject an empty title, missing description, and wrong canonical", (t) => {
