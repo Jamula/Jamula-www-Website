@@ -595,7 +595,7 @@ function baseStylesheet(root) {
   return fs
     .readdirSync(directory)
     .map((file) => path.join(directory, file))
-    .find((file) => file.endsWith(".css") && fs.readFileSync(file, "utf8").includes("--j-ink"));
+    .find((file) => file.endsWith(".css") && fs.readFileSync(file, "utf8").includes("--j-deep"));
 }
 
 test("built output satisfies SEO, accessibility, privacy, and schema contracts", () => {
@@ -728,7 +728,7 @@ test("contrast checks preserve important root declarations over later normal dec
   assert.deepEqual(
     contrastErrors([
       css,
-      ":root{--j-color-text:var(--j-ink)!important}" + ":root{--j-color-text:var(--j-color-bg)}",
+      ":root{--j-color-text:var(--j-white)!important}" + ":root{--j-color-text:var(--j-color-bg)}",
     ]),
     []
   );
@@ -754,7 +754,7 @@ test("contrast checks require jointly applicable dark media ancestors", async (t
     ["matching dark ancestors", "dark", "dark", []],
   ]) {
     await t.test(name, () => {
-      const color = outer === inner ? "var(--j-ink)" : "var(--j-color-bg)";
+      const color = outer === inner ? "var(--j-white)" : "var(--j-color-bg)";
       const nested =
         `@media(prefers-color-scheme:${outer}){` +
         `@media(prefers-color-scheme:${inner}){:root{--j-color-text:${color}}}}`;
@@ -1003,8 +1003,7 @@ test("contrast validation detects light and dark token regressions", (t) => {
   const stylesheet = baseStylesheet(root);
   assert.ok(stylesheet, "the built base stylesheet must contain the Jamula color tokens");
   let css = fs.readFileSync(stylesheet, "utf8");
-  css = css.replace("--j-ink:#1b1a16", "--j-ink:#e9e7df");
-  css = css.replace("--j-press:#63bd8d", "--j-press:#17160f");
+  css = css.replace("--j-deep:#162d32", "--j-deep:#f7f8f2");
   fs.writeFileSync(stylesheet, css);
 
   const messages = validateSite(root).join("\n");

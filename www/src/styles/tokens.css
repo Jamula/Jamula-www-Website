@@ -16,7 +16,7 @@
   --j-white: #f7f8f2;
 
   --j-color-bg: var(--j-deep);
-  --j-color-surface: var(--j-cloth);
+  --j-color-surface: var(--j-deep);
   --j-color-border: var(--j-sage);
   --j-color-text: var(--j-white);
   --j-color-text-subtle: var(--j-cloth);
@@ -67,4 +67,10 @@
   --j-shadow-sm: none;
   --j-transition-fast: 160ms ease-out;
   --j-ease-weave: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
 }
