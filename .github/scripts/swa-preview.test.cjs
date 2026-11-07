@@ -297,6 +297,10 @@ test("both production verifiers compare live CSP against the built config", () =
   for (const name of ["deploy", "deploy-com"]) {
     assert.match(
       productionJobs[name],
+      /\s+- name: Check out verification helper from deployed revision\n\s+uses: actions\/checkout@[a-f0-9]+(?:\s+# [^\n]+)?\n\s+with:\n\s+persist-credentials: false\n\s+ref: \$\{\{ env\.DEPLOYMENT_SHA \}\}/,
+    );
+    assert.match(
+      productionJobs[name],
       /node \.github\/scripts\/verify-swa-csp\.cjs \\\n\s+www\/dist\/staticwebapp\.config\.json "\$headers"/,
     );
     assert.doesNotMatch(
