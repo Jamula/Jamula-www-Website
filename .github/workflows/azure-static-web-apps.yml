@@ -167,6 +167,14 @@ jobs:
     runs-on: ubuntu-latest
     environment: swa-deployment
     steps:
+      - name: Check out exact verifier revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.DEPLOYMENT_SHA }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts/verify-swa-csp.cjs
+          sparse-checkout-cone-mode: false
+
       - name: Require production deployment token
         shell: bash
         env:
@@ -304,6 +312,14 @@ jobs:
     runs-on: ubuntu-latest
     environment: swa-deployment
     steps:
+      - name: Check out exact verifier revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.DEPLOYMENT_SHA }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts/verify-swa-csp.cjs
+          sparse-checkout-cone-mode: false
+
       - name: Require companion deployment token
         shell: bash
         env:
