@@ -293,6 +293,10 @@ jobs:
             sleep 10
           done
           rm -f "$metadata_file"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --tlsv1.2 --header 'Cache-Control: no-cache' \
+            --dump-header "$headers" --output "$body" \
+            "${DEPLOYED_URL%/}/"
 
           header_value() {
             awk -F': ' -v wanted="$1" '
