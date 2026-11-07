@@ -595,7 +595,7 @@ function baseStylesheet(root) {
   return fs
     .readdirSync(directory)
     .map((file) => path.join(directory, file))
-    .find((file) => file.endsWith(".css") && fs.readFileSync(file, "utf8").includes("--j-deep"));
+    .find((file) => file.endsWith(".css") && /--j-deep\s*:/.test(fs.readFileSync(file, "utf8")));
 }
 
 test("built output satisfies SEO, accessibility, privacy, and schema contracts", () => {
