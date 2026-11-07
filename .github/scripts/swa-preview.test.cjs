@@ -419,6 +419,10 @@ for (const name of ["deploy", "deploy-com"]) {
             .map(([header, value]) => `${header}: ${value}\r\n`)
             .join(""),
       );
+      fs.writeFileSync(
+        path.join(directory, "old-headers.txt"),
+        "HTTP/2 200\r\nContent-Security-Policy: default-src 'self'\r\n",
+      );
       const scripts = steps
         .filter((step) => /        run:/.test(step.body))
         .map((step) =>
@@ -441,10 +445,19 @@ for (const name of ["deploy", "deploy-com"]) {
               esac
             done
             case "$url" in
-              */release.json?*) printf '{"version":"%s","revision":"%s","run":"1","attempt":"1"}\\n' "\${TEST_VERSION:-0.1.0}" "$DEPLOYMENT_SHA" > "$output" ;;
+              */release.json?*) release_ready=true; printf '{"version":"%s","revision":"%s","run":"1","attempt":"1"}\\n' "\${TEST_VERSION:-0.1.0}" "$DEPLOYMENT_SHA" > "$output" ;;
               */robots.txt) printf 'HTTP/2 200\\r\\nContent-Type: text/plain\\r\\n' > "$headers" ;;
               */__jamula_missing_route__) printf 'Page not found' > "$output"; printf '404' ;;
-              */) cp home-headers.txt "$headers"; printf '<title>Jamula</title>' > "$output" ;;
+              */)
+                if [[ "\${release_ready:-false}" == true ]]; then
+                  cp home-headers.txt "$headers"
+                  if [[ "\${TEST_BROKEN_HEADERS:-false}" == true ]]; then
+                    sed -i 's/X-Frame-Options: DENY/X-Frame-Options: SAMEORIGIN/' "$headers"
+                  fi
+                else
+                  cp old-headers.txt "$headers"
+                fi
+                printf '<title>Jamula</title>' > "$output" ;;
               *) return 93 ;;
             esac
           }
@@ -464,6 +477,7 @@ for (const name of ["deploy", "deploy-com"]) {
           RELEASE_VERSION: "0.1.0",
           RELEASE_ATTEMPT: "1",
           GITHUB_RUN_ID: "1",
+          GITHUB_REPOSITORY: "test/repo",
           ARTIFACT_DIGEST: "disposable-artifact-digest",
           GITHUB_EVENT_NAME: "push",
           GITHUB_STEP_SUMMARY: "summary.txt",
@@ -478,6 +492,33 @@ for (const name of ["deploy", "deploy-com"]) {
       assert.match(summary, /Verified Azure deployment/);
       assert.ok(summary.includes(revision.stdout.trim()));
       assert.match(summary, /disposable-artifact-digest/);
+      const broken = spawnSync("bash", ["-c", shellScript], {
+        cwd: directory,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          DEPLOYMENT_TOKEN: "disposable-test-token",
+          DEPLOYMENT_SHA: revision.stdout.trim(),
+          DEPLOYED_URL:
+            name === "deploy"
+              ? "https://ashy-beach-033c7d01e.7.azurestaticapps.net"
+              : "https://red-cliff-0ee064a1e.2.azurestaticapps.net",
+          RELEASE_VERSION: "0.1.0",
+          RELEASE_ATTEMPT: "1",
+          GITHUB_RUN_ID: "1",
+          GITHUB_REPOSITORY: "test/repo",
+          GITHUB_EVENT_NAME: "workflow_dispatch",
+          GITHUB_STEP_SUMMARY: "broken-summary.txt",
+          TEST_BROKEN_HEADERS: "true",
+        },
+      });
+      assert.ifError(broken.error);
+      assert.notEqual(broken.status, 0);
+      assert.match(broken.stdout, /Unexpected X-Frame-Options header/);
+      assert.equal(
+        fs.existsSync(path.join(directory, "broken-summary.txt")),
+        false,
+      );
       const stale = spawnSync(
         "bash",
         ["-c", `sleep() { :; }\n${shellScript}`],
@@ -495,6 +536,7 @@ for (const name of ["deploy", "deploy-com"]) {
             RELEASE_VERSION: "0.1.0",
             RELEASE_ATTEMPT: "1",
             GITHUB_RUN_ID: "1",
+            GITHUB_REPOSITORY: "test/repo",
             GITHUB_EVENT_NAME: "workflow_dispatch",
             GITHUB_STEP_SUMMARY: "summary.txt",
             TEST_VERSION: "0.0.9",
