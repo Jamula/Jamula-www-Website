@@ -205,13 +205,11 @@ function contrastErrors(styles) {
   if (!hasDarkRoot) errors.push("color tokens are missing a prefers-color-scheme: dark root");
   const pairs = [
     ["--j-color-text", "--j-color-bg", 4.5],
-    ["--j-color-text", "--j-color-surface", 4.5],
     ["--j-color-text-subtle", "--j-color-bg", 4.5],
-    ["--j-color-text-subtle", "--j-color-surface", 4.5],
     ["--j-color-accent", "--j-color-bg", 4.5],
-    ["--j-color-accent", "--j-color-surface", 4.5],
     ["--j-color-accent-hover", "--j-color-bg", 4.5],
-    ["--j-color-accent-hover", "--j-color-surface", 4.5],
+    ["--j-deep", "--j-color-surface", 4.5],
+    ["--j-deep", "--j-sage", 4.5],
     ["--j-color-skip-link-fg", "--j-color-skip-link-bg", 4.5],
     ["--j-color-focus-ring", "--j-color-bg", 3],
   ];
@@ -998,17 +996,32 @@ test("sitemap validation rejects a noncanonical and unknown route", (t) => {
   assert.match(messages, /sitemap page URLs must exactly match/);
 });
 
-test("contrast validation detects light and dark token regressions", (t) => {
-  const root = copyBuild(t);
-  const stylesheet = baseStylesheet(root);
-  assert.ok(stylesheet, "the built base stylesheet must contain the Jamula color tokens");
-  let css = fs.readFileSync(stylesheet, "utf8");
-  css = css.replace("--j-deep:#162d32", "--j-deep:#f7f8f2");
-  fs.writeFileSync(stylesheet, css);
+test("contrast validation detects dark-field and light-band token regressions", async (t) => {
+  for (const [name, original, replacement, diagnostic] of [
+    [
+      "dark field",
+      "--j-deep:#162d32",
+      "--j-deep:#f7f8f2",
+      /light contrast --j-color-text on --j-color-bg/,
+    ],
+    [
+      "cloth band",
+      "--j-cloth:#d9e8e2",
+      "--j-cloth:#162d32",
+      /light contrast --j-deep on --j-color-surface/,
+    ],
+    ["sage band", "--j-sage:#98c9bc", "--j-sage:#162d32", /light contrast --j-deep on --j-sage/],
+  ]) {
+    await t.test(name, (subtest) => {
+      const root = copyBuild(subtest);
+      const stylesheet = baseStylesheet(root);
+      assert.ok(stylesheet, "the built base stylesheet must contain the Jamula color tokens");
+      const css = fs.readFileSync(stylesheet, "utf8").replace(original, replacement);
+      fs.writeFileSync(stylesheet, css);
 
-  const messages = validateSite(root).join("\n");
-  assert.match(messages, /light contrast --j-color-text on --j-color-bg/);
-  assert.match(messages, /dark contrast --j-color-accent on --j-color-bg/);
+      assert.match(validateSite(root).join("\n"), diagnostic);
+    });
+  }
 });
 
 test("Organization schema validation rejects invalid JSON, wrong identity, and extra fields", async (t) => {

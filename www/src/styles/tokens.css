@@ -16,7 +16,7 @@
   --j-white: #f7f8f2;
 
   --j-color-bg: var(--j-deep);
-  --j-color-surface: var(--j-deep);
+  --j-color-surface: var(--j-cloth);
   --j-color-border: var(--j-sage);
   --j-color-text: var(--j-white);
   --j-color-text-subtle: var(--j-cloth);
