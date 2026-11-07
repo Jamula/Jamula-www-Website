@@ -1,4 +1,4 @@
-/* Base — letterpress editorial ground for The Standing Statement. */
+/* Global foundations for the Woven Plane surface. */
 
 *,
 *::before,
@@ -9,14 +9,12 @@
 }
 
 html {
-  font-size: 100%; /* respect browser default (typically 16px) */
+  font-size: 100%;
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
-  /* Paper never runs out under a short page. */
-  background-color: var(--j-color-bg);
+  background: var(--j-color-bg);
 }
 
-/* Honour reduced-motion everywhere; motion is enhancement only. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -29,20 +27,16 @@ html {
 }
 
 body {
-  font-family: var(--j-font-serif);
+  min-height: 100dvh;
+  color: var(--j-color-text);
+  background: var(--j-color-bg);
+  font-family: var(--j-font-sans);
   font-size: var(--j-text-base);
   line-height: var(--j-leading-normal);
-  color: var(--j-color-text);
-  background-color: var(--j-color-bg);
-  min-height: 100dvh;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   font-kerning: normal;
-  /* Oldstyle figures + real ligatures suit the specimen voice. */
-  font-variant-numeric: oldstyle-nums proportional-nums;
 }
-
-/* ── Typography ──────────────────────────────────────────────── */
 
 h1,
 h2,
@@ -50,8 +44,9 @@ h3,
 h4,
 h5,
 h6 {
+  font-family: var(--j-font-display);
+  font-weight: 650;
   line-height: var(--j-leading-tight);
-  font-weight: 600;
   letter-spacing: var(--j-tracking-display);
   text-wrap: balance;
 }
@@ -64,17 +59,15 @@ dd {
   text-wrap: pretty;
 }
 
-/* Ink selection, not browser blue. */
 ::selection {
-  background-color: var(--j-color-accent);
-  color: var(--j-color-bg);
+  color: var(--j-deep);
+  background: var(--j-sage);
 }
 
 a {
   color: var(--j-color-accent);
-  text-decoration-line: underline;
   text-decoration-thickness: 1px;
-  text-underline-offset: 0.18em;
+  text-underline-offset: 0.2em;
   transition: color var(--j-transition-fast);
 }
 
@@ -83,14 +76,11 @@ a:hover {
   text-decoration-thickness: 2px;
 }
 
-/* Visible focus — a pressed ink outline, not a glow. */
 :focus-visible {
   outline: var(--j-rule-heavy) solid var(--j-color-focus-ring);
-  outline-offset: 3px;
+  outline-offset: 4px;
   border-radius: var(--j-radius-sm);
 }
-
-/* ── Media ───────────────────────────────────────────────────── */
 
 img,
 video,
@@ -100,31 +90,25 @@ svg {
   height: auto;
 }
 
-/* ── Skip link ───────────────────────────────────────────────── */
-
 .skip-link {
   position: absolute;
-  inset-inline-start: var(--j-space-4);
-  inset-block-start: var(--j-space-4);
-  padding: var(--j-space-2) var(--j-space-4);
-  background: var(--j-color-skip-link-bg);
-  color: var(--j-color-skip-link-fg);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  border-radius: var(--j-radius-sm);
-  text-decoration: none;
-  /* Hidden until focused. */
-  transform: translateY(-160%);
-  transition: transform var(--j-transition-fast);
   z-index: 100;
+  inset-block-start: var(--j-space-4);
+  inset-inline-start: var(--j-space-4);
+  padding: var(--j-space-2) var(--j-space-4);
+  transform: translateY(-160%);
+  color: var(--j-color-skip-link-fg);
+  background: var(--j-color-skip-link-bg);
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform var(--j-transition-fast);
 }
 
 .skip-link:focus-visible {
   transform: translateY(0);
+  outline-color: var(--j-color-skip-link-fg);
   outline-offset: 2px;
 }
-
-/* ── Utilities ───────────────────────────────────────────────── */
 
 .sr-only {
   position: absolute;
@@ -138,14 +122,42 @@ svg {
   border: 0;
 }
 
-/* Letterpress specimen label — letterspaced small caps, used for the
-   quiet marks above section headings and on specimen columns. */
-.specimen-label {
-  font-family: var(--j-font-serif);
-  font-size: var(--j-text-sm);
-  font-weight: 600;
-  font-variant-caps: all-small-caps;
-  letter-spacing: var(--j-tracking-label);
-  text-transform: lowercase; /* small-caps renders these as caps glyphs */
+.woven-label {
   color: var(--j-color-text-subtle);
+  font-size: var(--j-text-sm);
+  font-weight: 700;
+  letter-spacing: var(--j-tracking-label);
+  text-transform: uppercase;
+}
+
+button {
+  min-height: 44px;
+  padding: var(--j-space-2) var(--j-space-4);
+  border: 0;
+  border-block-end: 2px solid var(--j-ochre);
+  color: var(--j-deep);
+  background: var(--j-cloth);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    color var(--j-transition-fast),
+    background-color var(--j-transition-fast);
+}
+
+button:hover:not(:disabled) {
+  color: var(--j-deep);
+  background: var(--j-sage);
+}
+
+button:disabled {
+  color: var(--j-deep);
+  background: var(--j-sage);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+button[hidden],
+[hidden] {
+  display: none !important;
 }
