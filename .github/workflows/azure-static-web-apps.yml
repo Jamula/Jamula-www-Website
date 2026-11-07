@@ -167,6 +167,14 @@ jobs:
     runs-on: ubuntu-latest
     environment: swa-deployment
     steps:
+      - name: Check out exact verifier revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.DEPLOYMENT_SHA }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts/verify-swa-csp.cjs
+          sparse-checkout-cone-mode: false
+
       - name: Require production deployment token
         shell: bash
         env:
@@ -249,8 +257,8 @@ jobs:
           }
 
           grep -qi '<title>.*Jamula' "$body"
-          expect_header "Content-Security-Policy" \
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'"
+          node .github/scripts/verify-swa-csp.cjs \
+            www/dist/staticwebapp.config.json "$headers"
           expect_header "X-Frame-Options" "DENY"
           expect_header "X-Content-Type-Options" "nosniff"
           expect_header "Referrer-Policy" "strict-origin-when-cross-origin"
@@ -304,6 +312,14 @@ jobs:
     runs-on: ubuntu-latest
     environment: swa-deployment
     steps:
+      - name: Check out exact verifier revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.DEPLOYMENT_SHA }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts/verify-swa-csp.cjs
+          sparse-checkout-cone-mode: false
+
       - name: Require companion deployment token
         shell: bash
         env:
@@ -386,8 +402,8 @@ jobs:
           }
 
           grep -qi '<title>.*Jamula' "$body"
-          expect_header "Content-Security-Policy" \
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'"
+          node .github/scripts/verify-swa-csp.cjs \
+            www/dist/staticwebapp.config.json "$headers"
           expect_header "X-Frame-Options" "DENY"
           expect_header "X-Content-Type-Options" "nosniff"
           expect_header "Referrer-Policy" "strict-origin-when-cross-origin"
