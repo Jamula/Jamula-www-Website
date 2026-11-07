@@ -132,6 +132,119 @@ Only an approved legal owner can open a scoped hold with matter ID, data/subject
 
 ## Future implementation tests
 
+### Public website analytics implementation and activation gate
+
+**Owner:** Cyrus/property administrator; implementation owner Spock.
+**Implementation date:** 2026-11-02 UTC. Code is not evidence of deployment or
+account configuration. User authorized this limited analytics purpose; no
+production deployment or merge is authorized by this change.
+
+The shared Astro artifact resolves the runtime HTTPS hostname, not the canonical
+metadata: `jamula.com` and `www.jamula.com` use `G-90MTZQ2EXX`;
+`jamula.net` and `www.jamula.net` use `G-7JW27J2XSW`. Canonicals remain `.net`.
+Preview/local/unknown hosts, HTTP and nonstandard ports do not load a tag, even
+when Accept is invoked. No DNS, deployment secrets, linker, paid services or new
+browser dependencies are part of this feature.
+
+`www/public/analytics-consent.js` is the sole consent controller. Before a valid
+origin-scoped opt-in there is no Google script, preconnect, queue, consent ping or
+analytics request. GPC overrides grants. After opt-in, the controller requests one
+manual `page_view` per document and `contact_click` for the marked contact link
+only. Repeated initialization/acceptance cannot attach duplicate listeners or
+pageviews. Contact clicks count intent, not sent/received inquiries. Page identity
+is allowlisted (home, analytics privacy, otherwise fixed not-found); query,
+fragment, arbitrary path, destination address, link text, document referrer and
+user-supplied values are not copied to events.
+
+The local receipt records purpose/version/hostname/action/time for 180 days,
+without a subject identifier or server submission. This is a deliberately bounded
+static-site preference mechanism, **not** the authenticated service's append-only
+receipt/audit architecture above. Invalid/stale grants require a new choice.
+Withdrawal disables the stream first, empties queued commands, removes its script,
+deletes only the integration's two host-only `/` cookies and, when rejection is
+successfully saved or removal of the prior receipt is verified, reloads to unload
+Google's code. A failed rejection write falls back to removing only the consent
+receipt and verifies its absence; the next load then requires a new choice with
+analytics off. It does not send a denied-consent update to an already loaded tag.
+Cross-tab revocation, clearing,
+expiry and GPC changes disable further site events. If neither replacement nor
+verified removal is possible, collection still stops in the current document,
+but the page does not automatically reload or claim persistent withdrawal. It
+keeps the choice panel open and explicitly warns that analytics may resume on a
+later page load, instructing the visitor to clear browser site data before
+reloading or returning. Browser storage that rejects every mutation cannot be
+made to persist withdrawal by this static-site controller.
+Withdrawal cannot cancel already dispatched requests or delete Google's historical
+records. A later opt-in after stopping requires a clean document reload.
+
+**Required human steps before production activation — all unverified here:**
+
+- Obtain Cyrus's approval of the **exact** public notice and consent-control
+  wording in `www/src/pages/privacy.astro` and
+  `www/src/components/AnalyticsConsent.astro`. These are draft implementation
+  wording, not evidence that public-policy copy has been approved.
+- Confirm the two measurement IDs and their properties, corresponding apex/www
+  host coverage and authorized administrator. Do not combine properties or add
+  connected tag destinations, Google Ads links or cross-domain configuration.
+- In **each** web stream, disable **Enhanced measurement entirely**, including
+  history-based pageviews, scrolls, outbound clicks, site search, forms, downloads
+  and video. Do not rely on `send_page_view: false` to disable these account-side
+  events. Disable tag event creation/modifications or other remote settings that
+  add events/destinations or copy sensitive values. GA's inherent automatically
+  collected session/first-visit/engagement information is not a Jamula conversion
+  and cannot be represented as "only two event names ever reach Google."
+- Disable **Google Signals**, user-provided data collection, advertising
+  personalization, unnecessary granular location/device collection and optional
+  account data sharing. Review existing product links, audiences and tag
+  destinations; remove advertising/cross-context uses. Code additionally sets
+  `allow_google_signals` and `allow_ad_personalization_signals` false and all three
+  advertising consent categories denied, but does not prove account state.
+- Set **Data collection and modification → Data retention** to **2 months** for
+  user/event data (shortest currently documented option) and **Reset user data on
+  new activity → Off** for both properties. Capture dated evidence of saved
+  settings; allow Google's documented 24-hour change window. Standard aggregate
+  reports are outside that retention setting; define an administrator-owned
+  periodic review/deletion/export policy rather than promising a two-month cap
+  on every Google-held record.
+- Review Google DPA/terms, controller/processor role, actual processing and
+  transfer/subprocessor facts, served jurisdictions and notice with the
+  appropriate professional owner. Neither code nor this notice settles legal
+  applicability, residency, lawful basis or vendor contractual acceptance.
+- Use an authorized clean browser on **all four HTTPS origins** after the eventual
+  protected-main deployment. Inspect Network/storage before any choice, after
+  Reject, on saved rejection, after Accept and after withdrawal/reload. Require
+  no Google requests before choice/reject; the correct sole ID after acceptance;
+  no destination email/query/referrer/fragment in collected parameters; no new
+  analytics traffic after withdrawal (already in-flight requests excepted);
+  only owned GA cookies removed. Test GPC, keyboard focus, 200% zoom/reflow,
+  screen-reader status, blocked storage/tag loading, another-tab withdrawal,
+  browser back/forward and revisit. Confirm no unexpected enhanced/advertising
+  traffic and no duplicate pageviews; record actual results, not assumptions.
+
+The footer links the public scoped notice at `/privacy/`; this is not a general
+portal/contact/legal notice. Automated checks: build with `cd www && npm run build`,
+then from the repository root run
+`node --test www/tests/analytics-consent.test.mjs` and
+`node www/scripts/test_built_site.mjs`. Tests intercept script insertion and
+commands; they do not contact Google, assert its implementation, or configure an
+account. Keep independent review and Cyrus's exact-head approval before any
+future merge; deployment availability is a separate gate.
+
+**Official-source verification, 2026-11-02 UTC:** Google Analytics/Google tag
+documentation below verifies configuration semantics, not Jamula account settings
+or legal compliance. Recheck at activation and on vendor behavior changes.
+
+- Google, [GA4 configuration reference](https://developers.google.com/analytics/devguides/collection/ga4/reference/config):
+  manual pageviews, location/referrer/title overrides, Signals/personalization,
+  cookie prefix, host-only `cookie_domain: none` and session `cookie_expires: 0`.
+- Google, [Manage privacy settings](https://developers.google.com/tag-platform/security/guides/privacy):
+  `ga-disable-<ID>` and advertising suppression controls.
+- Google, [Data retention](https://support.google.com/analytics/answer/7667196?hl=en):
+  two-month minimum, reset-on-activity option, monthly deletion and aggregate-report
+  exception; account settings remain **unverified**.
+
+### Future customer-service test requirements
+
 - Cross-tenant guessed/sequential IDs fail at API, storage, cache, queue, search/vector, export and support layers.
 - Tenant switching clears context/caches; concurrent tabs cannot confuse tenant context.
 - Invite collision, identity linking, domain claim, recovery, offboarding, break-glass and support-access tests fail closed and generate complete audit.
