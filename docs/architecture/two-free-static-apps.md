@@ -11,17 +11,60 @@ and response behavior independently before claiming operational success.
 
 The production workflow builds one artifact and deploys it to both apps. Pull request previews remain on the original .net app only. Deployment jobs use the `swa-deployment` GitHub environment, restricted to the `main` branch. The .net token is environment secret `SWA_NET_DEPLOYMENT_TOKEN`; the .com token is `SWA_COM_DEPLOYMENT_TOKEN`. Never commit their values.
 
-PR builds in `azure-static-web-apps.yml` do not deploy or consume deployment secrets, including for Dependabot. Production jobs require a `push` or `workflow_dispatch` event on `refs/heads/main`, the latest-main SHA gate, and the main-only deployment environment; a PR cannot unlock that environment by editing a job condition. `azure-static-web-apps-preview.yml` runs from the default branch after a successful build and uses the same restricted environment. It resolves the current same-repository PR, checks the workflow identity and head SHA, verifies the artifact's GitHub SHA-256 digest, rejects unsafe archive entries, and requires `staticwebapp.config.json` to match the trusted default branch. It never installs dependencies or executes PR scripts. A trusted PR event passed to the pinned Azure action selects the numbered PR environment; the returned URL must match that environment before live verification. Closed PRs and PRs with no remaining deployable changes remove their previews through this same trusted workflow.
+PR builds in `azure-static-web-apps.yml` do not deploy or consume deployment secrets, including for Dependabot. Production jobs require a `workflow_dispatch` event on `refs/heads/main`, latest-main SHA checks, and the main-only deployment environment; pushes do not deploy; a PR cannot unlock that environment by editing a job condition. `azure-static-web-apps-preview.yml` runs from the default branch after a successful build and uses the same restricted environment. It resolves the current same-repository PR, checks the workflow identity and head SHA, verifies the artifact's GitHub SHA-256 digest, rejects unsafe archive entries, and requires `staticwebapp.config.json` to match the trusted default branch. It never installs dependencies or executes PR scripts. A trusted PR event passed to the pinned Azure action selects the numbered PR environment; the returned URL must match that environment before live verification. Closed PRs and PRs with no remaining deployable changes remove their previews through this same trusted workflow.
 
-For an authorized manual release, run
-`gh workflow run azure-static-web-apps.yml --ref main --repo Jamula/Jamula-www-Website`.
-The trigger has no revision or artifact override inputs. It rebuilds the exact
-event SHA and deploys the shared verified artifact to both existing apps through
-the normal production concurrency group and environment protections. Non-main
-refs and runs whose SHA is already stale at selection are not deployable. If
-selection skips a stale run, dispatch again on current `main`; never bypass the
-gate or promote a preview artifact. A successful dispatch request alone is not
-release evidence: await both deployment jobs and verify all four live hosts.
+## Release operations
+
+Only an authorized operator should dispatch the workflow on current `main`:
+
+```sh
+gh workflow run azure-static-web-apps.yml --ref main --repo Jamula/Jamula-www-Website
+# For a non-default increment, add -f bump=minor or -f bump=major.
+```
+
+The first release is `v0.1.0` regardless of bump choice; later releases
+increment the highest published stable `vMAJOR.MINOR.PATCH` tag (patch by
+default). Published GitHub releases and matching tags are the durable release
+history. `www/package.json` and its lockfile stay at the development baseline,
+not the latest release version; no bot pushes to protected main. Malformed,
+orphaned, draft, prerelease, duplicate, or pre-baseline version history fails
+closed and requires investigation. Non-version tags are ignored. Releasing the
+same SHA as the latest release is rejected.
+
+The event SHA must still be current main at selection, before each deployment,
+and before publication. One build of that SHA produces an immutable artifact,
+including `release.json` with version, revision, run ID and build attempt.
+Both apps deploy that artifact and verify this identity and the existing live
+security/configuration checks. Publication rechecks both live identities and
+history, atomically creates the tag at the selected SHA, then creates the GitHub
+Release only after both deployment jobs succeed. Runs share the production
+concurrency group; GitHub may replace a pending run, so check the specific run
+status rather than treating dispatch as success. Non-main dispatches fail.
+
+The repository must allow the workflow's `GITHUB_TOKEN` contents-write
+permission to create tags and releases; the write grant is limited to the
+publication job. Configure tag rules to reserve release tags for the authorized
+release process without blocking that token, and maintain the existing branch
+and environment protections. Verify actual settings and secrets; this document
+is not evidence that they are configured. Other release writers and Azure
+operators must be coordinated with this pipeline: its concurrency group cannot
+serialize external changes. Main checks are point-in-time, not a transaction
+locking the branch; avoid merging during release and inspect the run if main
+moves. A move during publication can leave a published release with a failed
+run; inspect the tag, release and live metadata before any recovery.
+
+Azure deployments to the two apps are not atomic. A failure may leave one app
+updated and the other unchanged, even though no release is published. Inspect
+both jobs, both live `/release.json` files and all four hostnames. Fix the
+cause and rerun failed jobs only while the original SHA is still current and
+history is unchanged; publication rechecks both identities. Alternatively,
+dispatch a new release on current main after reviewing the partial state. If
+publication created a tag but failed to create the GitHub Release, history
+intentionally blocks retries: an authorized maintainer must investigate the tag,
+its SHA, deployments and any release first, and reconcile the orphaned tag
+under repository protections before retrying. Never infer success from a dispatch
+or a single HTTP 200; inspect both deployments and the published release. A
+failed release does not automatically roll back either app.
 
 Cyrus selected this existing-app boundary for issue #32: no new preview app.
 `SWA_NET_DEPLOYMENT_TOKEN` remains app-scoped, not preview-only. The protection
@@ -66,4 +109,4 @@ region rather than providing alias-based global distribution.
 
 Verify all four HTTPS URLs return 200 without cross-host redirects, valid TLS certificates, and matching site content. Verify each HTTP URL redirects to the same hostname over HTTPS. Recheck MX/SPF/DKIM after DNS changes.
 
-Rollback: revert the companion deployment job to stop updates to the second app; retain the original .net app and the main-only secret boundary. Remove only the explicitly added .com web records if undoing .com hosting. Remove the new app and its deployment secret only after deciding to retire it. Do not reset the entire DNS zone or restore deployment tokens as repository secrets.
+Recovery requires an explicitly authorized release of a corrective change on main to both apps; there is no automated rollback or preview promotion. Do not remove apps, change DNS, or restore deployment tokens as repository secrets as part of routine release recovery.
