@@ -47,6 +47,8 @@ source date before relying on it.
   proposed requirements and test plans, not proof of passing results
 - [Security and quality strategy](security/quality-strategy.md) —
   proposed controls and future tests
+- [Side-quest operations review](operations/side-quest-operations-review.md) —
+  monthly evidence review using the existing MBR, with data-quality and privacy rules
 - [Public claims register](content/public-claims-register.md) —
   owner/reviewer approval is required before publication
 - [License and provenance inventory](legal/license-inventory.md) and

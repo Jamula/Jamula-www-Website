@@ -67,3 +67,26 @@ At round start, call Test-RetroOverdue (see skill retro-enforcement). If overdue
 
 **Why GitHub Issues, not markdown:**
 Production data: 0% completion across 6 retros using markdown checklists, 100% after switching to GitHub Issues.
+
+---
+
+## Monthly Side-quest operations review
+
+| Field | Value |
+|-------|-------|
+| **Trigger** | manual |
+| **When** | after |
+| **Condition** | Run when the monthly Side-quest operations review is requested. |
+| **Facilitator** | Seven |
+| **Participants** | Seven, Spock, Data, Uhura |
+| **Time budget** | focused |
+| **Enabled** | ✅ yes |
+
+**Agenda:**
+1. Seven opens the existing monthly business review (MBR), confirms its UTC window and observation time, and checks prior GitHub issue follow-through.
+2. Spock presents the available evidence for the metric categories in the [Side-quest operations review runbook](../docs/operations/side-quest-operations-review.md).
+3. Data checks source scope, completeness, comparison validity, uncertainty, privacy, access, and retention; missing or unsafe evidence remains unknown.
+4. Seven records evidence-backed decisions and routes accepted follow-up through GitHub issues with an owner, acceptance criteria, and linked evidence.
+5. Uhura maintains the runbook when an approved process change requires documentation.
+
+The MBR remains the single executive review surface. This ceremony adds no dashboard, telemetry, scheduled automation, or private-data export.
