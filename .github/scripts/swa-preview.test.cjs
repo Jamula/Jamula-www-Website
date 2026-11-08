@@ -346,8 +346,10 @@ for (const name of ["deploy", "deploy-com"]) {
         "Download verified deployment artifact",
         "Verify downloaded configuration",
         "Require current main revision",
+        "Record production deployment",
         "Deploy prebuilt site",
         "Verify live site",
+        "Record deployment result",
       ],
     );
     assert.match(
@@ -367,10 +369,10 @@ for (const name of ["deploy", "deploy-com"]) {
       /name: swa-site-\$\{\{ env\.DEPLOYMENT_SHA \}\}/,
     );
     assert.match(steps[2].body, /path: www\/dist/);
-    assert.match(steps[5].body, /app_location: www\/dist/);
-    assert.match(steps[5].body, /skip_app_build: true/);
+    assert.match(steps[6].body, /app_location: www\/dist/);
+    assert.match(steps[6].body, /skip_app_build: true/);
     assert.match(
-      steps[5].body,
+      steps[6].body,
       new RegExp(
         `azure_static_web_apps_api_token: \\$\\{\\{ secrets\\.SWA_${name === "deploy" ? "NET" : "COM"}_DEPLOYMENT_TOKEN \\}\\}`,
       ),
@@ -424,7 +426,13 @@ for (const name of ["deploy", "deploy-com"]) {
         "HTTP/2 200\r\nContent-Security-Policy: default-src 'self'\r\n",
       );
       const scripts = steps
-        .filter((step) => /        run:/.test(step.body))
+        .filter(
+          (step) =>
+            /        run:/.test(step.body) &&
+            !["Record production deployment", "Record deployment result"].includes(
+              step.name,
+            ),
+        )
         .map((step) =>
           step.body
             .split(/        run: (?:\|\n)?/)[1]

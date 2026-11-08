@@ -1,3 +1,11 @@
+---
+interface Props {
+  releaseVersion?: string | undefined;
+}
+
+const { releaseVersion } = Astro.props;
+---
+
 <div class="analytics">
   <div class="analytics__controls">
     <button
@@ -14,12 +22,17 @@
     </button>
     <a href="/privacy/">Website analytics privacy</a>
   </div>
-  <section id="analytics-consent" aria-labelledby="analytics-heading" hidden>
+  <section
+    id="analytics-consent"
+    aria-labelledby="analytics-heading"
+    data-release-version={releaseVersion}
+    hidden
+  >
     <h2 id="analytics-heading">Your analytics choice</h2>
     <p>
       With your permission, Google Analytics measures page views and contact-link clicks. A click
-      indicates interest, not a sent inquiry. Analytics is optional and off until you accept.
-      Rejecting does not affect the website.
+      indicates interest, not a sent inquiry. Events also include the deployed release version.
+      Analytics is optional and off until you accept. Rejecting does not affect the website.
     </p>
     <p>
       Your choice applies only to this hostname and browser for up to 180 days. Withdraw at any time
