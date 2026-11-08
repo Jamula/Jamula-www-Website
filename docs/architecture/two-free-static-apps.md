@@ -90,7 +90,7 @@ document records the required configuration, not the current secret state;
 verify repository settings before asserting migration completion.
 
 Validate the boundary with `node --test .github/scripts/swa-preview.test.cjs`
-and `python -m unittest discover -s scripts -p test_preview_artifact.py`.
+and `dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release`.
 These tests do not establish live deployment or cleanup behavior. For that,
 inspect successful Actions runs for the exact default-branch workflow revision
 and verify the numbered preview URL, noindex/security headers, artifact digest,

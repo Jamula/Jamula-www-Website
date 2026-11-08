@@ -245,7 +245,7 @@ From the repository root:
 ```powershell
 dotnet run --project scripts\mbr\tests\JamulaMbr.Tests.csproj
 node --test scripts\mbr\tests\ui.test.mjs
-python scripts\validate_governance.py
+dotnet run --project scripts\validation\JamulaValidation.csproj --configuration Release -- validate-governance .
 ```
 
 The dependency-free .NET fixture runner covers page traversal and page failure,
