@@ -223,6 +223,50 @@ const staticWebAppConfig = path.join(
   "../../www/public/staticwebapp.config.json",
 );
 
+test("trusted preview validator resolves the downloaded archive and deployment output", () => {
+  const workflow = fs.readFileSync(
+    path.join(__dirname, "../workflows/azure-static-web-apps-preview.yml"),
+    "utf8",
+  ).replace(/\r\n/g, "\n");
+  const step = workflow.match(
+    /- name: Extract only static files and verify trusted configuration\n([\s\S]*?)(?=\n      - name:)/,
+  )?.[1];
+  assert.ok(step);
+  const cwd = step.match(/^\s+working-directory: (.+)$/m)?.[1];
+  const command = step.match(/^\s+run: (.+)$/m)?.[1];
+  assert.equal(cwd, "trusted/scripts/validation");
+  const args = command?.match(
+    /^dotnet run --configuration Release -- validate-artifact "([^"]+)" "([^"]+)" "([^"]+)"$/,
+  );
+  assert.ok(args, "expected the trusted validator and its three quoted paths");
+  const workspace = path.resolve(__dirname, "../..");
+  const resolveArgument = (arg) => path.resolve(
+    workspace,
+    cwd,
+    arg.replace(/^\$GITHUB_WORKSPACE(?=\/|$)/, workspace),
+  );
+  const archive = workflow.match(/fs\.writeFileSync\("([^"]+)", bytes\)/)?.[1];
+  const deployment = workflow.match(/^\s+app_location: (.+)$/m)?.[1];
+  assert.equal(archive, ".preview/site.zip");
+  assert.equal(deployment, "www/dist");
+  assert.equal(resolveArgument(args[1]), path.resolve(workspace, archive));
+  assert.equal(resolveArgument(args[2]), path.resolve(workspace, deployment));
+  assert.equal(
+    resolveArgument(args[3]),
+    path.resolve(workspace, "trusted/www/public/staticwebapp.config.json"),
+  );
+  const verifyStep = workflow.match(
+    /- name: Verify isolated live preview\n([\s\S]*)$/,
+  )?.[1];
+  assert.ok(verifyStep);
+  assert.equal(verifyStep.match(/^\s+working-directory: (.+)$/m)?.[1], cwd);
+  const verifyConfig = verifyStep.match(
+    /dotnet run --configuration Release -- verify-site "\$DEPLOYED_URL" "([^"]+)"/,
+  )?.[1];
+  assert.ok(verifyConfig);
+  assert.equal(resolveArgument(verifyConfig), resolveArgument(args[3]));
+});
+
 test("live CSP verifier accepts the policy from the Static Web Apps config", () => {
   const config = JSON.parse(fs.readFileSync(staticWebAppConfig, "utf8"));
   const headersDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-csp-"));

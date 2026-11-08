@@ -73,7 +73,7 @@ jobs:
       - name: Extract only static files and verify trusted configuration
         if: steps.gate.outputs.action == 'upload'
         working-directory: trusted/scripts/validation
-        run: dotnet run --configuration Release -- validate-artifact ../../.preview/site.zip ../../www/dist ../../www/public/staticwebapp.config.json
+        run: dotnet run --configuration Release -- validate-artifact "$GITHUB_WORKSPACE/.preview/site.zip" "$GITHUB_WORKSPACE/www/dist" "$GITHUB_WORKSPACE/trusted/www/public/staticwebapp.config.json"
 
       - name: Recheck current PR before deployment
         if: steps.gate.outputs.action != 'skip'
@@ -143,7 +143,7 @@ jobs:
             echo "::error::The deployment URL is not the selected PR preview."
             exit 1
           fi
-          dotnet run --configuration Release -- verify-site "$DEPLOYED_URL" ../../www/public/staticwebapp.config.json
+          dotnet run --configuration Release -- verify-site "$DEPLOYED_URL" "$GITHUB_WORKSPACE/trusted/www/public/staticwebapp.config.json"
           {
             echo "### Verified isolated PR preview"
             echo "- PR: ${PR_NUMBER}"
