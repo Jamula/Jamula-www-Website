@@ -19,6 +19,7 @@ export function initializeAnalytics(win = window, doc = document) {
   const reject = doc.querySelector("#analytics-reject");
   const preferences = doc.querySelector("#analytics-preferences");
   const withdraw = doc.querySelector("#analytics-withdraw");
+  const releaseVersion = panel.getAttribute("data-release-version");
   const id =
     win.location.protocol === "https:" && !win.location.port
       ? HOSTS.get(win.location.hostname)
@@ -147,7 +148,10 @@ export function initializeAnalytics(win = window, doc = document) {
       cookie_flags: "Secure;SameSite=Lax",
       linker: { domains: [], accept_incoming: false, decorate_forms: false },
     });
-    win.gtag("event", "page_view", { send_to: id });
+    win.gtag("event", "page_view", {
+      send_to: id,
+      ...(releaseVersion ? { release_version: releaseVersion } : {}),
+    });
     script = doc.createElement("script");
     script.async = true;
     script.referrerPolicy = "no-referrer";
@@ -234,7 +238,11 @@ export function initializeAnalytics(win = window, doc = document) {
       event.target.closest("a[data-analytics-contact]") &&
       permitted()
     ) {
-      win.gtag("event", "contact_click", { send_to: id, contact_method: "email" });
+      win.gtag("event", "contact_click", {
+        send_to: id,
+        ...(releaseVersion ? { release_version: releaseVersion } : {}),
+        contact_method: "email",
+      });
     }
   });
   win.addEventListener("storage", (event) => {
