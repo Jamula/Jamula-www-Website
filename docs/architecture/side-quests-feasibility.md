@@ -1,8 +1,8 @@
 # Side-quests feasibility assessment
 
-**Evidence date:** 2026-11-08  
-**Status:** Documented research; no platform or inference provider selected  
-**Scope:** Issue #108, the approved Enable side-quests milestone  
+**Evidence date:** 2026-11-08
+**Status:** Documented research; no platform or inference provider selected
+**Scope:** Issue #108, the approved Enable side-quests milestone
 **Constraint:** No new paid services, plan upgrades, provisioning, deployment, or
 production changes
 
