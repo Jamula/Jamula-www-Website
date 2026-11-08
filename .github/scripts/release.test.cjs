@@ -38,7 +38,7 @@ test("required PR validation builds and tests explicit release and versionless m
   const commands = [
     "npm exec -- astro build",
     "node scripts/test_built_site.mjs",
-    "node --test tests/*.test.mjs",
+    null,
   ];
   let previousIndex = -1;
   for (const [index, name] of names.entries()) {
@@ -56,8 +56,11 @@ test("required PR validation builds and tests explicit release and versionless m
       /^        if: steps\.changes\.outputs\.website == 'true'$/m,
     );
     assert.match(step, /^        env:$/m);
-    if (index === 2) {
-      assert.match(step, /^        run: >-\n          node --experimental-test-coverage --test\n          --test-coverage-include=public\/analytics-consent\.js\n          --test-coverage-lines=90 --test-coverage-branches=90\n          tests\/\*\.test\.mjs$/m);
+    if (index % 3 === 2) {
+      assert.match(
+        step,
+        /^        run: >-\n          node --experimental-test-coverage --test\n          --test-coverage-include=public\/analytics-consent\.js\n          --test-coverage-lines=90 --test-coverage-branches=90\n          tests\/\*\.test\.mjs$/m,
+      );
     } else {
       assert.ok(step.includes(`\n        run: ${commands[index % 3]}\n`));
     }
