@@ -69,10 +69,12 @@ test("live metadata must match version, revision and build run attempt", () => {
 });
 
 test("release wiring preserves isolation, serialization and publication ordering", () => {
-  const workflow = fs.readFileSync(
-    path.join(__dirname, "../workflows/azure-static-web-apps.yml"),
-    "utf8",
-  );
+  const workflow = fs
+    .readFileSync(
+      path.join(__dirname, "../workflows/azure-static-web-apps.yml"),
+      "utf8",
+    )
+    .replace(/\r\n/g, "\n");
   const prepare = workflow.split("\n  prepare:")[1].split("\n  build:")[0];
   const publish = workflow.split("\n  publish:")[1];
   assert.doesNotMatch(workflow, /^  push:/m);
@@ -110,10 +112,12 @@ test("release wiring preserves isolation, serialization and publication ordering
 });
 
 test("publication fails before writing on stale identity, main or history", () => {
-  const workflow = fs.readFileSync(
-    path.join(__dirname, "../workflows/azure-static-web-apps.yml"),
-    "utf8",
-  );
+  const workflow = fs
+    .readFileSync(
+      path.join(__dirname, "../workflows/azure-static-web-apps.yml"),
+      "utf8",
+    )
+    .replace(/\r\n/g, "\n");
   const publish = workflow.split("\n  publish:")[1];
   const script = publish
     .match(/        run: \|\n([\s\S]*)/)[1]
