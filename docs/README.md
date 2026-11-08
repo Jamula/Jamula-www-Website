@@ -51,6 +51,8 @@ source date before relying on it.
   dated hosting, identity, inference, and local-routing evidence; not a platform approval
 - [Side-quest quality baseline](security/side-quests-quality-baseline.md) —
   measured existing test/coverage evidence and unmeasured release gates
+- [Side-quest operations review](operations/side-quest-operations-review.md) —
+  monthly evidence review using the existing MBR, with data-quality and privacy rules
 - [Public claims register](content/public-claims-register.md) —
   owner/reviewer approval is required before publication
 - [License and provenance inventory](legal/license-inventory.md) and
