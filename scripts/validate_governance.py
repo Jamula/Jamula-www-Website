@@ -85,8 +85,16 @@ def validate_deployment_boundary() -> None:
             fail(f"The PR {name} job must not access a deployment secret or environment")
     for name in ("deploy", "deploy-com"):
         job = jobs.get(name, "")
-        if "github.event_name == 'push'" not in job or "environment: swa-deployment" not in job:
-            fail(f"{name} must require a production push and the main-only environment")
+        if (
+            "github.event_name == 'workflow_dispatch'" not in job
+            or "github.ref == 'refs/heads/main'" not in job
+            or "environment: swa-deployment" not in job
+        ):
+            fail(f"{name} must require a manual main release and the main-only environment")
+    if "\n  push:" in build.split("\njobs:", 1)[0]:
+        fail("Production deployment must not run on push")
+    if "needs: [prepare, build, deploy, deploy-com]" not in jobs.get("publish", ""):
+        fail("Publication must require both verified deployments")
     if "workflow_run:" not in preview or "\n  pull_request:" in preview:
         fail("Preview deployment must run as a trusted workflow_run")
     if "environment: swa-deployment" not in preview or "ref: ${{ github.workflow_sha }}" not in preview:

@@ -15,8 +15,9 @@ those proposals are not descriptions of features that have shipped.
   Website operation must not add paid operating services; existing domain
   renewals and CI allowances are separate. Free-tier quotas and lack of an SLA
   remain constraints, not guarantees of unlimited or uninterrupted service.
-- The production workflow is sourced from `main`. Pull-request previews are
-  isolated and are not promoted to production.
+- Production is deployed only by an authorized manual, versioned release from
+  `main`; merging does not deploy. Pull-request previews are isolated and are
+  not promoted to production.
 - The homepage currently has no contact form or other contact mechanism. Open
   website follow-ups are tracked in [#86](https://github.com/Jamula/Jamula-www-Website/issues/86),
   [#87](https://github.com/Jamula/Jamula-www-Website/issues/87),
@@ -25,6 +26,17 @@ those proposals are not descriptions of features that have shipped.
 
 Repository workflow configuration documents the intended deployment boundary;
 it does not by itself prove current DNS, TLS, secret, or live-preview state.
+
+## Releasing
+
+After authorization, run `gh workflow run azure-static-web-apps.yml --ref main`
+and monitor the run through publication. The first release is `v0.1.0`;
+subsequent releases increment the patch by default. Choose a different increment
+with `-f bump=minor` or `-f bump=major`. Published GitHub releases and their
+`v` tags are the release history; `www/package.json` remains the development
+baseline, not the current release version. See the
+[release runbook](docs/architecture/two-free-static-apps.md) for permissions,
+verification, retries, and partial-deployment recovery.
 
 ## Local development
 
@@ -59,5 +71,6 @@ For documentation/governance changes, run from the repository root:
 ```sh
 python scripts/validate_governance.py
 node --test .github/scripts/swa-preview.test.cjs
+node --test .github/scripts/release.test.cjs
 python -m unittest discover -s scripts -p 'test_preview*.py'
 ```

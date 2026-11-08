@@ -345,6 +345,7 @@ for (const name of ["deploy", "deploy-com"]) {
           : "Require companion deployment token",
         "Download verified deployment artifact",
         "Verify downloaded configuration",
+        "Require current main revision",
         "Deploy prebuilt site",
         "Verify live site",
       ],
@@ -355,10 +356,7 @@ for (const name of ["deploy", "deploy-com"]) {
     );
     assert.match(steps[0].body, /ref: \$\{\{ env\.DEPLOYMENT_SHA \}\}/);
     assert.match(steps[0].body, /persist-credentials: false/);
-    assert.match(
-      steps[0].body,
-      /sparse-checkout: \.github\/scripts\/verify-swa-csp\.cjs/,
-    );
+    assert.match(steps[0].body, /\.github\/scripts\/verify-swa-csp\.cjs/);
     assert.match(steps[0].body, /sparse-checkout-cone-mode: false/);
     assert.match(
       steps[2].body,
@@ -369,10 +367,10 @@ for (const name of ["deploy", "deploy-com"]) {
       /name: swa-site-\$\{\{ env\.DEPLOYMENT_SHA \}\}/,
     );
     assert.match(steps[2].body, /path: www\/dist/);
-    assert.match(steps[4].body, /app_location: www\/dist/);
-    assert.match(steps[4].body, /skip_app_build: true/);
+    assert.match(steps[5].body, /app_location: www\/dist/);
+    assert.match(steps[5].body, /skip_app_build: true/);
     assert.match(
-      steps[4].body,
+      steps[5].body,
       new RegExp(
         `azure_static_web_apps_api_token: \\$\\{\\{ secrets\\.SWA_${name === "deploy" ? "NET" : "COM"}_DEPLOYMENT_TOKEN \\}\\}`,
       ),
@@ -402,6 +400,10 @@ for (const name of ["deploy", "deploy-com"]) {
         path.join(directory, ".github/scripts/verify-swa-csp.cjs"),
         verifier.stdout,
       );
+      fs.copyFileSync(
+        path.join(__dirname, "release.cjs"),
+        path.join(directory, ".github/scripts/release.cjs"),
+      );
       assert.equal(fs.existsSync(path.join(directory, "www/public")), false);
       fs.mkdirSync(path.join(directory, "www/dist"), { recursive: true });
       const config = JSON.parse(fs.readFileSync(staticWebAppConfig, "utf8"));
@@ -417,6 +419,10 @@ for (const name of ["deploy", "deploy-com"]) {
             .map(([header, value]) => `${header}: ${value}\r\n`)
             .join(""),
       );
+      fs.writeFileSync(
+        path.join(directory, "old-headers.txt"),
+        "HTTP/2 200\r\nContent-Security-Policy: default-src 'self'\r\n",
+      );
       const scripts = steps
         .filter((step) => /        run:/.test(step.body))
         .map((step) =>
@@ -425,11 +431,8 @@ for (const name of ["deploy", "deploy-com"]) {
             .replace(/^          /gm, ""),
         )
         .join("\n");
-      const result = spawnSync(
-        "bash",
-        [
-          "-c",
-          `
+      const shellScript = `
+          gh() { printf '%s\\n' "$DEPLOYMENT_SHA"; }
           curl() {
             local headers="" output="" url=""
             while [[ $# -gt 0 ]]; do
@@ -442,29 +445,44 @@ for (const name of ["deploy", "deploy-com"]) {
               esac
             done
             case "$url" in
+              */release.json?*) release_ready=true; printf '{"version":"%s","revision":"%s","run":"1","attempt":"1"}\\n' "\${TEST_VERSION:-0.1.0}" "$DEPLOYMENT_SHA" > "$output" ;;
               */robots.txt) printf 'HTTP/2 200\\r\\nContent-Type: text/plain\\r\\n' > "$headers" ;;
               */__jamula_missing_route__) printf 'Page not found' > "$output"; printf '404' ;;
-              */) cp home-headers.txt "$headers"; printf '<title>Jamula</title>' > "$output" ;;
+              */)
+                if [[ "\${release_ready:-false}" == true ]]; then
+                  cp home-headers.txt "$headers"
+                  if [[ "\${TEST_BROKEN_HEADERS:-false}" == true ]]; then
+                    sed -i 's/X-Frame-Options: DENY/X-Frame-Options: SAMEORIGIN/' "$headers"
+                  fi
+                else
+                  cp old-headers.txt "$headers"
+                fi
+                printf '<title>Jamula</title>' > "$output" ;;
               *) return 93 ;;
             esac
           }
           ${scripts}
-          `,
-        ],
-        {
-          cwd: directory,
-          encoding: "utf8",
-          env: {
-            ...process.env,
-            DEPLOYMENT_TOKEN: "disposable-test-token",
-            DEPLOYMENT_SHA: revision.stdout.trim(),
-            DEPLOYED_URL: "https://isolated.azurestaticapps.net",
-            ARTIFACT_DIGEST: "disposable-artifact-digest",
-            GITHUB_EVENT_NAME: "push",
-            GITHUB_STEP_SUMMARY: "summary.txt",
-          },
+          `;
+      const result = spawnSync("bash", ["-c", shellScript], {
+        cwd: directory,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          DEPLOYMENT_TOKEN: "disposable-test-token",
+          DEPLOYMENT_SHA: revision.stdout.trim(),
+          DEPLOYED_URL:
+            name === "deploy"
+              ? "https://ashy-beach-033c7d01e.7.azurestaticapps.net"
+              : "https://red-cliff-0ee064a1e.2.azurestaticapps.net",
+          RELEASE_VERSION: "0.1.0",
+          RELEASE_ATTEMPT: "1",
+          GITHUB_RUN_ID: "1",
+          GITHUB_REPOSITORY: "test/repo",
+          ARTIFACT_DIGEST: "disposable-artifact-digest",
+          GITHUB_EVENT_NAME: "push",
+          GITHUB_STEP_SUMMARY: "summary.txt",
         },
-      );
+      });
       assert.ifError(result.error);
       assert.equal(result.status, 0, result.stderr);
       const summary = fs.readFileSync(
@@ -474,6 +492,60 @@ for (const name of ["deploy", "deploy-com"]) {
       assert.match(summary, /Verified Azure deployment/);
       assert.ok(summary.includes(revision.stdout.trim()));
       assert.match(summary, /disposable-artifact-digest/);
+      const broken = spawnSync("bash", ["-c", shellScript], {
+        cwd: directory,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          DEPLOYMENT_TOKEN: "disposable-test-token",
+          DEPLOYMENT_SHA: revision.stdout.trim(),
+          DEPLOYED_URL:
+            name === "deploy"
+              ? "https://ashy-beach-033c7d01e.7.azurestaticapps.net"
+              : "https://red-cliff-0ee064a1e.2.azurestaticapps.net",
+          RELEASE_VERSION: "0.1.0",
+          RELEASE_ATTEMPT: "1",
+          GITHUB_RUN_ID: "1",
+          GITHUB_REPOSITORY: "test/repo",
+          GITHUB_EVENT_NAME: "workflow_dispatch",
+          GITHUB_STEP_SUMMARY: "broken-summary.txt",
+          TEST_BROKEN_HEADERS: "true",
+        },
+      });
+      assert.ifError(broken.error);
+      assert.notEqual(broken.status, 0);
+      assert.match(broken.stdout, /Unexpected X-Frame-Options header/);
+      assert.equal(
+        fs.existsSync(path.join(directory, "broken-summary.txt")),
+        false,
+      );
+      const stale = spawnSync(
+        "bash",
+        ["-c", `sleep() { :; }\n${shellScript}`],
+        {
+          cwd: directory,
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            DEPLOYMENT_TOKEN: "disposable-test-token",
+            DEPLOYMENT_SHA: revision.stdout.trim(),
+            DEPLOYED_URL:
+              name === "deploy"
+                ? "https://ashy-beach-033c7d01e.7.azurestaticapps.net"
+                : "https://red-cliff-0ee064a1e.2.azurestaticapps.net",
+            RELEASE_VERSION: "0.1.0",
+            RELEASE_ATTEMPT: "1",
+            GITHUB_RUN_ID: "1",
+            GITHUB_REPOSITORY: "test/repo",
+            GITHUB_EVENT_NAME: "workflow_dispatch",
+            GITHUB_STEP_SUMMARY: "summary.txt",
+            TEST_VERSION: "0.0.9",
+          },
+        },
+      );
+      assert.ifError(stale.error);
+      assert.notEqual(stale.status, 0);
+      assert.match(stale.stdout, /Live release metadata did not match/);
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }
@@ -513,16 +585,17 @@ function jobEnabled(
 }
 
 test("manual production trigger has no revision override inputs", () => {
-  assert.match(productionWorkflow, /^on:\n  workflow_dispatch:\n  push:/m);
+  assert.match(productionWorkflow, /^on:\n  workflow_dispatch:\n    inputs:/m);
+  assert.doesNotMatch(productionWorkflow, /^  push:/m);
   assert.match(productionWorkflow, /DEPLOYMENT_SHA:.*\|\| github\.sha/);
   assert.match(productionWorkflow, /group: >-\n[\s\S]*?\|\| 'production'/);
 });
 
-for (const event of ["push", "workflow_dispatch"]) {
+for (const event of ["workflow_dispatch"]) {
   test(`${event} production jobs require main and a selected artifact`, () => {
     assert.equal(jobEnabled("prepare", event, "refs/heads/main"), true);
     for (const ref of ["refs/heads/feature", "refs/tags/main"]) {
-      assert.equal(jobEnabled("prepare", event, ref), false);
+      assert.equal(jobEnabled("prepare", event, ref), true);
     }
     for (const name of ["deploy", "deploy-com"]) {
       assert.equal(jobEnabled(name, event, "refs/heads/main"), true);
@@ -555,7 +628,7 @@ for (const event of ["push", "workflow_dispatch"]) {
       );
       try {
         const script = productionJobs.prepare
-          .match(/        run: \|\n([\s\S]*)/)[1]
+          .match(/        run: \|\n([\s\S]*?)(?=\n      - name:|\n  build:)/)[1]
           .replace(/^          /gm, "");
         const result = spawnSync(
           "bash",
@@ -585,11 +658,19 @@ for (const event of ["push", "workflow_dispatch"]) {
           },
         );
         assert.ifError(result.error);
-        assert.equal(result.status, 0, result.stderr);
-        assert.equal(
-          fs.readFileSync(path.join(directory, "output.txt"), "utf8").trim(),
-          `should_deploy=${expected}`,
-        );
+        if (expected === "true") {
+          assert.equal(result.status, 0, result.stderr);
+          assert.equal(
+            fs.readFileSync(path.join(directory, "output.txt"), "utf8").trim(),
+            "should_deploy=true",
+          );
+        } else {
+          assert.notEqual(result.status, 0);
+          assert.equal(
+            fs.existsSync(path.join(directory, "output.txt")),
+            false,
+          );
+        }
       } finally {
         fs.rmSync(path.join(directory, "output.txt"), { force: true });
         fs.rmdirSync(directory);
@@ -598,12 +679,12 @@ for (const event of ["push", "workflow_dispatch"]) {
   }
 }
 
-for (const event of ["push", "workflow_dispatch"]) {
+for (const event of ["workflow_dispatch"]) {
   test(`${event} gate fails closed when latest main cannot be read`, () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-production-"));
     try {
       const script = productionJobs.prepare
-        .match(/        run: \|\n([\s\S]*)/)[1]
+        .match(/        run: \|\n([\s\S]*?)(?=\n      - name:|\n  build:)/)[1]
         .replace(/^          /gm, "");
       const result = spawnSync(
         "bash",
@@ -656,7 +737,7 @@ test("PR validation stays isolated and unrelated events cannot deploy production
     ),
     false,
   );
-  for (const event of ["pull_request", "workflow_run", "schedule"]) {
+  for (const event of ["push", "pull_request", "workflow_run", "schedule"]) {
     for (const name of ["deploy", "deploy-com"]) {
       assert.equal(jobEnabled(name, event, "refs/heads/main"), false);
     }
