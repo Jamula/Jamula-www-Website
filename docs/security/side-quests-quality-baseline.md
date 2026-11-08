@@ -57,9 +57,11 @@ node --experimental-test-coverage --test \
   tests/*.test.mjs
 ```
 
-The same gate runs for the release-version and versionless preview build
-variants in `.github/workflows/required-pr-validation.yml`. It does not claim
-coverage for Astro build-time templates or other deployables. The temporary
+The gate runs after the existing website build in
+`.github/workflows/required-pr-validation.yml`. This parent retains the #104
+release semantics; the separate #105 release-version/versionless build matrix
+is not integrated here. It does not claim coverage for Astro build-time
+templates or other deployables. The temporary
 .NET collection command shape used for the baseline was:
 
 ```powershell
