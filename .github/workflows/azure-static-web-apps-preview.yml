@@ -27,6 +27,11 @@ jobs:
           persist-credentials: false
           path: trusted
 
+      - name: Set up trusted .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: trusted/scripts/validation/global.json
+
       - name: Select current preview and download immutable artifact
         id: gate
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -67,8 +72,8 @@ jobs:
 
       - name: Extract only static files and verify trusted configuration
         if: steps.gate.outputs.action == 'upload'
-        shell: bash
-        run: python trusted/scripts/validate_preview_artifact.py .preview/site.zip www/dist trusted/www/public/staticwebapp.config.json
+        working-directory: trusted/scripts/validation
+        run: dotnet run --configuration Release -- validate-artifact ../../.preview/site.zip ../../www/dist ../../www/public/staticwebapp.config.json
 
       - name: Recheck current PR before deployment
         if: steps.gate.outputs.action != 'skip'
@@ -124,6 +129,7 @@ jobs:
 
       - name: Verify isolated live preview
         if: steps.current.outputs.deploy == 'true' && steps.gate.outputs.action == 'upload'
+        working-directory: trusted/scripts/validation
         shell: bash
         env:
           DEPLOYED_URL: ${{ steps.deploy.outputs.static_web_app_url }}
@@ -137,7 +143,7 @@ jobs:
             echo "::error::The deployment URL is not the selected PR preview."
             exit 1
           fi
-          python trusted/scripts/verify_preview_site.py "$DEPLOYED_URL"
+          dotnet run --configuration Release -- verify-site "$DEPLOYED_URL" ../../www/public/staticwebapp.config.json
           {
             echo "### Verified isolated PR preview"
             echo "- PR: ${PR_NUMBER}"
