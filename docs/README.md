@@ -47,6 +47,10 @@ source date before relying on it.
   proposed requirements and test plans, not proof of passing results
 - [Security and quality strategy](security/quality-strategy.md) —
   proposed controls and future tests
+- [Side-quest feasibility assessment](architecture/side-quests-feasibility.md) —
+  dated hosting, identity, inference, and local-routing evidence; not a platform approval
+- [Side-quest quality baseline](security/side-quests-quality-baseline.md) —
+  measured existing test/coverage evidence and unmeasured release gates
 - [Side-quest operations review](operations/side-quest-operations-review.md) —
   monthly evidence review using the existing MBR, with data-quality and privacy rules
 - [Public claims register](content/public-claims-register.md) —

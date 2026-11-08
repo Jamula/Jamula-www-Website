@@ -38,7 +38,7 @@ test("required PR validation builds and tests explicit release and versionless m
   const commands = [
     "npm exec -- astro build",
     "node scripts/test_built_site.mjs",
-    "node --test tests/*.test.mjs",
+    null,
   ];
   let previousIndex = -1;
   for (const [index, name] of names.entries()) {
@@ -56,7 +56,14 @@ test("required PR validation builds and tests explicit release and versionless m
       /^        if: steps\.changes\.outputs\.website == 'true'$/m,
     );
     assert.match(step, /^        env:$/m);
-    assert.ok(step.includes(`\n        run: ${commands[index % 3]}\n`));
+    if (index % 3 === 2) {
+      assert.match(
+        step,
+        /^        run: >-\n          node --experimental-test-coverage --test\n          --test-coverage-include=public\/analytics-consent\.js\n          --test-coverage-lines=90 --test-coverage-branches=90\n          tests\/\*\.test\.mjs$/m,
+      );
+    } else {
+      assert.ok(step.includes(`\n        run: ${commands[index % 3]}\n`));
+    }
     const version = index < 3 ? "0.1.0" : "";
     assert.ok(
       step.includes(`\n          PUBLIC_RELEASE_VERSION: "${version}"\n`),
@@ -219,10 +226,12 @@ test("live metadata must match version, revision and build run attempt", () => {
 });
 
 test("release wiring preserves isolation, serialization and publication ordering", () => {
-  const workflow = fs.readFileSync(
-    path.join(__dirname, "../workflows/azure-static-web-apps.yml"),
-    "utf8",
-  );
+  const workflow = fs
+    .readFileSync(
+      path.join(__dirname, "../workflows/azure-static-web-apps.yml"),
+      "utf8",
+    )
+    .replace(/\r\n/g, "\n");
   const prepare = workflow.split("\n  prepare:")[1].split("\n  build:")[0];
   const publish = workflow.split("\n  publish:")[1];
   assert.doesNotMatch(workflow, /^  push:/m);
@@ -267,10 +276,12 @@ test("release wiring preserves isolation, serialization and publication ordering
 });
 
 test("publication fails before writing on stale identity, main or history", () => {
-  const workflow = fs.readFileSync(
-    path.join(__dirname, "../workflows/azure-static-web-apps.yml"),
-    "utf8",
-  );
+  const workflow = fs
+    .readFileSync(
+      path.join(__dirname, "../workflows/azure-static-web-apps.yml"),
+      "utf8",
+    )
+    .replace(/\r\n/g, "\n");
   const publish = workflow.split("\n  publish:")[1];
   const script = publish
     .match(/        run: \|\n([\s\S]*)/)[1]

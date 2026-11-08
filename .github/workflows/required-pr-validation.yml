@@ -121,7 +121,11 @@ jobs:
         if: steps.changes.outputs.website == 'true'
         env:
           PUBLIC_RELEASE_VERSION: "0.1.0"
-        run: node --test tests/*.test.mjs
+        run: >-
+          node --experimental-test-coverage --test
+          --test-coverage-include=public/analytics-consent.js
+          --test-coverage-lines=90 --test-coverage-branches=90
+          tests/*.test.mjs
 
       - name: Build versionless preview website
         if: steps.changes.outputs.website == 'true'
@@ -141,7 +145,11 @@ jobs:
         env:
           PUBLIC_RELEASE_VERSION: ""
           EXPECT_NO_RELEASE: "1"
-        run: node --test tests/*.test.mjs
+        run: >-
+          node --experimental-test-coverage --test
+          --test-coverage-include=public/analytics-consent.js
+          --test-coverage-lines=90 --test-coverage-branches=90
+          tests/*.test.mjs
 
       - name: Set up .NET SDK
         if: steps.changes.outputs.monitor == 'true'
