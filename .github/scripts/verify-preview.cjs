@@ -12,10 +12,20 @@ const TRANSIENT_CODES = new Set([
 ]);
 const BODY_LIMIT = 5 * 1024 * 1024;
 
-function requestPreview(url) {
+function requestPreview(url, expectedStatus = 200) {
   let timer;
   return new Promise((resolve, reject) => {
     const request = https.get(url, (response) => {
+      response.on("error", reject);
+      if (response.statusCode !== expectedStatus) {
+        resolve({
+          status: response.statusCode,
+          headers: response.headers,
+          body: Buffer.alloc(0),
+        });
+        response.destroy();
+        return;
+      }
       const chunks = [];
       let size = 0;
       response.on("data", (chunk) => {
@@ -28,7 +38,6 @@ function requestPreview(url) {
         }
         chunks.push(chunk);
       });
-      response.on("error", reject);
       response.on("end", () => {
         resolve({
           status: response.statusCode,
@@ -54,7 +63,7 @@ async function fetchPreview(url, options = {}) {
   const log = options.log ?? console.error;
   for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt += 1) {
     try {
-      const response = await request(url);
+      const response = await request(url, options.expectedStatus ?? 200);
       if (TRANSIENT_STATUS.has(response.status)) {
         const error = new Error(`HTTP ${response.status}`);
         error.status = response.status;
@@ -63,7 +72,9 @@ async function fetchPreview(url, options = {}) {
       return response;
     } catch (error) {
       const transient =
-        TRANSIENT_STATUS.has(error.status) || TRANSIENT_CODES.has(error.code);
+        error.status !== undefined
+          ? TRANSIENT_STATUS.has(error.status)
+          : TRANSIENT_CODES.has(error.code);
       log(
         `Preview request ${url} attempt ${attempt + 1} failed: ${error.message}`,
       );
@@ -130,10 +141,10 @@ async function verifyPreview(url, options = {}) {
   ) {
     throw new Error("The preview robots.txt MIME type is not text/plain.");
   }
-  const missing = await fetchPreview(
-    `${base}/__jamula_missing_route__`,
-    options,
-  );
+  const missing = await fetchPreview(`${base}/__jamula_missing_route__`, {
+    ...options,
+    expectedStatus: 404,
+  });
   if (missing.status !== 404) {
     throw new Error("The preview missing route did not return 404.");
   }

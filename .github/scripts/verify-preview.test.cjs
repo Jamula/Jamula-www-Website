@@ -42,8 +42,12 @@ function fixture() {
   const delays = [];
   const logs = [];
   const options = {
-    request: async (url) => {
+    request: async (url, expectedStatus) => {
       calls.push(url);
+      assert.equal(
+        expectedStatus,
+        url.endsWith("/__jamula_missing_route__") ? 404 : 200,
+      );
       assert.ok(responses.length > 0, "Unexpected extra request");
       const response = responses.shift();
       if (response instanceof Error) throw response;
@@ -255,6 +259,7 @@ test("HTTP transport returns redirects without following their location", async 
       const response = new EventEmitter();
       response.statusCode = 302;
       response.headers = { location: "https://evil.example" };
+      response.destroy = () => {};
       callback(response);
       response.emit("end");
     });
@@ -270,6 +275,7 @@ test("HTTP transport rejects an oversized body without a retryable error", async
     const request = new EventEmitter();
     queueMicrotask(() => {
       const response = new EventEmitter();
+      response.statusCode = 200;
       response.destroy = (error) => response.emit("error", error);
       callback(response);
       response.emit("data", Buffer.alloc(5 * 1024 * 1024 + 1));
@@ -287,6 +293,7 @@ test("HTTP transport propagates interrupted response reads", async (t) => {
     const request = new EventEmitter();
     queueMicrotask(() => {
       const response = new EventEmitter();
+      response.statusCode = 200;
       callback(response);
       response.emit("error", error);
     });
@@ -312,6 +319,134 @@ test("HTTP transport enforces the exact connection and response deadline", async
   t.mock.timers.tick(1);
   assert.equal(destroyed, true);
   await assert.rejects(pending, { code: "ETIMEDOUT" });
+});
+
+test("HTTP transport preserves permanent statuses despite reset or deadline without backoff", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  for (const status of [
+    201, 301, 302, 307, 308, 400, 401, 403, 404, 409, 501,
+  ]) {
+    for (const failure of ["reset", "deadline"]) {
+      let calls = 0;
+      let destroyed = false;
+      let requestDestroyed = false;
+      const delays = [];
+      t.mock.method(https, "get", (url, callback) => {
+        calls += 1;
+        const request = new EventEmitter();
+        request.destroy = (error) => {
+          requestDestroyed = true;
+          request.emit("error", error);
+        };
+        queueMicrotask(() => {
+          const response = new EventEmitter();
+          response.statusCode = status;
+          response.headers = {};
+          response.destroy = () => {
+            destroyed = true;
+          };
+          callback(response);
+          assert.equal(response.listenerCount("data"), 0);
+          if (failure === "reset") {
+            const error = Object.assign(new Error("read reset"), {
+              code: "ECONNRESET",
+            });
+            response.emit("error", error);
+            request.emit("error", error);
+          } else {
+            // Advance before promise cleanup to reproduce a deadline after headers.
+            t.mock.timers.tick(20000);
+          }
+        });
+        return request;
+      });
+      await assert.rejects(
+        verifyPreview(URL, {
+          sleep: async (delay) => delays.push(delay),
+          log: () => {},
+        }),
+        /did not return 200/,
+      );
+      t.mock.timers.tick(20000);
+      assert.equal(calls, 1, `${status} followed by ${failure}`);
+      assert.equal(destroyed, true);
+      assert.equal(requestDestroyed, failure === "deadline");
+      assert.deepEqual(delays, []);
+    }
+  }
+});
+
+test("HTTP transport retries transient statuses without waiting for their bodies", async (t) => {
+  for (const status of [429, 500, 502, 503, 504]) {
+    let calls = 0;
+    const delays = [];
+    t.mock.method(https, "get", (url, callback) => {
+      calls += 1;
+      const attempt = calls;
+      const request = new EventEmitter();
+      queueMicrotask(() => {
+        const response = new EventEmitter();
+        response.statusCode = attempt === 1 ? status : 200;
+        response.headers = {};
+        response.destroy = () => {
+          response.emit(
+            "error",
+            Object.assign(new Error("read reset"), { code: "ECONNRESET" }),
+          );
+        };
+        callback(response);
+        if (attempt === 2) {
+          response.emit("data", Buffer.from("success"));
+          response.emit("end");
+        }
+      });
+      return request;
+    });
+    const response = await fetchPreview(`${URL}/`, {
+      sleep: async (delay) => delays.push(delay),
+      log: () => {},
+    });
+    assert.equal(response.body.toString(), "success");
+    assert.equal(calls, 2);
+    assert.deepEqual(delays, [2000]);
+  }
+});
+
+test("HTTP status on errors takes precedence over retryable network codes", async () => {
+  for (const status of [302, 401, 403, 404, 501]) {
+    const f = fixture();
+    const error = Object.assign(new Error(`HTTP ${status} then reset`), {
+      status,
+      code: "ECONNRESET",
+    });
+    f.responses.unshift(error);
+    await assert.rejects(
+      fetchPreview(`${URL}/`, f.options),
+      (caught) => caught === error,
+    );
+    assert.equal(f.calls.length, 1);
+    assert.deepEqual(f.delays, []);
+  }
+});
+
+test("HTTP transport reads the expected 404 body", async (t) => {
+  t.mock.method(https, "get", (url, callback) => {
+    const request = new EventEmitter();
+    queueMicrotask(() => {
+      const response = new EventEmitter();
+      response.statusCode = 404;
+      response.headers = {};
+      callback(response);
+      response.emit("data", Buffer.from("Page not found"));
+      response.emit("end");
+    });
+    return request;
+  });
+  const response = await fetchPreview(`${URL}/__jamula_missing_route__`, {
+    expectedStatus: 404,
+  });
+  assert.equal(response.status, 404);
+  assert.equal(response.body.toString(), "Page not found");
 });
 
 test("CLI rejects missing arguments and production URLs with a failing exit", () => {
