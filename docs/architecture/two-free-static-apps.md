@@ -18,32 +18,46 @@ PR builds in `azure-static-web-apps.yml` do not deploy or consume deployment sec
 Only an authorized operator should dispatch the workflow on current `main`:
 
 ```sh
-gh workflow run azure-static-web-apps.yml --ref main --repo Jamula/Jamula-www-Website
-# For a non-default increment, add -f bump=minor or -f bump=major.
+gh workflow run azure-static-web-apps.yml --ref main --repo Jamula/Jamula-www-Website -f change_type=material
+# For a fix-only deployment, use -f change_type=fix instead.
 ```
 
-The first release is `v0.1.0` regardless of bump choice; later releases
-increment the highest published stable `vMAJOR.MINOR.PATCH` tag (patch by
-default). Published GitHub releases and matching tags are the durable release
+Choose **material** for a material production change: the first release is
+`v0.1.0`, and subsequent material releases increment the patch component of the
+highest published stable `vMAJOR.MINOR.PATCH` tag. Choose **fix** for bug or
+script fixes only: the latest release and its immutable tag are reused, never
+moved or rewritten. Fix-only deployment without a release fails explicitly;
+use the material path to establish the first baseline. This is an operator
+classification, not an inference from changed filenames. Published GitHub releases and matching tags are the durable release
 history. `www/package.json` and its lockfile stay at the development baseline,
 not the latest release version; no bot pushes to protected main. Malformed,
 orphaned, draft, prerelease, duplicate, or pre-baseline version history fails
-closed and requires investigation. Non-version tags are ignored. Releasing the
-same SHA as the latest release is rejected.
+closed and requires investigation. Non-version tags are ignored. A material
+release of the same SHA as the latest release is rejected.
 
 The event SHA must still be current main at selection, before each deployment,
 and before publication. One build of that SHA produces an immutable artifact,
 including `release.json` with version, revision, run ID and build attempt.
+The selected release version is also displayed in the site footer and included
+in consented Google Analytics events; pull-request previews omit it.
+Before each Azure upload, the workflow creates a GitHub deployment record for
+that app with the actual deployed SHA, selected release tag and release URL,
+classification, run and build attempt in its payload. The record reports
+in-progress, then success only after that app's verification, or failure if
+the upload or verification fails. The release tag identifies the material
+release commit; for fixes the separately recorded and stamped deployed SHA may
+be newer. A material deployment's release URL may not exist until publication.
 Both apps deploy that artifact and verify this identity and the existing live
 security/configuration checks. Publication rechecks both live identities and
-history, atomically creates the tag at the selected SHA, then creates the GitHub
-Release only after both deployment jobs succeed. Runs share the production
+the complete selected release history, atomically creates the material tag at
+the selected SHA, then creates the GitHub Release only after both deployment
+jobs succeed; fixes create neither tag nor release. Runs share the production
 concurrency group; GitHub may replace a pending run, so check the specific run
 status rather than treating dispatch as success. Non-main dispatches fail.
 
 The repository must allow the workflow's `GITHUB_TOKEN` contents-write
-permission to create tags and releases; the write grant is limited to the
-publication job. Configure tag rules to reserve release tags for the authorized
+permission to create tags and releases (limited to the publication job), and
+deployments-write permission for each production deployment job. Configure tag rules to reserve release tags for the authorized
 release process without blocking that token, and maintain the existing branch
 and environment protections. Verify actual settings and secrets; this document
 is not evidence that they are configured. Other release writers and Azure
@@ -54,11 +68,19 @@ moves. A move during publication can leave a published release with a failed
 run; inspect the tag, release and live metadata before any recovery.
 
 Azure deployments to the two apps are not atomic. A failure may leave one app
-updated and the other unchanged, even though no release is published. Inspect
-both jobs, both live `/release.json` files and all four hostnames. Fix the
+updated and the other unchanged, even though no new release is published. A
+successful app record does not imply the other app or publication succeeded.
+Check the GitHub deployment records and their statuses, both jobs, both live
+`/release.json` files and all four hostnames. A canceled run, status API failure,
+or interruption may leave an in-progress record; an API failure can also
+leave an uncertain record even when the response was lost. Investigate against
+the run and live identities rather than assuming a rollback. Fix the
 cause and rerun failed jobs only while the original SHA is still current and
-history is unchanged; publication rechecks both identities. Alternatively,
-dispatch a new release on current main after reviewing the partial state. If
+history is unchanged; publication rechecks both identities and the selected
+history fingerprint. A changed history or moved tag fails closed even when the
+same version is still latest; investigate external writers before a fresh
+dispatch. Alternatively, dispatch on current main after reviewing the partial
+state and choosing the appropriate classification. If
 publication created a tag but failed to create the GitHub Release, history
 intentionally blocks retries: an authorized maintainer must investigate the tag,
 its SHA, deployments and any release first, and reconcile the orphaned tag
