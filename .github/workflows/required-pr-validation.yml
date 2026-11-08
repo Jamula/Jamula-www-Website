@@ -107,14 +107,40 @@ jobs:
 
       - name: Build static website
         if: steps.changes.outputs.website == 'true'
+        env:
+          PUBLIC_RELEASE_VERSION: "0.1.0"
         run: npm exec -- astro build
 
       - name: Test generated website contracts
         if: steps.changes.outputs.website == 'true'
+        env:
+          PUBLIC_RELEASE_VERSION: "0.1.0"
         run: node scripts/test_built_site.mjs
 
       - name: Test website behavior regressions
         if: steps.changes.outputs.website == 'true'
+        env:
+          PUBLIC_RELEASE_VERSION: "0.1.0"
+        run: node --test tests/*.test.mjs
+
+      - name: Build versionless preview website
+        if: steps.changes.outputs.website == 'true'
+        env:
+          PUBLIC_RELEASE_VERSION: ""
+        run: npm exec -- astro build
+
+      - name: Test versionless preview contracts
+        if: steps.changes.outputs.website == 'true'
+        env:
+          PUBLIC_RELEASE_VERSION: ""
+          EXPECT_NO_RELEASE: "1"
+        run: node scripts/test_built_site.mjs
+
+      - name: Test versionless preview behavior regressions
+        if: steps.changes.outputs.website == 'true'
+        env:
+          PUBLIC_RELEASE_VERSION: ""
+          EXPECT_NO_RELEASE: "1"
         run: node --test tests/*.test.mjs
 
       - name: Set up .NET SDK

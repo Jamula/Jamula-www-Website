@@ -18,6 +18,57 @@ const release = (version) => ({
   prerelease: false,
 });
 
+test("required PR validation builds and tests explicit release and versionless modes", () => {
+  const workflow = fs
+    .readFileSync(
+      path.join(__dirname, "../workflows/required-pr-validation.yml"),
+      "utf8",
+    )
+    .replace(/\r\n/g, "\n");
+  assert.match(workflow, /^    name: required-pr-validation$/m);
+  const steps = workflow.split("\n      - name: ");
+  const names = [
+    "Build static website",
+    "Test generated website contracts",
+    "Test website behavior regressions",
+    "Build versionless preview website",
+    "Test versionless preview contracts",
+    "Test versionless preview behavior regressions",
+  ];
+  const commands = [
+    "npm exec -- astro build",
+    "node scripts/test_built_site.mjs",
+    "node --test tests/*.test.mjs",
+  ];
+  let previousIndex = -1;
+  for (const [index, name] of names.entries()) {
+    const matches = steps.filter((step) => step.startsWith(`${name}\n`));
+    assert.equal(matches.length, 1, `${name} must run exactly once`);
+    const step = matches[0];
+    const stepIndex = steps.indexOf(step);
+    assert.ok(
+      stepIndex > previousIndex,
+      `${name} must follow the previous mode step`,
+    );
+    previousIndex = stepIndex;
+    assert.match(
+      step,
+      /^        if: steps\.changes\.outputs\.website == 'true'$/m,
+    );
+    assert.match(step, /^        env:$/m);
+    assert.ok(step.includes(`\n        run: ${commands[index % 3]}\n`));
+    const version = index < 3 ? "0.1.0" : "";
+    assert.ok(
+      step.includes(`\n          PUBLIC_RELEASE_VERSION: "${version}"\n`),
+    );
+    if (index < 3) {
+      assert.doesNotMatch(step, /EXPECT_NO_RELEASE/);
+    } else if (index > 3) {
+      assert.match(step, /^          EXPECT_NO_RELEASE: "1"$/m);
+    }
+  }
+});
+
 test("first material release establishes baseline; fix requires history", () => {
   assert.equal(selectRelease([], [], "material", sha).version, "0.1.0");
   assert.throws(() => selectRelease([], [], "fix", sha), /No release exists/);
