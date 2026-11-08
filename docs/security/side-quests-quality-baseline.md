@@ -1,7 +1,7 @@
 # Side-quests quality and measurement baseline
 
-**Evidence date:** 2026-11-08  
-**Status:** Baseline inventory; no side-quest component has passed release gates  
+**Evidence date:** 2026-11-08
+**Status:** Baseline inventory; no side-quest component has passed release gates
 **Related work:** #109, #115, #116, #117, #118, and #120
 
 This document records what can be measured in the current repository and what
