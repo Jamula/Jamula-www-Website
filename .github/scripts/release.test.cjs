@@ -23,6 +23,52 @@ test("first release uses baseline irrespective of selected bump", () => {
     assert.equal(nextVersion([], [], bump, sha), "0.1.0");
 });
 
+test("required PR validation preserves build contracts and measured behavior coverage", () => {
+  const workflow = fs
+    .readFileSync(
+      path.join(__dirname, "../workflows/required-pr-validation.yml"),
+      "utf8",
+    )
+    .replace(/\r\n/g, "\n");
+  assert.match(workflow, /^    name: required-pr-validation$/m);
+  const steps = workflow.split("\n      - name: ");
+  const names = [
+    "Build static website",
+    "Test generated website contracts",
+    "Test website behavior regressions",
+  ];
+  const commands = [
+    "npm exec -- astro build",
+    "node scripts/test_built_site.mjs",
+    null,
+  ];
+  let previousIndex = -1;
+  for (const [index, name] of names.entries()) {
+    const matches = steps.filter((step) => step.startsWith(`${name}\n`));
+    assert.equal(matches.length, 1, `${name} must run exactly once`);
+    const step = matches[0];
+    const stepIndex = steps.indexOf(step);
+    assert.ok(
+      stepIndex > previousIndex,
+      `${name} must follow the previous mode step`,
+    );
+    previousIndex = stepIndex;
+    assert.match(
+      step,
+      /^        if: steps\.changes\.outputs\.website == 'true'$/m,
+    );
+    if (index % 3 === 2) {
+      assert.match(
+        step,
+        /^        run: >-\n          node --experimental-test-coverage --test\n          --test-coverage-include=public\/analytics-consent\.js\n          --test-coverage-lines=90 --test-coverage-branches=90\n          tests\/\*\.test\.mjs$/m,
+      );
+    } else {
+      assert.ok(step.includes(`\n        run: ${commands[index % 3]}\n`));
+    }
+    assert.doesNotMatch(step, /EXPECT_NO_RELEASE/);
+  }
+});
+
 test("increments highest release numerically, not API order", () => {
   const tags = [tag("0.2.9"), tag("0.10.2"), tag("0.1.0")];
   const releases = ["0.2.9", "0.10.2", "0.1.0"].map(release);
@@ -69,10 +115,12 @@ test("live metadata must match version, revision and build run attempt", () => {
 });
 
 test("release wiring preserves isolation, serialization and publication ordering", () => {
-  const workflow = fs.readFileSync(
-    path.join(__dirname, "../workflows/azure-static-web-apps.yml"),
-    "utf8",
-  );
+  const workflow = fs
+    .readFileSync(
+      path.join(__dirname, "../workflows/azure-static-web-apps.yml"),
+      "utf8",
+    )
+    .replace(/\r\n/g, "\n");
   const prepare = workflow.split("\n  prepare:")[1].split("\n  build:")[0];
   const publish = workflow.split("\n  publish:")[1];
   assert.doesNotMatch(workflow, /^  push:/m);
@@ -110,10 +158,12 @@ test("release wiring preserves isolation, serialization and publication ordering
 });
 
 test("publication fails before writing on stale identity, main or history", () => {
-  const workflow = fs.readFileSync(
-    path.join(__dirname, "../workflows/azure-static-web-apps.yml"),
-    "utf8",
-  );
+  const workflow = fs
+    .readFileSync(
+      path.join(__dirname, "../workflows/azure-static-web-apps.yml"),
+      "utf8",
+    )
+    .replace(/\r\n/g, "\n");
   const publish = workflow.split("\n  publish:")[1];
   const script = publish
     .match(/        run: \|\n([\s\S]*)/)[1]

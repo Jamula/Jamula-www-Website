@@ -115,7 +115,11 @@ jobs:
 
       - name: Test website behavior regressions
         if: steps.changes.outputs.website == 'true'
-        run: node --test tests/*.test.mjs
+        run: >-
+          node --experimental-test-coverage --test
+          --test-coverage-include=public/analytics-consent.js
+          --test-coverage-lines=90 --test-coverage-branches=90
+          tests/*.test.mjs
 
       - name: Set up .NET SDK
         if: steps.changes.outputs.monitor == 'true'
