@@ -29,18 +29,22 @@ and record sample size and known uncertainty.
 
 For each applicable row, record the source link or local source reference,
 scope, UTC window, observation time, sample size or denominator, and limitations.
-Report a value only when the source supports it. Mark absent, failed, stale, or
-unverifiable evidence as **unknown** or **unavailable**, never as zero or a
-pass.
+Report a value only when the source supports it. Mark absent, inaccessible,
+failed, stale, or unverifiable evidence as **unknown** or **unavailable**, never
+as zero or a pass. If a category does not apply, state why rather than
+substituting zero.
 
 | Area | Evidence to bring |
 | --- | --- |
 | Website experience | Core Web Vitals by production route and the source's documented device cohorts; include samples and collection window. |
+| Accessibility | WCAG 2.2 AA evidence for the reviewed routes, including automated checks and applicable keyboard, screen-reader, zoom/reflow, contrast, reduced-motion, form-error, authentication, and embedded-flow checks. State route/scope, method, date, findings, and limitations; an automated scan alone is not a conformance claim. |
 | Feature outcomes | Feature-level adoption and outcome measures with their definitions and denominators. PRs and closed issues are delivery activity, not proof of adoption or customer outcome. |
 | Test quality | Line and branch coverage separately for every deployable and overall, plus test count, duration, parallelism, retries, and observed flakiness from the same CI evidence. The target is at least 90% for both line and branch coverage at each level. Identify the exact commit and report covered/total counts; calculate overall coverage from summed counts, not an average of percentages. Missing per-deployable or overall evidence is unknown, not a pass. |
 | AI operations | Repository-attributed usage and input/output/cache tokens separately; latency with its statistic and sample size; attributed cost and basis; quality evaluation results; safety outcomes; and tool success/failure outcomes. Use only already-approved, repository-scoped sources. |
+| Security and authorization | Explicit allow/deny outcomes for protected routes, APIs, and MCP tools, with counts and denominators by action/section where an approved source supports them; relevant authentication/policy failures, incidents, and tested stop-control results. Do not include identities, tokens, prompts, or private content. No observed denial events is not evidence that denial controls work; absent telemetry or tests is unknown. |
 | Limits and controls | Observed quota/limit use, shutdown or stop-control evidence, and privacy/retention evidence relevant to the reviewed systems. A lack of observed traffic does not prove a shutdown control works. |
 | Releases and debt | Release/deployment incidents in the window and current tracked technical-debt issues, with links to their GitHub records. Distinguish current issue state from historical state. |
+| Python tooling debt | Progress on the five-script retirement and replacement tracked in [#110](https://github.com/Jamula/Jamula-www-Website/issues/110): remaining scripts and workflow/documentation callers, replacement-test coverage of success and failure/security behavior, and accepted completion criteria. Use the issue and exact-revision validation as evidence; do not infer completion from closed work or a passing unrelated suite. |
 
 No other numeric regression or alert threshold is introduced by this review.
 Use thresholds only when an approved, measured baseline supports them; label
@@ -74,19 +78,28 @@ telemetry, product changes, or issue creation.
 
 ## Initial dry run
 
-The existing MBR collector was run for `2026-11` on 2026-11-08 UTC. Its snapshot
-covered `[2026-11-01T00:00:00Z, 2026-12-01T00:00:00Z)` and was observed at
-`2026-11-08T22:48:46Z`:
+The inherited draft reports an MBR collector run for `2026-11` on 2026-11-08
+UTC. It says the snapshot covered `[2026-11-01T00:00:00Z,
+2026-12-01T00:00:00Z)` and was observed at `2026-11-08T22:48:46Z`:
+
+These details are reported in the inherited runbook draft and were not
+independently verified for this revision: the local snapshot was not inspected
+and the source requests were not rerun. Treat the date, window, observation time,
+and source-health statements below as unverified reports, not accepted
+measurements or proof that the review process completed.
 
 | Evidence | Dry-run result |
 | --- | --- |
-| GitHub pull-request and issue sources | Both reported complete-page source health. The MBR can provide delivery activity and current backlog; neither is a feature-outcome measure. |
-| Repository-filtered Actions billing | The MBR reported the source available for this repository and month. No monetary or minute values are copied into this runbook. |
-| Other review categories | The MBR snapshot did not provide route/device Core Web Vitals, feature outcomes, coverage, test execution details, AI quality/safety/tool outcomes, quota/shutdown, privacy/retention, or release-incident evidence. These remain unknown for this dry run, not zero. |
-| Prior review actions | Not evaluated in this dry run; Seven checks the GitHub issue ledger when facilitating the monthly review. |
+| GitHub pull-request and issue sources | The draft reports complete-page source health. This has not been independently verified. These sources can show delivery activity and current backlog, not feature outcomes. |
+| Repository-filtered Actions billing | The draft reports the source available for this repository and month. This has not been independently verified; no monetary or minute value is asserted here. |
+| Website experience and accessibility | No route/device Core Web Vitals or accessibility assessment is evidenced in the reported snapshot. Both are unknown, not zero or conformant. |
+| Tests, AI, security, and controls | No coverage/test-execution evidence, AI quality/safety/tool outcomes, explicit authorization-denial signals, quota/stop-control test, or privacy/retention evidence is shown by the reported snapshot. These remain unknown. |
+| Feature outcomes and Python tooling debt | No adoption/outcome evidence or independently verified #110 retirement progress is provided by the reported snapshot. Delivery activity alone does not establish either. |
+| Releases and prior review actions | Release/deployment incidents and prior action follow-through were not evaluated in the reported dry run; Seven checks the GitHub issue ledger when facilitating the monthly review. |
 
-This is a source-availability dry run, not a completed operations review or a
-baseline. The local snapshot stays in the MBR's ignored `.local` storage; do not
-commit or publish it. If a later run cannot produce an exact comparable window
-or an authorized source, retain the gap as unknown rather than filling it with
-an estimate.
+The draft labels this a source-availability dry run, not a completed operations
+review or baseline; the dry-run execution and source evidence remain
+unverified. The local snapshot, if present, stays in the MBR's ignored `.local`
+storage; do not commit or publish it. If a later run cannot produce an exact
+comparable window or an authorized source, retain the gap as unknown rather
+than filling it with an estimate.
