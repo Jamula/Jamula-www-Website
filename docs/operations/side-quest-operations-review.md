@@ -69,12 +69,31 @@ Do not broaden collection or access to fill a gap. Follow each source's approved
 retention and deletion rules; if those rules or an approved source are unclear,
 retain no additional export and report the metric as unknown.
 
-Route accepted work through existing GitHub issues where possible. Any new
-follow-up issue must have one accountable owner, acceptance criteria, and links
-to non-sensitive evidence. Record decisions and unresolved data gaps in the
-relevant issue thread; do not create a parallel markdown report or copy source
-datasets. This runbook defines the process only and does not itself authorize
-telemetry, product changes, or issue creation.
+Persist accepted durable decisions through the configured `squad_state`
+governed bridge, not GitHub issue threads: use `memory.write`
+(`squad_state-memory-write`) with the appropriate governed decision class and
+required approval, or `decide` (`squad_state-squad_decide`) for the team decision
+inbox and its review process. An inbox submission is pending review, not proof
+of acceptance. Verify the bridge's successful result and retain the returned
+record identifier or reference before claiming persistence. Keep restricted
+evidence in its authorized source; persist only appropriately sanitized
+decision context, rationale, approval status, and safe evidence references.
+
+If the configured bridge is missing, unavailable, or rejects the write, do not
+fake persistence or bypass it: report the decision as **pending persistence**
+in the review handoff and halt Squad state mutation until the governed bridge
+is available and the write succeeds. Do not edit raw `.squad` state files,
+including decision inbox or memory files, or use manual Git/file operations as
+a persistence fallback.
+
+Use GitHub issues only as the actionable data-gap and follow-up work ledger,
+reusing existing issues where possible. Each follow-up needs one accountable
+owner, acceptance criteria, non-sensitive evidence links, and a link or
+reference to its governed decision record when one exists. An issue does not
+replace the governed record or turn a pending decision into an accepted one.
+Do not create a parallel markdown report or copy source datasets. This runbook
+defines the process only and does not itself authorize telemetry, product
+changes, issue creation, or decision approval.
 
 ## Initial dry run
 
