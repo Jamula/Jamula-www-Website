@@ -47,6 +47,8 @@ source date before relying on it.
   proposed requirements and test plans, not proof of passing results
 - [Security and quality strategy](security/quality-strategy.md) —
   proposed controls and future tests
+- [Side-quest component release contract](architecture/side-quest-release-contract.md) —
+  proposal-only artifact identity, independent releases, collective manifests, and recovery
 - [Side-quest operations review](operations/side-quest-operations-review.md) —
   monthly evidence review using the existing MBR, with data-quality and privacy rules
 - [Public claims register](content/public-claims-register.md) —
