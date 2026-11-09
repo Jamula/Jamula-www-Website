@@ -339,6 +339,70 @@ test("deployment event rejects unselected actions", () => {
   }
 });
 
+test("CSP verifier requires one non-empty policy in the built configuration", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-csp-"));
+  const configPath = path.join(directory, "config.json");
+  const headersPath = path.join(directory, "headers.txt");
+  fs.writeFileSync(headersPath, "HTTP/2 200\r\n");
+  try {
+    for (const config of [
+      {},
+      { globalHeaders: {} },
+      { globalHeaders: { "Content-Security-Policy": "" } },
+      { globalHeaders: { "Content-Security-Policy": null } },
+    ]) {
+      fs.writeFileSync(configPath, JSON.stringify(config));
+      assert.throws(
+        () => assertConfiguredCsp(configPath, headersPath),
+        /configuration has no CSP/,
+      );
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("CSP verifier CLI checks exact policy and reports argument or file errors", () => {
+  const config = JSON.parse(fs.readFileSync(staticWebAppConfig, "utf8"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-csp-"));
+  const configPath = path.join(directory, "config.json");
+  const headersPath = path.join(directory, "headers.txt");
+  fs.writeFileSync(configPath, JSON.stringify(config));
+  const runVerifier = (...args) =>
+    spawnSync(
+      process.execPath,
+      [path.join(__dirname, "verify-swa-csp.cjs"), ...args],
+      { encoding: "utf8" },
+    );
+  try {
+    const usage = runVerifier();
+    assert.equal(usage.status, 1);
+    assert.match(usage.stderr, /Usage: verify-swa-csp\.cjs/);
+
+    fs.writeFileSync(
+      headersPath,
+      `HTTP/2 200\r\nContent-Security-Policy: ${config.globalHeaders["Content-Security-Policy"]}\r\n`,
+    );
+    const valid = runVerifier(configPath, headersPath);
+    assert.equal(valid.status, 0, valid.stderr);
+
+    fs.writeFileSync(
+      headersPath,
+      "HTTP/2 200\r\nContent-Security-Policy: default-src 'self'\r\n",
+    );
+    const mismatch = runVerifier(configPath, headersPath);
+    assert.equal(mismatch.status, 1);
+    assert.match(mismatch.stderr, /does not match the built configuration/);
+
+    fs.writeFileSync(configPath, "{");
+    const malformed = runVerifier(configPath, headersPath);
+    assert.equal(malformed.status, 1);
+    assert.match(malformed.stderr, /JSON|Unexpected end/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("selects a numbered non-production environment for upload and cleanup", async () => {
   for (const state of ["open", "closed"]) {
     const f = fixture();
