@@ -46,6 +46,15 @@ Existing measured local test results captured before side-quest work:
 
 ## Coverage gate implementation
 
+The local [first-party coverage inventory and gate](../../scripts/coverage/README.md)
+now combines Cobertura counts and rejects malformed reports, missing source
+measurements, unmeasured sources, and below-threshold components. It currently
+exits 1 rather than passing: Astro build-time code, workflow logic (including
+11 runnable Squad workflow templates), and maintenance templates remain
+unmeasured, while some measured components are below threshold. Its printed
+aggregate is a measured subtotal, not overall first-party coverage. This is
+local measurement infrastructure, not an initiative-wide CI gate.
+
 Coverage thresholds are not currently enforced for every project or
 initiative-wide. The current website CI now enforces a 90% line and branch
 threshold for its shipped `public/analytics-consent.js` browser module, using:
