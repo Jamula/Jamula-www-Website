@@ -49,6 +49,8 @@ source date before relying on it.
   proposed controls and future tests
 - [Side-quest feasibility assessment](architecture/side-quests-feasibility.md) —
   dated hosting, identity, inference, and local-routing evidence; not a platform approval
+- [Side-quest component release contract](architecture/side-quest-release-contract.md) —
+  proposal-only artifact identity, independent releases, collective manifests, and recovery
 - [Side-quest quality baseline](security/side-quests-quality-baseline.md) —
   measured existing test/coverage evidence and unmeasured release gates
 - [Side-quest operations review](operations/side-quest-operations-review.md) —
