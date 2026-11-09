@@ -106,12 +106,18 @@ static class Monitor
     private static readonly Regex HtmlTitle =
         new(@"<title\b[^>]*>(.*?)</title\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
-    public static async Task<int> RunAsync(CancellationToken ct)
+    public static Task<int> RunAsync(CancellationToken ct) =>
+        RunAsync(ct, ResolveHostAddressesAsync, CreateProductionHandler);
+
+    internal static async Task<int> RunAsync(
+        CancellationToken ct,
+        Func<string, AddressFamily, CancellationToken, Task<IPAddress[]>> resolveHostAddressesAsync,
+        Func<HttpMessageHandler> createHandler)
     {
         IPAddress[] addresses;
         try
         {
-            addresses = await Dns.GetHostAddressesAsync(
+            addresses = await resolveHostAddressesAsync(
                 Config.ApexHost, AddressFamily.InterNetwork, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -149,10 +155,7 @@ static class Monitor
 
         Console.WriteLine($"DNS OK: {Config.ApexHost} → {ipv4Addresses[0]}");
 
-        using var handler = new HttpClientHandler
-        {
-            AllowAutoRedirect = false
-        };
+        using var handler = createHandler();
         using var client = new HttpClient(handler)
         {
             Timeout = TimeSpan.FromSeconds(8)
@@ -160,6 +163,18 @@ static class Monitor
 
         return await CheckApprovedHostsAsync(client, Config.ApprovedHosts, Console.Out, ct);
     }
+
+    private static Task<IPAddress[]> ResolveHostAddressesAsync(
+        string host,
+        AddressFamily addressFamily,
+        CancellationToken ct) =>
+        Dns.GetHostAddressesAsync(host, addressFamily, ct);
+
+    private static HttpMessageHandler CreateProductionHandler() =>
+        new HttpClientHandler
+        {
+            AllowAutoRedirect = false
+        };
 
     public static async Task<int> CheckApprovedHostsAsync(
         HttpClient client,
@@ -383,6 +398,7 @@ static class SelfTests
         }
 
         RunCanonicalParserTests(Assert);
+        await RunDnsTestsAsync(Assert);
 
         var successfulRun = await RunWebScenarioAsync(DefaultResponse, Config.ApprovedHosts);
         Assert("AllApprovedHosts_CheckContentCanonicalUpgradeAnd404",
@@ -655,6 +671,118 @@ static class SelfTests
                 && scenario.Output.Contains(expectedDiagnostic, StringComparison.Ordinal));
         }
     }
+
+    private static async Task RunDnsTestsAsync(Action<string, bool> assert)
+    {
+        var requests = new List<Uri>();
+        bool resolverCalled = false;
+        var successfulRun = await CaptureMonitorRunAsync(() => Monitor.RunAsync(
+                CancellationToken.None,
+                async (host, addressFamily, _) =>
+                {
+                    await Task.Yield();
+                    resolverCalled = host == Config.ApexHost
+                        && addressFamily == AddressFamily.InterNetwork;
+                    return new[]
+                    {
+                        IPAddress.Parse(Config.ApprovedIp),
+                        IPAddress.Parse(Config.ApprovedIp)
+                    };
+                },
+                () => new ScenarioHttpMessageHandler(request =>
+                {
+                    Uri uri = request.RequestUri!;
+                    requests.Add(uri);
+                    return DefaultResponse(uri, uri.Host);
+                })));
+        assert("Monitor_DnsApprovedAddressRunsOfflineHostChecks",
+            successfulRun.ExitCode == 0
+            && !successfulRun.WasCanceled
+            && resolverCalled
+            && Config.ApprovedHosts.All(host => HasAllRequestTypes(requests, host)));
+
+        bool socketFailureCreatedHandler = false;
+        int socketFailure = await Monitor.RunAsync(
+            CancellationToken.None,
+            (_, _, _) => Task.FromException<IPAddress[]>(
+                new SocketException((int)SocketError.HostNotFound)),
+            () =>
+            {
+                socketFailureCreatedHandler = true;
+                return CreateUnusedHandler();
+            });
+        assert("Monitor_DnsSocketExceptionReturnsFailureBeforeHttp",
+            socketFailure == 1 && !socketFailureCreatedHandler);
+
+        bool emptyResponseCreatedHandler = false;
+        int emptyResponse = await Monitor.RunAsync(
+            CancellationToken.None,
+            (_, _, _) => Task.FromResult(Array.Empty<IPAddress>()),
+            () =>
+            {
+                emptyResponseCreatedHandler = true;
+                return CreateUnusedHandler();
+            });
+        assert("Monitor_DnsEmptyResponseReturnsFailureBeforeHttp",
+            emptyResponse == 1 && !emptyResponseCreatedHandler);
+
+        bool driftCreatedHandler = false;
+        int drift = await Monitor.RunAsync(
+            CancellationToken.None,
+            (_, _, _) => Task.FromResult(new[] { IPAddress.Parse("203.0.113.8") }),
+            () =>
+            {
+                driftCreatedHandler = true;
+                return CreateUnusedHandler();
+            });
+        assert("Monitor_DnsDriftReturnsFailureBeforeHttp",
+            drift == 2 && !driftCreatedHandler);
+
+        using var canceledCts = new CancellationTokenSource();
+        canceledCts.Cancel();
+        bool canceledHandlerCreated = false;
+        var canceledRun = await CaptureMonitorRunAsync(() => Monitor.RunAsync(
+                canceledCts.Token,
+                (_, _, ct) => Task.FromCanceled<IPAddress[]>(ct),
+                () =>
+                {
+                    canceledHandlerCreated = true;
+                    return CreateUnusedHandler();
+                }));
+        assert("Monitor_DnsCancellationPropagatesBeforeHttp",
+            canceledRun.WasCanceled && canceledCts.IsCancellationRequested && !canceledHandlerCreated);
+
+        bool unexpectedCancellationHandlerCreated = false;
+        var unexpectedCancellationRun = await CaptureMonitorRunAsync(() => Monitor.RunAsync(
+                CancellationToken.None,
+                (_, _, _) => Task.FromException<IPAddress[]>(
+                    new OperationCanceledException("unexpected resolver cancellation")),
+                () =>
+                {
+                    unexpectedCancellationHandlerCreated = true;
+                    return CreateUnusedHandler();
+                }));
+        assert("Monitor_UnrequestedDnsCancellationPropagates",
+            unexpectedCancellationRun.WasCanceled
+            && unexpectedCancellationRun.ExitCode is null
+            && !unexpectedCancellationHandlerCreated);
+    }
+
+    private static async Task<(int? ExitCode, bool WasCanceled)> CaptureMonitorRunAsync(
+        Func<Task<int>> runAsync)
+    {
+        try
+        {
+            return (await runAsync(), false);
+        }
+        catch (OperationCanceledException)
+        {
+            return (null, true);
+        }
+    }
+
+    private static HttpMessageHandler CreateUnusedHandler() =>
+        new ScenarioHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
 
     private static void RunCanonicalParserTests(Action<string, bool> assert)
     {
