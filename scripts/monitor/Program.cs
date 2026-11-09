@@ -404,6 +404,25 @@ static class SelfTests
             && Config.ApprovedHosts.Skip(1).All(host =>
                 failedHostRun.Output.Contains($"HTTPS OK: https://{host}/", StringComparison.Ordinal)));
 
+        var multipleFailuresRun = await RunWebScenarioAsync(
+            (request, host) => host == "jamula.net"
+                && request.Scheme == Uri.UriSchemeHttps
+                && request.AbsolutePath == "/"
+                    ? HtmlResponse(HttpStatusCode.ServiceUnavailable, HomeHtml)
+                    : host == "www.jamula.net"
+                        && request.Scheme == Uri.UriSchemeHttps
+                        && request.AbsolutePath == "/"
+                            ? throw new HttpRequestException("second-host fixture failure")
+                            : DefaultResponse(request, host),
+            Config.ApprovedHosts);
+        Assert("AllApprovedHosts_RetainsFirstFailureAndContinues",
+            multipleFailuresRun.ExitCode == 4
+            && Config.ApprovedHosts.All(host => HasAllRequestTypes(multipleFailuresRun.Requests, host))
+            && multipleFailuresRun.Output.Contains("jamula.net: HTTPS:", StringComparison.Ordinal)
+            && multipleFailuresRun.Output.Contains("www.jamula.net: HTTPS:", StringComparison.Ordinal)
+            && Config.ApprovedHosts.Skip(2).All(host =>
+                multipleFailuresRun.Output.Contains($"HTTPS OK: https://{host}/", StringComparison.Ordinal)));
+
         await AssertScenarioAsync(
             "HttpsCertificateFailure_IsReportedForHostname",
             (request, _) => request.Scheme == Uri.UriSchemeHttps && request.AbsolutePath == "/"
@@ -411,6 +430,14 @@ static class SelfTests
                 : DefaultResponse(request, _),
             3,
             "jamula.net: HTTPS: request");
+
+        await AssertScenarioAsync(
+            "HttpsTimeout_IsReportedForHostname",
+            (request, _) => request.Scheme == Uri.UriSchemeHttps && request.AbsolutePath == "/"
+                ? throw new TaskCanceledException("fixture timeout")
+                : DefaultResponse(request, _),
+            3,
+            "HTTPS: request to https://jamula.net/ timed out");
 
         await AssertScenarioAsync(
             "HttpsNonSuccessStatus_IsRejected",
@@ -421,11 +448,30 @@ static class SelfTests
             "jamula.net: HTTPS:");
 
         await AssertScenarioAsync(
+            "MalformedCanonicalHref_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttps && request.AbsolutePath == "/"
+                ? HtmlResponse(HttpStatusCode.OK, HomeHtml.Replace(
+                    "href=\"https://jamula.net/\"", "href=\"\"", StringComparison.Ordinal))
+                : DefaultResponse(request, _),
+            6,
+            "canonical link has an absent or empty href");
+
+        await AssertScenarioAsync(
             "StaleHomeTitle_IsRejected",
             (request, _) => request.Scheme == Uri.UriSchemeHttps && request.AbsolutePath == "/"
                 ? HtmlResponse(HttpStatusCode.OK, HomeHtml.Replace(
                     "AI Strategy, Custom Software &amp; Cloud Consulting — Jamula",
                     "Home — Jamula", StringComparison.Ordinal))
+                : DefaultResponse(request, _),
+            9,
+            "jamula.net: page content:");
+
+        await AssertScenarioAsync(
+            "MissingHomeTitle_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttps && request.AbsolutePath == "/"
+                ? HtmlResponse(HttpStatusCode.OK, HomeHtml.Replace(
+                    "<title>AI Strategy, Custom Software &amp; Cloud Consulting — Jamula</title>",
+                    "", StringComparison.Ordinal))
                 : DefaultResponse(request, _),
             9,
             "jamula.net: page content:");
@@ -501,6 +547,66 @@ static class SelfTests
             "expected HTTPS on the same hostname");
 
         await AssertScenarioAsync(
+            "HttpUpgradeWrongScheme_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttp
+                ? RedirectResponse(new Uri(
+                    $"http://jamula.net{Config.UpgradePath}?{Config.UpgradeQuery}"))
+                : DefaultResponse(request, _),
+            8,
+            "expected HTTPS on the same hostname");
+
+        await AssertScenarioAsync(
+            "HttpUpgradeMissingLocation_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttp
+                ? new HttpResponseMessage(HttpStatusCode.MovedPermanently)
+                : DefaultResponse(request, _),
+            8,
+            "Location '(absent)'");
+
+        await AssertScenarioAsync(
+            "HttpUpgradeWrongPort_IsRejected",
+            (request, _) => request.Scheme == Uri.UriSchemeHttp
+                ? RedirectResponse(new Uri(
+                    $"https://jamula.net:444{Config.UpgradePath}?{Config.UpgradeQuery}"))
+                : DefaultResponse(request, _),
+            8,
+            "expected HTTPS on the same hostname");
+
+        foreach (var statusCode in new[]
+        {
+            HttpStatusCode.Found,
+            HttpStatusCode.SeeOther,
+            HttpStatusCode.TemporaryRedirect,
+            HttpStatusCode.PermanentRedirect
+        })
+        {
+            await AssertScenarioAsync(
+                $"HttpUpgrade_{statusCode}_IsAccepted",
+                (request, host) => request.Scheme == Uri.UriSchemeHttp
+                    ? RedirectResponse(new Uri(
+                        $"https://{host}{Config.UpgradePath}?{Config.UpgradeQuery}"), statusCode)
+                    : DefaultResponse(request, host),
+                0,
+                "HTTP upgrade OK:");
+        }
+
+        await AssertScenarioAsync(
+            "HttpUpgradeTimeout_IsReported",
+            (request, _) => request.Scheme == Uri.UriSchemeHttp
+                ? throw new TaskCanceledException("fixture timeout")
+                : DefaultResponse(request, _),
+            8,
+            "request to http://jamula.net/__jamula_monitor_path_check__?jamula-monitor=1 timed out");
+
+        await AssertScenarioAsync(
+            "HttpUpgradeRequestFailure_IsReported",
+            (request, _) => request.Scheme == Uri.UriSchemeHttp
+                ? throw new HttpRequestException("fixture connection failure")
+                : DefaultResponse(request, _),
+            8,
+            "request to http://jamula.net/__jamula_monitor_path_check__?jamula-monitor=1 failed");
+
+        await AssertScenarioAsync(
             "Missing404Status_IsRejected",
             (request, _) => request.AbsolutePath == Config.NotFoundPath
                 ? HtmlResponse(HttpStatusCode.OK, HomeHtml)
@@ -515,6 +621,22 @@ static class SelfTests
                 : DefaultResponse(request, _),
             10,
             "Page not found");
+
+        await AssertScenarioAsync(
+            "NotFoundTimeout_IsReported",
+            (request, _) => request.AbsolutePath == Config.NotFoundPath
+                ? throw new TaskCanceledException("fixture timeout")
+                : DefaultResponse(request, _),
+            10,
+            "404 experience: request to https://jamula.net/__jamula_monitor_not_found__ timed out");
+
+        await AssertScenarioAsync(
+            "NotFoundRequestFailure_IsReported",
+            (request, _) => request.AbsolutePath == Config.NotFoundPath
+                ? throw new HttpRequestException("fixture connection failure")
+                : DefaultResponse(request, _),
+            10,
+            "404 experience: request to https://jamula.net/__jamula_monitor_not_found__ failed");
 
         Console.WriteLine(failures == 0
             ? "\nAll monitor self-tests passed."
@@ -546,6 +668,9 @@ static class SelfTests
 
         var (malformedResult, _) = CanonicalParser.Extract("<link rel=\"canonical\">");
         assert("CanonicalParser_ReportsMissingHref", malformedResult == CanonicalResult.MalformedHref);
+
+        var (emptyHrefResult, _) = CanonicalParser.Extract("<link rel=\"canonical\" href=\"\">");
+        assert("CanonicalParser_ReportsEmptyHref", emptyHrefResult == CanonicalResult.MalformedHref);
 
         var (quotedResult, quotedHref) = CanonicalParser.Extract(
             "<link href='https://jamula.net/' rel='canonical'>");

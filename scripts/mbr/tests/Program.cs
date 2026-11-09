@@ -1,6 +1,12 @@
 using System.Text.Json;
 using JamulaMbr;
 
+if (FakeGhEntrypoint.IsFixtureProcess)
+{
+    Environment.ExitCode = await FakeGhEntrypoint.RunAsync(args);
+    return;
+}
+
 var tests = 0;
 void Check(bool condition, string name)
 {
@@ -497,4 +503,5 @@ finally
     File.Delete(Path.Combine(directory, "costs.json"));
     Directory.Delete(directory);
 }
+await MbrIntegrationTests.RunAsync(Check);
 Console.WriteLine($"{tests} offline fixture checks passed.");
