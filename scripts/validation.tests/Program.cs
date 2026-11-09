@@ -47,6 +47,9 @@ runner.Run("Artifact_UnsafePaths_AreRejectedBeforeWrites", ArtifactUnsafePathsRe
 runner.Run("Artifact_ControlCharacters_AreRejected", ArtifactControlCharacterRejected);
 runner.Run("Artifact_ExactAndCaseCollidingPaths_AreRejected", ArtifactDuplicatesRejected);
 runner.Run("Artifact_UnicodeCaseFoldCollisions_AreRejected", ArtifactUnicodeCaseFoldCollisionRejected);
+runner.Run("Artifact_DuplicateDirectoryEntries_AreRejected", ArtifactDuplicateDirectoryEntriesRejected);
+runner.Run("Artifact_TraversalDirectoryEntry_IsRejectedBeforeWrites", ArtifactTraversalDirectoryEntryRejected);
+runner.Run("Artifact_MalformedZipDirectories_AreRejectedBeforeWrites", ArtifactMalformedZipDirectoriesRejected);
 runner.Run("Artifact_SymlinkEntry_IsRejected", ArtifactSymlinkEntryRejected);
 runner.Run("Artifact_EncryptedEntry_IsRejectedBeforeWrites", ArtifactEncryptedEntryRejected);
 runner.Run("Artifact_DeclaredSizeMismatch_IsRejectedBeforeWrites", ArtifactDeclaredSizeMismatchRejected);
@@ -73,6 +76,7 @@ runner.Run("Preview_ConfiguredHeaderMismatch_IsRejected", () => PreviewResponseF
 runner.Run("Preview_MissingHsts_IsRejected", () => PreviewResponseFailure("hsts", "Strict-Transport-Security"));
 runner.Run("Preview_MissingNoindex_IsRejected", () => PreviewResponseFailure("noindex", "X-Robots-Tag"));
 runner.Run("Preview_RobotsMimeMismatch_IsRejected", () => PreviewResponseFailure("robots-mime", "MIME type"));
+runner.Run("Preview_RobotsServerError_IsRejected", PreviewRobotsServerErrorRejected);
 runner.Run("Preview_MissingRouteSuccess_IsRejected", () => PreviewResponseFailure("missing-route-success", "did not return 404"));
 runner.Run("Preview_MissingRouteWrongBody_IsRejected", () => PreviewResponseFailure("missing-route-body", "expected 404 page"));
 runner.Run("Preview_ReadinessRetries_AreBoundedAndVisible", PreviewReadinessRetriesBounded);
@@ -243,6 +247,55 @@ void ArtifactUnicodeCaseFoldCollisionRejected()
     Throws<InvalidDataException>(() => PreviewArtifactValidator.ExtractPreview(
         fixture.CreateArchive(("asset-ß.txt", "one"), ("asset-ss.txt", "two")),
         Path.Combine(fixture.Root, "dist"), fixture.ConfigPath), "duplicated");
+}
+
+void ArtifactDuplicateDirectoryEntriesRejected()
+{
+    using var fixture = new ArtifactFixture();
+    var archive = fixture.CreateArchive((IEnumerable<ZipEntryFixture>)[
+        new ZipEntryFixture("assets/", "", 0x4000),
+        new ZipEntryFixture("assets/", "", 0x4000)
+    ]);
+    var destination = Path.Combine(fixture.Root, "dist");
+    Throws<InvalidDataException>(() => PreviewArtifactValidator.ExtractPreview(archive, destination, fixture.ConfigPath), "duplicated");
+    Check(!Directory.Exists(destination), "duplicate-directory-validation-created-no-output");
+}
+
+void ArtifactTraversalDirectoryEntryRejected()
+{
+    using var fixture = new ArtifactFixture();
+    var destination = Path.Combine(fixture.Root, "dist");
+    Throws<InvalidDataException>(() => PreviewArtifactValidator.ExtractPreview(
+        fixture.CreateArchive(Entry("../outside/", "", 0x4000)), destination, fixture.ConfigPath));
+    Check(!Directory.Exists(destination), "traversal-directory-validation-created-no-output");
+    Check(!Directory.Exists(Path.Combine(fixture.Root, "outside")), "traversal-directory-created-no-outside-path");
+}
+
+void ArtifactMalformedZipDirectoriesRejected()
+{
+    using var fixture = new ArtifactFixture();
+    var malformedArchives = new List<string>();
+    var missingEndRecord = fixture.CreateArchive();
+    using (var stream = new FileStream(missingEndRecord, FileMode.Open, FileAccess.Write))
+    {
+        stream.SetLength(stream.Length - 22);
+    }
+    malformedArchives.Add(missingEndRecord);
+
+    var invalidCentralDirectory = fixture.CreateArchive();
+    var bytes = File.ReadAllBytes(invalidCentralDirectory);
+    var endRecord = FindSignature(bytes, 0x06054b50);
+    var centralOffset = BitConverter.ToInt32(bytes, endRecord + 16);
+    bytes[centralOffset] = 0;
+    File.WriteAllBytes(invalidCentralDirectory, bytes);
+    malformedArchives.Add(invalidCentralDirectory);
+
+    foreach (var archive in malformedArchives)
+    {
+        var destination = Path.Combine(fixture.Root, "dist-" + Path.GetFileName(archive));
+        Throws<InvalidDataException>(() => PreviewArtifactValidator.ExtractPreview(archive, destination, fixture.ConfigPath), "invalid ZIP directory");
+        Check(!Directory.Exists(destination), "malformed-zip-validation-created-no-output");
+    }
 }
 
 void ArtifactSymlinkEntryRejected()
@@ -482,6 +535,18 @@ void PreviewResponseFailure(string mutation, string expectedMessage)
     Throws<InvalidDataException>(() => PreviewSiteVerifier.VerifyAsync(
         PreviewFixture.Url, fixture.ConfigPath, client, TextWriter.Null, (_, _) => Task.CompletedTask)
         .GetAwaiter().GetResult(), expectedMessage);
+}
+
+void PreviewRobotsServerErrorRejected()
+{
+    using var fixture = new PreviewFixture();
+    var client = fixture.ClientFor("robots-error");
+    var error = Throws<HttpRequestException>(() => PreviewSiteVerifier.VerifyAsync(
+        PreviewFixture.Url, fixture.ConfigPath, client, TextWriter.Null, (_, _) => Task.CompletedTask)
+        .GetAwaiter().GetResult());
+    Equal(HttpStatusCode.ServiceUnavailable, error.StatusCode);
+    Equal(2, fixture.Requests.Count);
+    Equal(PreviewFixture.Url + "/robots.txt", fixture.Requests[1]);
 }
 
 void PreviewReadinessRetriesBounded()
@@ -876,6 +941,10 @@ sealed class PreviewFixture : IDisposable
             }
             if (path == "/robots.txt")
             {
+                if (mode == "robots-error")
+                {
+                    return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+                }
                 var content = TextContent("");
                 content.Headers.ContentType = new MediaTypeHeaderValue(mode == "robots-mime" ? "text/html" : "text/plain");
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
