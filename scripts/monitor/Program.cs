@@ -155,13 +155,23 @@ static class Monitor
 
         Console.WriteLine($"DNS OK: {Config.ApexHost} → {ipv4Addresses[0]}");
 
-        using var handler = createHandler();
-        using var client = new HttpClient(handler)
+        HttpMessageHandler handler = createHandler();
+        HttpClient client;
+        try
         {
-            Timeout = TimeSpan.FromSeconds(8)
-        };
+            client = new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(8)
+            };
+        }
+        catch
+        {
+            handler.Dispose();
+            throw;
+        }
 
-        return await CheckApprovedHostsAsync(client, Config.ApprovedHosts, Console.Out, ct);
+        using (client)
+            return await CheckApprovedHostsAsync(client, Config.ApprovedHosts, Console.Out, ct);
     }
 
     private static Task<IPAddress[]> ResolveHostAddressesAsync(
@@ -701,6 +711,18 @@ static class SelfTests
             && resolverCalled
             && Config.ApprovedHosts.All(host => HasAllRequestTypes(requests, host)));
 
+        ScenarioHttpMessageHandler? ownedHandler = null;
+        int ownedHandlerRun = await Monitor.RunAsync(
+            CancellationToken.None,
+            (_, _, _) => Task.FromResult(new[] { IPAddress.Parse(Config.ApprovedIp) }),
+            () => ownedHandler = new ScenarioHttpMessageHandler(request =>
+            {
+                Uri uri = request.RequestUri!;
+                return DefaultResponse(uri, uri.Host);
+            }));
+        assert("Monitor_HttpClientDisposesHandlerExactlyOnce",
+            ownedHandlerRun == 0 && ownedHandler?.DisposeCount == 1);
+
         bool socketFailureCreatedHandler = false;
         int socketFailure = await Monitor.RunAsync(
             CancellationToken.None,
@@ -726,6 +748,18 @@ static class SelfTests
         assert("Monitor_DnsEmptyResponseReturnsFailureBeforeHttp",
             emptyResponse == 1 && !emptyResponseCreatedHandler);
 
+        bool ipv6OnlyHandlerCreated = false;
+        int ipv6OnlyResponse = await Monitor.RunAsync(
+            CancellationToken.None,
+            (_, _, _) => Task.FromResult(new[] { IPAddress.IPv6Loopback }),
+            () =>
+            {
+                ipv6OnlyHandlerCreated = true;
+                return CreateUnusedHandler();
+            });
+        assert("Monitor_DnsIpv6OnlyResponseReturnsFailureBeforeHttp",
+            ipv6OnlyResponse == 1 && !ipv6OnlyHandlerCreated);
+
         bool driftCreatedHandler = false;
         int drift = await Monitor.RunAsync(
             CancellationToken.None,
@@ -737,6 +771,22 @@ static class SelfTests
             });
         assert("Monitor_DnsDriftReturnsFailureBeforeHttp",
             drift == 2 && !driftCreatedHandler);
+
+        bool multipleAddressHandlerCreated = false;
+        int multipleAddressDrift = await Monitor.RunAsync(
+            CancellationToken.None,
+            (_, _, _) => Task.FromResult(new[]
+            {
+                IPAddress.Parse(Config.ApprovedIp),
+                IPAddress.Parse("203.0.113.8")
+            }),
+            () =>
+            {
+                multipleAddressHandlerCreated = true;
+                return CreateUnusedHandler();
+            });
+        assert("Monitor_DnsMultipleDistinctAddressesAreDrift",
+            multipleAddressDrift == 2 && !multipleAddressHandlerCreated);
 
         using var canceledCts = new CancellationTokenSource();
         canceledCts.Cancel();
@@ -875,8 +925,18 @@ static class SelfTests
 sealed class ScenarioHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
     : HttpMessageHandler
 {
+    public int DisposeCount { get; private set; }
+
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken) =>
         Task.FromResult(responseFactory(request));
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+            DisposeCount++;
+
+        base.Dispose(disposing);
+    }
 }
