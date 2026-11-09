@@ -182,9 +182,14 @@ checked against the exact active set, not just the latest published version.
 The release record captures the validator and contract versions used for that
 decision.
 
-Independent and collective releases for the same target and active set share
-one logical exclusive release lease. Every mechanism that can change that
-active set must honor the same lease, fencing-token, and generation protocol.
+Independent and collective releases for the same target/environment share
+one logical exclusive release lease and one monotonically increasing
+fencing-token sequence. The lease key identifies only that stable
+target/environment; it must not include the active-set generation, component,
+manifest, workflow, or release-attempt identity. Changing the active set must
+neither create a new lease namespace nor reset the fencing-token sequence.
+Every mechanism that can change that target's active set must honor the same
+lease, fencing-token, and generation protocol.
 The lease serializes the whole activation and active-set update; a release
 must not bypass it by using a different workflow or by labelling itself
 independent or collective. Lease acquisition is followed by reading the
@@ -192,20 +197,32 @@ active-set generation (a monotonically changing
 version of the active set). The release validates its pins and compatibility
 against that generation while holding the lease. The lease must remain valid
 through activation and the final active-set update; if it expires, the
-operation stops and reacquires the lease before continuing.
+operation stops. Reacquisition issues a newer token from the same sequence
+and requires a fresh read, validation, and plan before any further write.
 
 Every lease holder receives a monotonically increasing fencing token. The
 activation boundary must reject writes from an expired holder or any holder
 with a token older than the newest issued token. Immediately before activation
 and again before recording the new active set, the release path revalidates
-that the lease and fencing token are current, the active-set generation has
-not changed, and all pinned artifacts remain compatible with the exact set
-that will be active. The active-set update must be conditional on the
-generation it validated. If the generation changed, the release must not
-activate using stale validation: it stops, reloads the active set, and repeats
-validation under a current lease. These are contract requirements, not a
-selection of a particular lock service, deployment topology, or atomic
-deployment implementation.
+that the lease and fencing token are current, the observed state matches the
+generation and component identities expected by its current plan, and all
+pinned artifacts remain compatible with the exact set that will be active.
+Generation is comparison data, never a lease key.
+Each mutation, including the final active-set update, requires a fenced
+compare-and-set against that expected state and current lease. The record
+identifies the attempt and token responsible for each mutation and its
+resulting state/generation. After its own successful mutation, the attempt
+advances its expected state to that recorded result; it cannot continue using
+its initial generation or attribute another attempt's writes to itself.
+
+A pre-write mismatch requires stopping, reloading, revalidating, and replanning
+under a current lease, or failing safely without a write. A generation change
+alone does not authorize rollback of a valid concurrent release. If this
+attempt has already mutated or activated artifacts, reconcile those owned
+changes with the exact observed state before deciding whether compatible
+completion is possible or authorized recovery is necessary. These are
+contract requirements, not a selection of a particular lock service,
+deployment topology, or atomic deployment implementation.
 
 Before activation, the release path must verify:
 
@@ -220,8 +237,9 @@ Before activation, the release path must verify:
   exposing secret values.
 - The component's authorization, health, and rollback checks are defined for
   its target.
-- The release holds the current exclusive lease and fencing token, and the
-  active-set generation is unchanged at both activation and active-set commit.
+- The release holds the current target/environment lease and fencing token,
+  and each activation and active-set commit uses a fenced compare-and-set
+  against its validated expected state/generation.
 
 Unknown, missing, or contradictory compatibility data fails closed. A model or
 MCP tool version is not a substitute for user authorization or content access
@@ -253,11 +271,14 @@ On failure:
 3. Determine whether the exact artifact is active before retrying. Retry only
    an idempotent operation against the same verified artifact and unchanged
    compatibility set, while holding a current lease and fencing token.
-4. If the active-set generation changed, compatibility is uncertain, or health
-   cannot be restored, stop the stale activation and use an authorized
-   recovery release that pins every artifact in a previously validated
-   compatible set. Do not assume rollback is atomic or that a prior mutable
-   tag still points to the same bytes.
+4. If the expected generation/state differs before this attempt has written,
+   reload, revalidate, and replan under the current lease or fail safely
+   without rollback. If this attempt has already mutated or activated
+   artifacts, reconcile its mutation records with the observed state.
+   Recovery is appropriate only when those owned changes cannot safely
+   complete with compatible observed state. Use a separately authorized
+   recovery release with exact artifact pins; do not assume rollback is
+   atomic or that a prior mutable tag still points to the same bytes.
 5. Verify that every artifact pinned by the recovery manifest—not merely one
    healthy component—is active at its exact pin, all required health checks
    pass, and the complete active set is compatible. Record recovery of the
@@ -265,6 +286,22 @@ On failure:
    is successful only under the same all-pinned-artifacts rule as any other
    deployment. Verify every affected route and identity boundary before
    closing the incident record.
+
+Recovery uses the same target/environment lease and fencing-token sequence as
+ordinary releases. A stale or expired holder must never undo a successor's
+writes, even if it was the original failing attempt. A recovery owner must
+hold a current lease, establish ownership of the affected mutations from the
+attempt records, and validate a recovery plan against the exact observed
+state. An unknown activation outcome or unverified ownership requires
+read-only reconciliation or escalation, not speculative rollback. Every
+recovery write uses a fenced compare-and-set against the state
+and ownership it validated. If a successor has changed an affected artifact,
+the old recovery plan is invalid: stop and reload rather than overwrite it.
+Reinstating the entire previous set is allowed only when the observed state
+still matches the failed attempt's owned mutation plan and the complete
+recovery set is compatible. If successor-owned changes must be included in
+a repair, that requires a new reviewed, authorized release plan; it is not
+rollback authority inherited from the failed attempt.
 
 Recovery must not promote a PR preview, rewrite a published version, expose
 private content, or perform an unapproved DNS change. Where the platform cannot
@@ -287,6 +324,18 @@ must demonstrate:
   safe retry behavior, stale lease fencing, active-set generation changes,
   and recovery to a previously validated compatible set without recording
   the attempted deployment as successful.
+- An independent attempt and a collective attempt for the same
+  target/environment use the same lease key and token sequence across
+  generation changes. For example, generation 10 with token 41 and generation
+  11 with token 42 retain the same target lease key; token 41 cannot write or
+  recover after token 42 is issued. These are synthetic test values, not
+  observed runtime state.
+- A pre-write generation mismatch reloads/revalidates/replans or fails without
+  recovery writes; an owned partial activation can complete only after
+  compatible-state reconciliation or enter authorized recovery.
+- Recovery compare-and-set rejects a changed expected state or mutation
+  ownership, including successor writes; reacquiring a lease does not confer
+  authority to restore a stale recovery set.
 - Stale source revision, mutable artifact reference, incompatible schema, and
   unavailable health or policy checks fail closed.
 - Protected-main production provenance and PR-preview isolation, including no
