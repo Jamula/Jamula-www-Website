@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Reflection;
 using System.Text.Json;
@@ -50,6 +51,7 @@ internal static class FakeGhEntrypoint
             return 0;
         }
 
+        await File.WriteAllTextAsync(Path.Combine(root, "billing-request"), endpoint);
         var year = QueryValue(endpoint, "year");
         var month = QueryValue(endpoint, "month");
         Console.WriteLine($$"""
@@ -85,6 +87,7 @@ internal static class MbrIntegrationTests
         var originalMode = Environment.GetEnvironmentVariable(ModeVariable);
         var originalRoot = Environment.GetEnvironmentVariable(RootVariable);
         var appAssembly = typeof(GitHub).Assembly.Location;
+        var apiMonth = FormatMonth(UtcMonthStart(DateTimeOffset.UtcNow).AddMonths(-1));
 
         try
         {
@@ -93,7 +96,7 @@ internal static class MbrIntegrationTests
             Environment.SetEnvironmentVariable(RootVariable, root);
 
             await VerifyGitHubCollectionAsync(check, root, originalPath);
-            await VerifyLocalWebHostAsync(check, root, appAssembly);
+            await VerifyLocalWebHostAsync(check, root, appAssembly, apiMonth);
             await VerifyCommandModesAsync(check, root, appAssembly);
         }
         finally
@@ -145,7 +148,8 @@ internal static class MbrIntegrationTests
         Environment.SetEnvironmentVariable("PATH", FixtureBinPath(root) + Path.PathSeparator + originalPath);
     }
 
-    private static async Task VerifyLocalWebHostAsync(Action<bool, string> check, string root, string appAssembly)
+    private static async Task VerifyLocalWebHostAsync(
+        Action<bool, string> check, string root, string appAssembly, string month)
     {
         var appRoot = Path.Combine(root, "web");
         CopyWebRoot(appRoot);
@@ -175,14 +179,14 @@ internal static class MbrIntegrationTests
         check(wrongHost.StatusCode == HttpStatusCode.Forbidden,
             "MbrHttp_UntrustedHostIsRejectedBeforeRouting");
 
-        using var crossSiteRequest = new HttpRequestMessage(HttpMethod.Get, "/api/snapshot?month=2026-11");
+        using var crossSiteRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/snapshot?month={month}");
         crossSiteRequest.Headers.TryAddWithoutValidation("Sec-Fetch-Site", "cross-site");
         using var crossSite = await client.SendAsync(crossSiteRequest);
         check(crossSite.StatusCode == HttpStatusCode.Forbidden,
             "MbrHttp_CrossSiteApiReadIsRejected");
 
         using var invalidRead = await client.GetAsync("/api/snapshot?month=2026-13");
-        using var absentRead = await client.GetAsync("/api/snapshot?month=2026-11");
+        using var absentRead = await client.GetAsync($"/api/snapshot?month={month}");
         check(invalidRead.StatusCode == HttpStatusCode.BadRequest &&
             absentRead.StatusCode == HttpStatusCode.NotFound,
             "MbrHttp_SnapshotRejectsInvalidMonthAndReportsMissingObservation");
@@ -191,9 +195,9 @@ internal static class MbrIntegrationTests
         check(invalidRefresh.StatusCode == HttpStatusCode.BadRequest,
             "MbrHttp_RefreshRejectsNonCanonicalMonth");
 
-        var firstRefresh = client.SendAsync(RefreshRequest(app.Address, "2026-11"));
+        var firstRefresh = client.SendAsync(RefreshRequest(app.Address, month));
         await WaitForFileAsync(startedMarker, TimeSpan.FromSeconds(10));
-        using var duplicateRefresh = await client.SendAsync(RefreshRequest(app.Address, "2026-11"));
+        using var duplicateRefresh = await client.SendAsync(RefreshRequest(app.Address, month));
         check(duplicateRefresh.StatusCode == HttpStatusCode.Conflict,
             "MbrHttp_ConcurrentRefreshIsRejectedWithoutStartingAnotherCollection");
 
@@ -209,16 +213,16 @@ internal static class MbrIntegrationTests
             pullsStatus == "ok" && issuesStatus == "ok" && actionsStatus == "ok",
             "MbrHttp_RefreshPersistsCompleteFixtureSnapshot");
 
-        using var savedRead = await client.GetAsync("/api/snapshot?month=2026-11");
+        using var savedRead = await client.GetAsync($"/api/snapshot?month={month}");
         var savedJson = await savedRead.Content.ReadAsStringAsync();
         check(savedRead.StatusCode == HttpStatusCode.OK &&
-            JsonDocument.Parse(savedJson).RootElement.GetProperty("month").GetString() == "2026-11",
+            JsonDocument.Parse(savedJson).RootElement.GetProperty("month").GetString() == month,
             "MbrHttp_SnapshotRouteReadsCompletedObservation");
 
-        var snapshotPath = Path.Combine(appRoot, ".local", "snapshot-2026-11.json");
+        var snapshotPath = Path.Combine(appRoot, ".local", $"snapshot-{month}.json");
         using (var locked = new FileStream(snapshotPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
-            using var storageFailure = await client.GetAsync("/api/snapshot?month=2026-11");
+            using var storageFailure = await client.GetAsync($"/api/snapshot?month={month}");
             var failureJson = await storageFailure.Content.ReadAsStringAsync();
             check(storageFailure.StatusCode == HttpStatusCode.InternalServerError &&
                 failureJson.Contains("Local snapshot read/write failed", StringComparison.Ordinal) &&
@@ -233,23 +237,38 @@ internal static class MbrIntegrationTests
         CopyWebRoot(appRoot);
         Environment.SetEnvironmentVariable(ModeVariable, "success");
 
-        var past = await RunCommandAsync(appAssembly, appRoot, root, "--snapshot", "2026-10");
+        var currentMonthStart = UtcMonthStart(DateTimeOffset.UtcNow);
+        var pastMonth = FormatMonth(currentMonthStart.AddMonths(-1));
+        var currentMonth = FormatMonth(currentMonthStart);
+        var futureMonth = FormatMonth(currentMonthStart.AddMonths(2));
+
+        var past = await RunCommandAsync(appAssembly, appRoot, root, "--snapshot", pastMonth);
         using var pastJson = JsonDocument.Parse(past.Output);
         check(past.ExitCode == 0 &&
             pastJson.RootElement.GetProperty("coverage").GetString()!.StartsWith("Past UTC month", StringComparison.Ordinal),
             "MbrCli_PastMonthSnapshotUsesHistoricalCoverageLabel");
 
-        var current = await RunCommandAsync(appAssembly, appRoot, root, "--snapshot", "2026-11");
+        var current = await RunCommandAsync(appAssembly, appRoot, root, "--snapshot", currentMonth);
         using var currentJson = JsonDocument.Parse(current.Output);
+        var observedAt = currentJson.RootElement.GetProperty("observedAt").GetDateTimeOffset();
+        var currentCoverage = currentJson.RootElement.GetProperty("coverage").GetString();
+        var expectedCurrentCoverage = currentMonthStart > observedAt
+            ? "Future period; no delivery observations yet"
+            : currentMonthStart.AddMonths(1) > observedAt
+                ? "Month to date (UTC)"
+                : "Past UTC month; latest state, not an archived month-end snapshot";
         check(current.ExitCode == 0 &&
-            currentJson.RootElement.GetProperty("coverage").GetString() == "Month to date (UTC)",
-            "MbrCli_CurrentMonthSnapshotUsesMonthToDateCoverageLabel");
+            currentCoverage == expectedCurrentCoverage,
+            "MbrCli_CurrentMonthSnapshotUsesUtcDateStableCoverageLabel");
 
-        var future = await RunCommandAsync(appAssembly, appRoot, root, "--snapshot", "2026-12");
+        var billingRequestPath = Path.Combine(root, "billing-request");
+        if (File.Exists(billingRequestPath)) File.Delete(billingRequestPath);
+        var future = await RunCommandAsync(appAssembly, appRoot, root, "--snapshot", futureMonth);
         using var futureJson = JsonDocument.Parse(future.Output);
         check(future.ExitCode == 0 &&
             futureJson.RootElement.GetProperty("coverage").GetString() == "Future period; no delivery observations yet" &&
-            futureJson.RootElement.GetProperty("costs").GetProperty("actionsStatus").GetString() == "not-applicable",
+            futureJson.RootElement.GetProperty("costs").GetProperty("actionsStatus").GetString() == "not-applicable" &&
+            !File.Exists(billingRequestPath),
             "MbrCli_FutureMonthSkipsBillingAndUsesFutureCoverageLabel");
 
         var invalidArguments = await RunCommandAsync(appAssembly, appRoot, root, "--unexpected");
@@ -295,6 +314,12 @@ internal static class MbrIntegrationTests
     }
 
     private static string FixtureBinPath(string root) => Path.Combine(root, "fake-bin");
+
+    private static DateTimeOffset UtcMonthStart(DateTimeOffset date) =>
+        new(date.Year, date.Month, 1, 0, 0, 0, TimeSpan.Zero);
+
+    private static string FormatMonth(DateTimeOffset month) =>
+        month.ToString("yyyy-MM", CultureInfo.InvariantCulture);
 
     private static async Task<(int ExitCode, string Output, string Error)> RunCommandAsync(
         string appAssembly, string workingDirectory, string fixtureRoot, params string[] arguments)
