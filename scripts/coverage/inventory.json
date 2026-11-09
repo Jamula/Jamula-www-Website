@@ -91,7 +91,13 @@
     {
       "id": "monitor",
       "reports": ["monitor.cobertura.xml"],
-      "sources": ["scripts/monitor/Program.cs"]
+      "sources": ["scripts/monitor/Program.cs"],
+      "unmeasured": [
+        {
+          "path": "scripts/monitor/InternalsVisibleTo.cs",
+          "reason": "Assembly-level InternalsVisibleTo metadata contains no executable lines for Cobertura to measure."
+        }
+      ]
     },
     {
       "id": "monthly-business-review",
@@ -207,6 +213,10 @@
     {
       "path": "scripts/mbr/tests/Program.cs",
       "reason": "Offline fixture runner, not the MBR application."
+    },
+    {
+      "path": "scripts/mbr/tests/MbrIntegrationTests.cs",
+      "reason": "Test-only integration fixtures and assertions, not MBR application behavior."
     },
     {
       "path": "scripts/monitor/tests/Program.cs",

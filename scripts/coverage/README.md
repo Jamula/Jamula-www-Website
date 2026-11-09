@@ -91,6 +91,9 @@ console-only runner summary as a successful gate.
 
 ## Current blockers
 
+- `scripts/monitor/InternalsVisibleTo.cs` is production assembly metadata with
+  no executable lines for Cobertura to measure. It is inventoried as
+  unmeasured and therefore blocks the gate, rather than being excluded.
 - The website has seven `.astro` templates with build-time logic and an
   executable `www/astro.config.ts`. Existing runtime coverage reports only
   `www/public/analytics-consent.js`; build and generated-site tests do not

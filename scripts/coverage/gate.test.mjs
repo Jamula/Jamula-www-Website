@@ -234,6 +234,26 @@ test("CoverageGate_InventoryClassifiesTrackedExecutableSources", async () => {
   );
   assert.deepEqual(executable.filter((file) => !entries.includes(file)), []);
   assert.deepEqual(entries.filter((file) => !tracked.has(file)), []);
+
+  const monitor = manifest.components.find((item) => item.id === "monitor");
+  const metadataPath = "scripts/monitor/InternalsVisibleTo.cs";
+  assert.ok(
+    monitor.unmeasured.some((item) => item.path === metadataPath && item.reason.trim()),
+  );
+  assert.ok(!manifest.excludedSources.some((item) => item.path === metadataPath));
+  const metadata = await readFile(
+    new URL("../monitor/InternalsVisibleTo.cs", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    metadata,
+    /^\s*using System\.Runtime\.CompilerServices;\s*\[assembly:\s*InternalsVisibleTo\("JamulaMonitor\.Tests"\)\]\s*$/,
+  );
+  assert.ok(
+    manifest.excludedSources.some(
+      (item) => item.path === "scripts/mbr/tests/MbrIntegrationTests.cs" && item.reason.trim(),
+    ),
+  );
 });
 
 test("CoverageGate_RejectsInvalidInventoryAndRepeatedSourceAssignments", () => {
