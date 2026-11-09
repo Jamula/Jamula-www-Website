@@ -209,6 +209,14 @@
       "reason": "Offline fixture runner, not the MBR application."
     },
     {
+      "path": "scripts/monitor/tests/Program.cs",
+      "reason": "Offline fixture runner, not the monitor application."
+    },
+    {
+      "path": "scripts/monitor/tests/SelfTests.cs",
+      "reason": "Test-only source; its assertions are not monitor behavior."
+    },
+    {
       "path": "scripts/mbr/tests/ui.test.mjs",
       "reason": "Test-only source; its assertions are not product behavior."
     },

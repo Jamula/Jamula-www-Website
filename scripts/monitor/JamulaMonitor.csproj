@@ -10,5 +10,8 @@
     <AssemblyName>JamulaMonitor</AssemblyName>
     <RootNamespace>JamulaMonitor</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="tests\**\*.cs" />
+  </ItemGroup>
   <!-- No third-party NuGet packages; BCL only. -->
 </Project>
