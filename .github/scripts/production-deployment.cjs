@@ -1,10 +1,10 @@
 const fs = require("node:fs");
 const { execFileSync } = require("node:child_process");
 
-function api(endpoint, body, jq) {
+function api(endpoint, body, jq, run = execFileSync) {
   const command = ["api", "--method", "POST", endpoint, "--input", "-"];
   if (jq) command.push("--jq", jq);
-  return execFileSync("gh", command, {
+  return run("gh", command, {
     input: JSON.stringify(body),
     encoding: "utf8",
     stdio: ["pipe", "pipe", "inherit"],
@@ -83,4 +83,4 @@ function execute(
 }
 
 if (require.main === module) execute(process.argv[2], process.argv.slice(3));
-module.exports = { execute };
+module.exports = { api, execute };

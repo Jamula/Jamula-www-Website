@@ -131,6 +131,79 @@ test("closes the preview when deployable changes have been removed", async () =>
   assert.equal((await selectPreview(f.github, f.repo, f.run)).action, "close");
 });
 
+test("rejects multiple current PRs, invalid PR numbers and unexpected states", async () => {
+  const multiple = fixture();
+  multiple.run.pull_requests = [{ number: 74 }, { number: 75 }];
+  await assert.rejects(
+    selectPreview(multiple.github, multiple.repo, multiple.run),
+    /multiple current PRs/,
+  );
+
+  const invalidNumber = fixture();
+  invalidNumber.pr.number = 0;
+  await assert.rejects(
+    selectPreview(invalidNumber.github, invalidNumber.repo, invalidNumber.run),
+    /invalid PR number/,
+  );
+
+  const unexpectedState = fixture();
+  unexpectedState.pr.state = "merged";
+  await assert.rejects(
+    selectPreview(
+      unexpectedState.github,
+      unexpectedState.repo,
+      unexpectedState.run,
+    ),
+    /unexpected PR state/,
+  );
+});
+
+test("refuses a possibly truncated PR file list at 3000 entries", async () => {
+  const f = fixture();
+  f.files.splice(
+    0,
+    f.files.length,
+    ...Array.from({ length: 3000 }, (_, index) => ({
+      filename: `docs/file-${index}.md`,
+    })),
+  );
+  await assert.rejects(
+    selectPreview(f.github, f.repo, f.run),
+    /file list may be truncated/,
+  );
+
+  f.files.length = 2999;
+  f.files[2998] = { filename: "www/index.html" };
+  assert.equal((await selectPreview(f.github, f.repo, f.run)).action, "upload");
+});
+
+test("recognizes deployable renames and the trusted build workflow as site changes", async () => {
+  const renamed = fixture();
+  renamed.files[0] = {
+    filename: "docs/moved-file.md",
+    previous_filename: "www/old-file.md",
+  };
+  assert.equal(
+    (await selectPreview(renamed.github, renamed.repo, renamed.run)).action,
+    "upload",
+  );
+
+  const workflowChange = fixture();
+  workflowChange.files[0] = {
+    filename: ".github/workflows/azure-static-web-apps.yml",
+  };
+  assert.equal(
+    (
+      await selectPreview(
+        workflowChange.github,
+        workflowChange.repo,
+        workflowChange.run,
+      )
+    ).action,
+    "upload",
+  );
+});
+
 for (const [name, mutate] of [
   [
     "wrong workflow",
@@ -169,6 +242,42 @@ for (const [name, mutate] of [
     },
   ],
   [
+    "zero artifact id",
+    (f) => {
+      f.artifacts[0].id = 0;
+    },
+  ],
+  [
+    "unsafe artifact id",
+    (f) => {
+      f.artifacts[0].id = Number.MAX_SAFE_INTEGER + 1;
+    },
+  ],
+  [
+    "malformed artifact digest",
+    (f) => {
+      f.artifacts[0].digest = "sha256:xyz";
+    },
+  ],
+  [
+    "zero artifact size",
+    (f) => {
+      f.artifacts[0].size_in_bytes = 0;
+    },
+  ],
+  [
+    "oversized artifact",
+    (f) => {
+      f.artifacts[0].size_in_bytes = 100 * 1024 * 1024 + 1;
+    },
+  ],
+  [
+    "missing workflow binding",
+    (f) => {
+      delete f.artifacts[0].workflow_run;
+    },
+  ],
+  [
     "duplicate artifact",
     (f) => {
       f.artifacts.push({ ...f.artifacts[0], id: 790 });
@@ -181,6 +290,12 @@ for (const [name, mutate] of [
     await assert.rejects(selectPreview(f.github, f.repo, f.run));
   });
 }
+
+test("accepts an artifact exactly at the documented size limit", async () => {
+  const f = fixture();
+  f.artifacts[0].size_in_bytes = 100 * 1024 * 1024;
+  assert.equal((await selectPreview(f.github, f.repo, f.run)).action, "upload");
+});
 
 test("deployment event always identifies the selected PR, not main", async () => {
   const f = fixture();
@@ -199,6 +314,24 @@ test("deployment event always identifies the selected PR, not main", async () =>
   } finally {
     fs.rmSync(path.join(directory, "event.json"), { force: true });
     fs.rmdirSync(directory);
+  }
+});
+
+test("deployment event rejects unselected actions", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-preview-"));
+  try {
+    assert.throws(
+      () =>
+        writePreviewEvent(
+          { action: "skip", pr: { number: 74 } },
+          { full_name: "Jamula/Jamula-www-Website" },
+          path.join(directory, "event.json"),
+        ),
+      /Only a selected PR/,
+    );
+    assert.equal(fs.existsSync(path.join(directory, "event.json")), false);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
   }
 });
 
@@ -222,6 +355,70 @@ const staticWebAppConfig = path.join(
   __dirname,
   "../../www/public/staticwebapp.config.json",
 );
+
+test("CSP verifier requires one non-empty policy in the built configuration", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-csp-"));
+  const configPath = path.join(directory, "config.json");
+  const headersPath = path.join(directory, "headers.txt");
+  fs.writeFileSync(headersPath, "HTTP/2 200\r\n");
+  try {
+    for (const config of [
+      {},
+      { globalHeaders: {} },
+      { globalHeaders: { "Content-Security-Policy": "" } },
+      { globalHeaders: { "Content-Security-Policy": null } },
+    ]) {
+      fs.writeFileSync(configPath, JSON.stringify(config));
+      assert.throws(
+        () => assertConfiguredCsp(configPath, headersPath),
+        /configuration has no CSP/,
+      );
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("CSP verifier CLI checks exact policy and reports argument or file errors", () => {
+  const config = JSON.parse(fs.readFileSync(staticWebAppConfig, "utf8"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-csp-"));
+  const configPath = path.join(directory, "config.json");
+  const headersPath = path.join(directory, "headers.txt");
+  fs.writeFileSync(configPath, JSON.stringify(config));
+  const runVerifier = (...args) =>
+    spawnSync(
+      process.execPath,
+      [path.join(__dirname, "verify-swa-csp.cjs"), ...args],
+      { encoding: "utf8" },
+    );
+  try {
+    const usage = runVerifier();
+    assert.equal(usage.status, 1);
+    assert.match(usage.stderr, /Usage: verify-swa-csp\.cjs/);
+
+    fs.writeFileSync(
+      headersPath,
+      `HTTP/2 200\r\nContent-Security-Policy: ${config.globalHeaders["Content-Security-Policy"]}\r\n`,
+    );
+    const valid = runVerifier(configPath, headersPath);
+    assert.equal(valid.status, 0, valid.stderr);
+
+    fs.writeFileSync(
+      headersPath,
+      "HTTP/2 200\r\nContent-Security-Policy: default-src 'self'\r\n",
+    );
+    const mismatch = runVerifier(configPath, headersPath);
+    assert.equal(mismatch.status, 1);
+    assert.match(mismatch.stderr, /does not match the built configuration/);
+
+    fs.writeFileSync(configPath, "{");
+    const malformed = runVerifier(configPath, headersPath);
+    assert.equal(malformed.status, 1);
+    assert.match(malformed.stderr, /JSON|Unexpected end/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test("live CSP verifier accepts the policy from the Static Web Apps config", () => {
   const config = JSON.parse(fs.readFileSync(staticWebAppConfig, "utf8"));
@@ -429,9 +626,10 @@ for (const name of ["deploy", "deploy-com"]) {
         .filter(
           (step) =>
             /        run:/.test(step.body) &&
-            !["Record production deployment", "Record deployment result"].includes(
-              step.name,
-            ),
+            ![
+              "Record production deployment",
+              "Record deployment result",
+            ].includes(step.name),
         )
         .map((step) =>
           step.body

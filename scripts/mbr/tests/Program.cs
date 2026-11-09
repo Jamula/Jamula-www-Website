@@ -20,6 +20,23 @@ foreach (var value in new[] { "../2026-11", "2026-13", "2026-1", "2026-11&repo=x
 Check(month.Contains(month.Start, now) && !month.Contains(month.End, now) &&
     !month.Contains(now.AddSeconds(1), now) && !month.Contains(month.Start.AddTicks(-1), now), "half-open UTC filtering");
 Check(month.Contains(DateTimeOffset.Parse("2026-10-31T18:00:00-07:00"), now), "Pacific timestamp converted to UTC month");
+Check(ReviewMonth.Parse("2000-01").Start.Year == 2000 &&
+    ReviewMonth.Parse("9998-12").End == DateTimeOffset.Parse("9999-01-01T00:00:00Z"),
+    "ReviewMonth_MinimumAndMaximumYears_AreAccepted");
+Expect<ArgumentException>(() => ReviewMonth.Parse("1999-12"), "ReviewMonth_BelowMinimumYear_IsRejected");
+var leap = ReviewMonth.Parse("2024-02");
+Check((leap.End - leap.Start).TotalDays == 29 &&
+    leap.Contains(leap.End.AddTicks(-1), leap.End) &&
+    !leap.Contains(leap.End, leap.End), "ReviewMonth_LeapDayAndExclusiveEnd_ArePreserved");
+Check(month.Contains(now, now) && !month.Contains(null, now) &&
+    !month.Contains(now.AddTicks(1), now), "ReviewMonth_ObservationBoundaryAndNull_AreFiltered");
+
+void Expect<TException>(Action action, string name) where TException : Exception
+{
+    try { action(); }
+    catch (TException) { Check(true, name); return; }
+    throw new InvalidOperationException("FAIL: " + name + ": expected " + typeof(TException).Name);
+}
 
 var visited = new List<int>();
 var pages = await GitHub.ReadPagesAsync(page =>
@@ -42,6 +59,43 @@ try
     throw new InvalidOperationException("Accepted malformed response.");
 }
 catch (JsonException) { Check(true, "non-array API response rejected"); }
+var emptyPageVisits = new List<int>();
+Check((await GitHub.ReadPagesAsync(page =>
+{
+    emptyPageVisits.Add(page);
+    return Task.FromResult("[]");
+})).Count == 0 && emptyPageVisits.SequenceEqual([1]), "Pagination_EmptyFirstPage_IsMeasuredZero");
+var fullPageVisits = new List<int>();
+var fullPageRows = await GitHub.ReadPagesAsync(page =>
+{
+    fullPageVisits.Add(page);
+    return Task.FromResult(page == 1 ? JsonSerializer.Serialize(Enumerable.Range(1, 100)) : "[]");
+});
+Check(fullPageVisits.SequenceEqual([1, 2]) && fullPageRows.Count == 100 &&
+    fullPageRows[0].GetInt32() == 1 && fullPageRows[^1].GetInt32() == 100,
+    "Pagination_ExactFullPage_RequiresEmptyTerminalPageAndRetainsClonedValues");
+int cappedVisits = 0;
+try
+{
+    await GitHub.ReadPagesAsync(page =>
+    {
+        cappedVisits++;
+        return Task.FromResult(JsonSerializer.Serialize(Enumerable.Range(0, 100)));
+    });
+    throw new Exception("Accepted incomplete capped response.");
+}
+catch (InvalidOperationException error)
+{
+    Check(cappedVisits == 200 && error.Message.Contains("completeness cannot be established", StringComparison.Ordinal),
+        "Pagination_SafetyLimit_RejectsIncompleteTwoHundredPages");
+}
+try
+{
+    await GitHub.ReadPagesAsync(page => Task.FromResult(page == 1
+        ? JsonSerializer.Serialize(Enumerable.Range(0, 100)) : "{broken"));
+    throw new Exception("Accepted malformed later page.");
+}
+catch (JsonException) { Check(true, "Pagination_MalformedLaterPage_DoesNotReturnPartialRows"); }
 
 WorkItem Item(int n, string state, string? reason = null, DateTimeOffset? closed = null, DateTimeOffset? merged = null) =>
     new(n, "<img src=x onerror=alert(1)> & \"fixture\"", "javascript:alert(1)", state, reason,
@@ -68,6 +122,42 @@ var missing = Metrics.Summarize(new(null, "unavailable", ""), month, now, true);
 Check(missing.Active is null && missing.Completed is null && missing.MedianMergeHours is null, "missing access remains unknown");
 var empty = Metrics.Summarize(new([], "ok", ""), month, now, true);
 Check(empty.Active?.Count == 0 && empty.MedianMergeHours is null, "true zero versus no merge sample");
+WorkItem Merged(int number, int hours) => Item(number, "closed",
+    closed: month.Start.AddMinutes(number), merged: month.Start.AddMinutes(number)) with
+    { CreatedAt = month.Start.AddMinutes(number).AddHours(-hours) };
+var even = Metrics.Summarize(new([Merged(1, 2), Merged(2, 10), Merged(3, 4), Merged(4, 6)], "ok", ""), month, now, true);
+Check(even.MedianMergeHours == 5 && even.MergeSampleSize == 4 &&
+    even.Completed!.Select(x => x.Number).SequenceEqual([4, 3, 2, 1]),
+    "Metrics_EvenMedian_UsesSortedMiddlePairAndCompletionOrder");
+var odd = Metrics.Summarize(new([Merged(1, 2), Merged(2, 10), Merged(3, 4)], "ok", ""), month, now, true);
+Check(odd.MedianMergeHours == 4 && odd.MergeSampleSize == 3, "Metrics_OddMedian_UsesSortedMiddleValue");
+var orderedBacklog = Metrics.Summarize(new([
+    Item(1, "open") with { CreatedAt = month.Start.AddHours(2), Draft = true },
+    Item(2, "open") with { CreatedAt = month.Start },
+    Item(3, "closed", "not_planned", month.Start.AddHours(1)),
+    Item(4, "closed", "not_planned", month.Start.AddHours(2))
+], "ok", ""), month, now, false);
+Check(orderedBacklog.Active!.Select(x => x.Number).SequenceEqual([2, 1]) &&
+    orderedBacklog.OtherClosed!.Select(x => x.Number).SequenceEqual([4, 3]) &&
+    orderedBacklog.MedianMergeHours is null && orderedBacklog.MergeSampleSize == 0,
+    "Metrics_BacklogAndOtherClosureOrdering_PreserveDraftAndNoIssueMergeSample");
+using (var document = JsonDocument.Parse("""
+[
+  {"number":7,"title":null,"state":null,"state_reason":"completed","created_at":"2026-10-31T18:00:00-07:00","closed_at":null,"merged_at":"2026-11-01T02:00:00Z","draft":true,"pull_request":{},"html_url":"javascript:alert(1)"},
+  {"number":7,"title":"duplicate","state":"open","created_at":"2026-11-01T00:00:00Z","draft":false},
+  {"number":8,"title":"second","state":"open","created_at":"2026-11-01T00:00:00Z"}
+]
+"""))
+{
+    var rows = Metrics.ReadItems(document.RootElement.EnumerateArray(), true);
+    Check(rows.Count == 2 && rows[0].Number == 7 && rows[0].Title == "" && rows[0].State == "" &&
+        rows[0].Reason == "completed" && rows[0].Draft && rows[0].ClosedAt is null &&
+        rows[0].MergedAt == DateTimeOffset.Parse("2026-11-01T02:00:00Z") &&
+        rows[0].CreatedAt == DateTimeOffset.Parse("2026-11-01T01:00:00Z") &&
+        rows[0].Url == $"https://github.com/{GitHub.Repo}/pull/7" &&
+        rows[1].Reason is null && rows[1].MergedAt is null && !rows[1].Draft,
+        "ReadItems_Pulls_DeduplicateAndPreserveNullableMetadataWithTrustedUrls");
+}
 using (var document = JsonDocument.Parse("""
 [
   {"number":1,"title":"<script>alert(1)</script>","state":"open","created_at":"2026-11-01T00:00:00Z","html_url":"javascript:alert(1)"},
@@ -85,6 +175,17 @@ Check(!RequestPolicy.Allows("POST", "https://evil.example", "cross-site", "1", "
     !RequestPolicy.Allows("POST", "", "", "1", "127.0.0.1:42") &&
     !RequestPolicy.Allows("GET", "", "cross-site", "", "127.0.0.1:42") &&
     !RequestPolicy.Allows("POST", "http://127.0.0.1:42", "same-origin", "", "127.0.0.1:42"), "cross-site and simple refresh denied");
+foreach (var method in new[] { "GET", "POST" })
+{
+    foreach (var site in new[] { "cross-site", "same-site" })
+        Check(!RequestPolicy.Allows(method, "http://127.0.0.1:42", site, "1", "127.0.0.1:42"),
+            $"RequestPolicy_{method}_{site.Replace("-", "")}_IsDenied");
+    Check(!RequestPolicy.Allows(method, "http://127.0.0.1:43", "same-origin", "1", "127.0.0.1:42"),
+        $"RequestPolicy_{method}_WrongPortOrigin_IsDenied");
+}
+Check(RequestPolicy.Allows("GET", "http://127.0.0.1:42", "", "", "127.0.0.1:42") &&
+    !RequestPolicy.Allows("POST", "http://127.0.0.1:42", "same-origin", "true", "127.0.0.1:42"),
+    "RequestPolicy_ExactRefreshHeaderRequiredButNotForGet");
 
 string Billing() => """
 {"organization":"Jamula","repository":"Jamula/Jamula-www-Website","product":"Actions",
@@ -131,6 +232,45 @@ var storageOnly = Costs.ReadActions("""
 {"product":"Actions","unitType":"gigabyte-hours","grossQuantity":1,"netQuantity":1,"netAmount":0.001}]}
 """, month, now);
 Check(storageOnly.Count == 1 && storageOnly[0].Key == "actionsUsd", "storage-only report never invents zero runner minutes");
+foreach (var field in new[] { "repository", "organization", "product", "timePeriod", "usageItems" })
+{
+    var root = System.Text.Json.Nodes.JsonNode.Parse(Billing())!.AsObject();
+    root.Remove(field);
+    Expect<JsonException>(() => Costs.ReadActions(root.ToJsonString(), month, now),
+        $"Actions_Missing_{field}_IsRejected");
+}
+foreach (var (label, json) in new[]
+{
+    ("NonObjectRoot", "[]"),
+    ("NonObjectPeriod", Billing().Replace("\"timePeriod\":{\"year\":2026,\"month\":11}", "\"timePeriod\":[]")),
+    ("MissingYear", Billing().Replace("\"year\":2026,", "")),
+    ("MissingMonth", Billing().Replace(",\"month\":11", ""))
+})
+{
+    Expect<JsonException>(() => Costs.ReadActions(json, month, now), $"Actions_{label}_IsRejected");
+}
+var nonArrayUsage = System.Text.Json.Nodes.JsonNode.Parse(Billing())!;
+nonArrayUsage["usageItems"] = new System.Text.Json.Nodes.JsonObject();
+Expect<JsonException>(() => Costs.ReadActions(nonArrayUsage.ToJsonString(), month, now),
+    "Actions_NonArrayUsage_IsRejected");
+foreach (var field in new[] { "product", "unitType", "grossQuantity", "netQuantity", "netAmount" })
+{
+    var root = System.Text.Json.Nodes.JsonNode.Parse(Billing())!;
+    root["usageItems"]![0]!.AsObject().Remove(field);
+    Expect<JsonException>(() => Costs.ReadActions(root.ToJsonString(), month, now),
+        $"Actions_RowMissing_{field}_IsRejected");
+}
+var badRow = System.Text.Json.Nodes.JsonNode.Parse(Billing())!;
+badRow["usageItems"]![0] = null;
+Expect<JsonException>(() => Costs.ReadActions(badRow.ToJsonString(), month, now),
+    "Actions_NullUsageRow_IsRejected");
+var negativeNet = Billing().Replace("\"netQuantity\":1", "\"netQuantity\":-1");
+Expect<JsonException>(() => Costs.ReadActions(negativeNet, month, now), "Actions_NegativeNetUsage_IsRejected");
+var overflowRows = System.Text.Json.Nodes.JsonNode.Parse(Billing())!;
+overflowRows["usageItems"]![0]!["netAmount"] = decimal.MaxValue;
+overflowRows["usageItems"]![1]!["netAmount"] = decimal.MaxValue;
+Expect<OverflowException>(() => Costs.ReadActions(overflowRows.ToJsonString(), month, now),
+    "Actions_OverflowedChargeSum_IsRejected");
 var emptyCosts = new CostResult("unknown", "Fixture", []);
 var automatic = await Costs.CollectAsync(emptyCosts, month, now, read: endpoint =>
 {
@@ -149,6 +289,36 @@ Check(malformedBilling.ActionsStatus == "unavailable" && malformedBilling.Measur
 var futureCosts = await Costs.CollectAsync(emptyCosts, ReviewMonth.Parse("2026-12"), now,
     read: _ => throw new Exception("Future billing should not be queried."));
 Check(futureCosts.ActionsStatus == "not-applicable", "Actions future month makes no billing request");
+var atStart = await Costs.CollectAsync(emptyCosts, month, month.Start,
+    read: _ => throw new Exception("Period at observation start must not query billing."));
+Check(atStart.ActionsStatus == "not-applicable" && atStart.Measurements.Count == 0,
+    "Actions_ObservationAtMonthStart_MakesNoRequest");
+foreach (var (name, error) in new (string, Exception)[]
+{
+    ("Win32", new System.ComponentModel.Win32Exception("private account detail")),
+    ("Overflow", new OverflowException("private account detail")),
+    ("InvalidOperation", new InvalidOperationException("private account detail"))
+})
+{
+    var failed = await Costs.CollectAsync(emptyCosts, month, now, read: _ => throw error);
+    Check(failed.ActionsStatus == "unavailable" && failed.Measurements.Count == 0 &&
+        !failed.ActionsDetail!.Contains("private account detail", StringComparison.Ordinal),
+        $"Actions_{name}Failure_RemainsUnknownAndSanitized");
+}
+using (var cancellation = new CancellationTokenSource())
+{
+    cancellation.Cancel();
+    try
+    {
+        await Costs.CollectAsync(emptyCosts, month, now,
+            read: _ => throw new OperationCanceledException(cancellation.Token));
+        throw new Exception("Cancellation was swallowed.");
+    }
+    catch (OperationCanceledException error)
+    {
+        Check(error.CancellationToken == cancellation.Token, "Actions_CallerCancellation_Propagates");
+    }
+}
 var importedCosts = new CostResult("imported", "Fixture", [
     new("aiInputTokens", 100, "actual", "Fixture", GitHub.Repo, now, month.Start, now),
     new("actionsUsd", 999, "actual", "Fixture", GitHub.Repo, now, month.Start, now)]);
@@ -263,6 +433,62 @@ try
     Check((await Import(measurement with { CoveredFrom = month.Start.AddDays(-1) })).Status == "invalid", "outside-month coverage rejected");
     Check((await Import(measurement with { Key = "aiUsd", Basis = "estimated" })).Status == "invalid", "unpriced estimate rejected");
     Check((await Import(measurement with { Key = "aiUsd", Basis = "estimated", PricingSource = "Synthetic price", PricingDate = "2026-11-01" })).Status == "imported", "dated estimate accepted");
+    foreach (var (label, value) in new (string, CostMeasurement)[]
+    {
+        ("UnknownKey", measurement with { Key = "totalSpend" }),
+        ("UnknownBasis", measurement with { Basis = "guessed" }),
+        ("BlankSource", measurement with { Source = " \t " }),
+        ("LongSource", measurement with { Source = new string('x', 501) }),
+        ("WrongScope", measurement with { Scope = "other/repo" }),
+        ("FutureObservation", measurement with { AsOf = now.AddTicks(1) }),
+        ("ObservationBeforeCoverage", measurement with { AsOf = now.AddTicks(-1) }),
+        ("EmptyCoverage", measurement with { CoveredThrough = month.Start }),
+        ("ReversedCoverage", measurement with { CoveredFrom = now, CoveredThrough = month.Start }),
+        ("MalformedPricingDate", measurement with { Key = "aiUsd", Basis = "estimated", PricingSource = "price", PricingDate = "yesterday" }),
+        ("FuturePricingDate", measurement with { Key = "aiUsd", Basis = "estimated", PricingSource = "price", PricingDate = "2026-11-03" }),
+        ("BlankPricingSource", measurement with { Key = "aiUsd", Basis = "estimated", PricingSource = " ", PricingDate = "2026-11-01" })
+    })
+    {
+        var invalid = await Import(value);
+        Check(invalid.Status == "invalid" && invalid.Measurements.Count == 0,
+            $"CostImport_{label}_IsRejectedWithoutMeasurements");
+    }
+    var boundaryImport = await Import(measurement with { Source = new string('x', 500) });
+    Check(boundaryImport.Status == "imported" && boundaryImport.Measurements.Single().Source.Length == 500 &&
+        boundaryImport.Measurements.Single().AsOf == now && boundaryImport.Measurements.Single().CoveredThrough == now,
+        "CostImport_ExactSourceAndObservationBoundaries_AreAccepted");
+    foreach (var (label, content) in new[]
+    {
+        ("NullDocument", "null"),
+        ("WrongMonth", JsonSerializer.Serialize(new CostImport(GitHub.Repo, "2026-10", [measurement]))),
+        ("NullMeasurements", $$"""{"repo":"{{GitHub.Repo}}","month":"2026-11","measurements":null}"""),
+        ("NullMeasurement", $$"""{"repo":"{{GitHub.Repo}}","month":"2026-11","measurements":[null]}"""),
+        ("DuplicateKey", JsonSerializer.Serialize(new CostImport(GitHub.Repo, month.Value, [measurement, measurement]))),
+        ("UnexpectedProperty", $$"""{"repo":"{{GitHub.Repo}}","month":"2026-11","measurements":[],"total":0}""")
+    })
+    {
+        await File.WriteAllTextAsync(path, content);
+        var invalid = await Costs.ReadAsync(path, month, now);
+        Check(invalid.Status == "invalid" && invalid.Measurements.Count == 0,
+            $"CostImport_{label}_IsRejectedWithoutMeasurements");
+    }
+    await File.WriteAllTextAsync(path, JsonSerializer.Serialize(new CostImport(GitHub.Repo, month.Value, [])));
+    var noMeasurements = await Costs.ReadAsync(path, month, now);
+    Check(noMeasurements.Status == "imported" && noMeasurements.Measurements.Count == 0,
+        "CostImport_EmptyMeasurements_DoNotInventTotals");
+    using (var cancellation = new CancellationTokenSource())
+    {
+        cancellation.Cancel();
+        try
+        {
+            await Costs.ReadAsync(path, month, now, cancellation.Token);
+            throw new Exception("Import cancellation was swallowed.");
+        }
+        catch (OperationCanceledException error)
+        {
+            Check(error.CancellationToken == cancellation.Token, "CostImport_CallerCancellation_Propagates");
+        }
+    }
     await File.WriteAllTextAsync(path, "{broken");
     Check((await Costs.ReadAsync(path, month, now)).Status == "invalid", "malformed cost file explicitly invalid");
 }

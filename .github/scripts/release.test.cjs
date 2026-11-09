@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { selectRelease, metadata, verifyMetadata } = require("./release.cjs");
-const { execute } = require("./production-deployment.cjs");
+const { api, execute } = require("./production-deployment.cjs");
 
 const sha = "a".repeat(40);
 const oldSha = "b".repeat(40);
@@ -207,6 +207,104 @@ test("deployment record must exist before its in-progress status and output surv
   assert.throws(() => execute("status", ["42", "invalid", ""], env, () => {}));
 });
 
+test("deployment API sends JSON on stdin and returns the selected response value", () => {
+  let invocation;
+  const body = { ref: sha, production_environment: true };
+  const result = api("repos/test/repo/deployments", body, ".id", (...args) => {
+    invocation = args;
+    return " 42\n";
+  });
+  assert.equal(result, "42");
+  assert.deepEqual(invocation, [
+    "gh",
+    [
+      "api",
+      "--method",
+      "POST",
+      "repos/test/repo/deployments",
+      "--input",
+      "-",
+      "--jq",
+      ".id",
+    ],
+    {
+      input: JSON.stringify(body),
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "inherit"],
+    },
+  ]);
+});
+
+test("deployment API omits the jq filter when no response projection is requested", () => {
+  let command;
+  assert.equal(
+    api("repos/test/repo/deployments", { ref: sha }, undefined, (...args) => {
+      command = args[1];
+      return "created";
+    }),
+    "created",
+  );
+  assert.deepEqual(command, [
+    "api",
+    "--method",
+    "POST",
+    "repos/test/repo/deployments",
+    "--input",
+    "-",
+  ]);
+});
+
+test("deployment start rejects each malformed identity before writing or requesting", () => {
+  const valid = {
+    GITHUB_REPOSITORY: "test/repo",
+    GITHUB_SERVER_URL: "https://github.com",
+    DEPLOYMENT_SHA: sha,
+    RELEASE_VERSION: "0.1.0",
+    GITHUB_RUN_ID: "2",
+    RELEASE_ATTEMPT: "1",
+    CHANGE_TYPE: "fix",
+    DEPLOYMENT_APP: "net",
+    GITHUB_OUTPUT: "out",
+  };
+  for (const [field, value] of [
+    ["DEPLOYMENT_SHA", "invalid"],
+    ["RELEASE_VERSION", "v0.1.0"],
+    ["GITHUB_RUN_ID", "0"],
+    ["RELEASE_ATTEMPT", "0"],
+    ["CHANGE_TYPE", "other"],
+    ["DEPLOYMENT_APP", "staging"],
+  ]) {
+    let requested = false;
+    assert.throws(
+      () =>
+        execute(
+          "start",
+          [],
+          { ...valid, [field]: value },
+          () => {
+            requested = true;
+          },
+          () => {
+            requested = true;
+          },
+        ),
+      /Invalid production deployment identity/,
+      field,
+    );
+    assert.equal(requested, false, field);
+  }
+});
+
+test("deployment CLI rejects unknown actions without contacting GitHub", () => {
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "production-deployment.cjs"), "unknown"],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Unknown deployment command/);
+});
+
 test("live metadata must match version, revision and build run attempt", () => {
   const expected = metadata("0.1.0", sha, "123", "2");
   verifyMetadata(JSON.parse(JSON.stringify(expected)), expected);
@@ -223,6 +321,104 @@ test("live metadata must match version, revision and build run attempt", () => {
   assert.throws(() => metadata("v0.1.0", sha, "123", "2"));
   assert.throws(() => metadata("0.1.0", sha, "0", "2"));
   assert.throws(() => verifyMetadata(null, expected));
+});
+
+test("release CLI selects history from paginated JSON files", () => {
+  const directory = fs.mkdtempSync(path.join(process.cwd(), "release-cli-"));
+  try {
+    const tagsFile = path.join(directory, "tags.json");
+    const releasesFile = path.join(directory, "releases.json");
+    fs.writeFileSync(tagsFile, JSON.stringify([[tag("0.1.0")]]));
+    fs.writeFileSync(releasesFile, JSON.stringify([[release("0.1.0")]]));
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(__dirname, "release.cjs"),
+        "select",
+        tagsFile,
+        releasesFile,
+        "material",
+        sha,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const selected = JSON.parse(result.stdout);
+    assert.equal(selected.version, "0.1.1");
+    assert.equal(selected.releaseSha, oldSha);
+    assert.match(selected.fingerprint, /^[a-f0-9]{64}$/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("release CLI writes and verifies exact deployment metadata", () => {
+  const directory = fs.mkdtempSync(path.join(process.cwd(), "release-cli-"));
+  const metadataFile = path.join(directory, "release.json");
+  try {
+    const command = (name) =>
+      spawnSync(
+        process.execPath,
+        [
+          path.join(__dirname, "release.cjs"),
+          name,
+          metadataFile,
+          "0.1.0",
+          sha,
+          "123",
+          "2",
+        ],
+        { encoding: "utf8" },
+      );
+    const written = command("write");
+    assert.equal(written.status, 0, written.stderr);
+    assert.deepEqual(JSON.parse(fs.readFileSync(metadataFile, "utf8")), {
+      version: "0.1.0",
+      revision: sha,
+      run: "123",
+      attempt: "2",
+    });
+    const verified = command("verify");
+    assert.equal(verified.status, 0, verified.stderr);
+    fs.writeFileSync(metadataFile, JSON.stringify({ version: "0.1.1" }));
+    const stale = command("verify");
+    assert.equal(stale.status, 1);
+    assert.match(stale.stderr, /does not match this deployment/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("release CLI rejects unknown commands and malformed history JSON", () => {
+  const unknown = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "release.cjs"), "unknown"],
+    { encoding: "utf8" },
+  );
+  assert.equal(unknown.status, 1);
+  assert.match(unknown.stderr, /Unknown release command/);
+
+  const directory = fs.mkdtempSync(path.join(process.cwd(), "release-cli-"));
+  try {
+    const invalidFile = path.join(directory, "invalid.json");
+    fs.writeFileSync(invalidFile, "{");
+    const malformed = spawnSync(
+      process.execPath,
+      [
+        path.join(__dirname, "release.cjs"),
+        "select",
+        invalidFile,
+        invalidFile,
+        "material",
+        sha,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(malformed.status, 1);
+    assert.match(malformed.stderr, /JSON|Unexpected end/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("release wiring preserves isolation, serialization and publication ordering", () => {
@@ -289,7 +485,11 @@ test("publication fails before writing on stale identity, main or history", () =
   for (const [scenario, overrides, expected] of [
     ["success", {}, [true, true]],
     ["fix reuse", { CHANGE_TYPE: "fix", TEST_EXISTING: "1" }, [false, false]],
-    ["fix moved tag", { CHANGE_TYPE: "fix", TEST_EXISTING: "1", TEST_MOVED: "1" }, [false, false]],
+    [
+      "fix moved tag",
+      { CHANGE_TYPE: "fix", TEST_EXISTING: "1", TEST_MOVED: "1" },
+      [false, false],
+    ],
     ["stale site", { TEST_VERSION: "0.0.9" }, [false, false]],
     ["stale main", { TEST_MAIN: oldSha }, [false, false]],
     ["changed history", { TEST_HISTORY: "1" }, [false, false]],
