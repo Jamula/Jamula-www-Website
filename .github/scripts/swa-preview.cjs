@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const BUILD_PATH = ".github/workflows/azure-static-web-apps.yml";
-const SHA_PATTERN = /^[a-f0-9]{40}$/;
+const SHA_PATTERN = /^[a-f0-9]{40}(?![\s\S])/;
 
 async function selectPreview(github, repo, run) {
   const repository = `${repo.owner}/${repo.repo}`;
@@ -138,4 +138,29 @@ function writePreviewEvent(selection, repository, destination) {
   );
 }
 
-module.exports = { selectPreview, writePreviewEvent };
+function previewEnvironment(selection, repository) {
+  const { pr, sha, action } = selection;
+  if (
+    !["upload", "close"].includes(action) ||
+    !Number.isSafeInteger(pr?.number) ||
+    pr.number <= 0 ||
+    String(pr.number).length > 16 ||
+    !SHA_PATTERN.test(sha ?? "") ||
+    pr.head?.sha !== sha ||
+    pr.head?.repo?.full_name !== repository ||
+    pr.base?.repo?.full_name !== repository ||
+    pr.base?.ref !== "main" ||
+    !SHA_PATTERN.test(pr.base?.sha ?? "") ||
+    !pr.head?.ref ||
+    pr.head.ref === "main" ||
+    !["open", "closed"].includes(pr.state) ||
+    (action === "upload" && pr.state !== "open")
+  ) {
+    throw new Error(
+      "A valid current same-repository PR is required for a non-production environment.",
+    );
+  }
+  return String(pr.number);
+}
+
+module.exports = { selectPreview, writePreviewEvent, previewEnvironment };

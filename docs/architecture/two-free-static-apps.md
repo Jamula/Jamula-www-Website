@@ -11,7 +11,36 @@ and response behavior independently before claiming operational success.
 
 The production workflow builds one artifact and deploys it to both apps. Pull request previews remain on the original .net app only. Deployment jobs use the `swa-deployment` GitHub environment, restricted to the `main` branch. The .net token is environment secret `SWA_NET_DEPLOYMENT_TOKEN`; the .com token is `SWA_COM_DEPLOYMENT_TOKEN`. Never commit their values.
 
-PR builds in `azure-static-web-apps.yml` do not deploy or consume deployment secrets, including for Dependabot. Production jobs require a `workflow_dispatch` event on `refs/heads/main`, latest-main SHA checks, and the main-only deployment environment; pushes do not deploy; a PR cannot unlock that environment by editing a job condition. `azure-static-web-apps-preview.yml` runs from the default branch after a successful build and uses the same restricted environment. It resolves the current same-repository PR, checks the workflow identity and head SHA, verifies the artifact's GitHub SHA-256 digest, rejects unsafe archive entries, and requires `staticwebapp.config.json` to match the trusted default branch. It never installs dependencies or executes PR scripts. A trusted PR event passed to the pinned Azure action selects the numbered PR environment; the returned URL must match that environment before live verification. Closed PRs and PRs with no remaining deployable changes remove their previews through this same trusted workflow.
+PR builds in `azure-static-web-apps.yml` do not deploy or consume deployment secrets, including for Dependabot. Production jobs require a `workflow_dispatch` event on `refs/heads/main`, latest-main SHA checks, and the main-only deployment environment; pushes do not deploy; a PR cannot unlock that environment by editing a job condition. `azure-static-web-apps-preview.yml` runs from the default branch after a successful build and uses the same restricted environment. It resolves the current same-repository PR, checks the workflow identity and head SHA, verifies the artifact's GitHub SHA-256 digest, rejects unsafe archive entries, and requires `staticwebapp.config.json` to match the trusted default branch. It never installs dependencies or executes PR scripts. The current PR is rechecked immediately before deployment; a validated positive numeric PR number is passed as the explicit `deployment_environment` input to the pinned Azure action for both upload and close. The returned URL must match that exact numbered environment before live verification. Closed PRs and PRs with no remaining deployable changes select cleanup through this same trusted workflow.
+
+### Preview routing guardrail
+
+The previous preview workflow attempted to override `GITHUB_EVENT_NAME`,
+`GITHUB_REF`, and related variables with a synthesized PR event. The GitHub
+runner's Docker handler writes runtime GitHub context over step environment
+values before launching the container. The action therefore received
+`workflow_run` on `main`, explaining why it returned the production URL despite
+the generated PR event file. This is a routing failure, not transient readiness,
+and must not be retried.
+
+Preview deployment now uses the supported named-environment contract: the
+environment name is exactly the validated PR number, preserving the numbered
+hostname. The preview action is pinned to
+`4d27395796ac319302594769cfe812bd207490b1`, whose manifest declares
+`deployment_environment`, unlike the old `v1` tag commit. Production action pins
+and production release gates are unchanged. This explicitly selects a numbered
+named preview rather than relying on automatic PR-event inference. Both upload
+and cleanup receive the same environment; reject invalid metadata before
+artifact download and revalidate it before exposing the deployment token.
+No fallback to production, empty environment, or broad workflow retry is allowed.
+
+Official sources verified on 2026-11-08:
+[runner Docker context handling](https://github.com/actions/runner/blob/main/src/Runner.Worker/Handlers/ContainerActionHandler.cs),
+[pinned Azure action inputs](https://github.com/Azure/static-web-apps-deploy/blob/4d27395796ac319302594769cfe812bd207490b1/action.yml),
+and [Azure named preview environments](https://learn.microsoft.com/azure/static-web-apps/named-environments).
+Named-environment upload/close behavior, including cleanup of existing
+PR-inferred environments, still needs an authorized exact-revision live run.
+Offline tests establish selection and request contracts, not Azure operations.
 
 ## Release operations
 
@@ -113,6 +142,20 @@ verify repository settings before asserting migration completion.
 
 Validate the boundary with `node --test .github/scripts/swa-preview.test.cjs`
 and `python -m unittest discover -s scripts -p test_preview_artifact.py`.
+
+Node.js live preview verification retries only timeouts, temporary DNS failures,
+connection resets/refusals, and HTTP 429/500/502/503/504 responses. Each of the
+home, robots, and missing-route probes allows six attempts with delays of
+2, 4, 8, 16, and 30 seconds (60 seconds of total backoff per probe); each request
+uses a 20-second deadline covering connection and response reading. Authentication failures, redirects, permanent
+DNS/TLS failures, unexpected statuses, and deterministic content/header failures
+fail immediately. The missing-route probe accepts only the expected 404 body.
+Retries are read-only verification requests, never deployment uploads or workflow
+reruns. The exact selected-PR URL check still runs before any network verification;
+a production URL or wrong PR identity must never be treated as a readiness issue.
+Run `node --test .github/scripts/verify-preview.test.cjs` for the
+focused retry checks.
+
 These tests do not establish live deployment or cleanup behavior. For that,
 inspect successful Actions runs for the exact default-branch workflow revision
 and verify the numbered preview URL, noindex/security headers, artifact digest,

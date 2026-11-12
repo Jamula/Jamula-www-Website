@@ -5,7 +5,11 @@ const path = require("node:path");
 const { test } = require("node:test");
 const { spawnSync } = require("node:child_process");
 const vm = require("node:vm");
-const { selectPreview, writePreviewEvent } = require("./swa-preview.cjs");
+const {
+  selectPreview,
+  writePreviewEvent,
+  previewEnvironment,
+} = require("./swa-preview.cjs");
 const { assertConfiguredCsp } = require("./verify-swa-csp.cjs");
 
 function fixture() {
@@ -25,7 +29,7 @@ function fixture() {
     number: 74,
     state: "open",
     head: { sha: run.head_sha, ref: run.head_branch, repo: repository },
-    base: { ref: "main", repo: repository },
+    base: { ref: "main", sha: "b".repeat(40), repo: repository },
   };
   const files = [{ filename: "www/package-lock.json" }];
   const artifacts = [
@@ -199,6 +203,209 @@ test("deployment event always identifies the selected PR, not main", async () =>
   } finally {
     fs.rmSync(path.join(directory, "event.json"), { force: true });
     fs.rmdirSync(directory);
+  }
+});
+
+test("selects a numbered non-production environment for upload and cleanup", async () => {
+  for (const state of ["open", "closed"]) {
+    const f = fixture();
+    f.pr.state = state;
+    const selection = await selectPreview(f.github, f.repo, f.run);
+    assert.equal(
+      previewEnvironment(selection, "Jamula/Jamula-www-Website"),
+      "74",
+    );
+  }
+  const f = fixture();
+  f.files.length = 0;
+  const selection = await selectPreview(f.github, f.repo, f.run);
+  assert.equal(selection.action, "close");
+  assert.equal(
+    previewEnvironment(selection, "Jamula/Jamula-www-Website"),
+    "74",
+  );
+});
+
+test("rejects invalid or production-like target metadata before upload", () => {
+  const mutations = [
+    (selection) => {
+      selection.action = "skip";
+    },
+    (selection) => {
+      selection.pr.number = 0;
+    },
+    (selection) => {
+      selection.pr.number = -1;
+    },
+    (selection) => {
+      selection.pr.number = "74";
+    },
+    (selection) => {
+      selection.pr.number = Number.MAX_SAFE_INTEGER + 1;
+    },
+    (selection) => {
+      selection.sha = "invalid";
+    },
+    (selection) => {
+      selection.sha += "\n";
+      selection.pr.head.sha = selection.sha;
+    },
+    (selection) => {
+      selection.pr.head.sha = "c".repeat(40);
+    },
+    (selection) => {
+      selection.pr.head.repo.full_name = "fork/site";
+    },
+    (selection) => {
+      selection.pr.base.repo.full_name = "fork/site";
+    },
+    (selection) => {
+      selection.pr.base.ref = "other";
+    },
+    (selection) => {
+      selection.pr.base.sha = "";
+    },
+    (selection) => {
+      selection.pr.head.ref = "main";
+    },
+    (selection) => {
+      selection.pr.head.ref = "";
+    },
+    (selection) => {
+      selection.pr.state = "closed";
+    },
+  ];
+  for (const mutate of mutations) {
+    const f = fixture();
+    const selection = structuredClone({
+      action: "upload",
+      pr: f.pr,
+      sha: f.run.head_sha,
+    });
+    mutate(selection);
+    assert.throws(
+      () => previewEnvironment(selection, "Jamula/Jamula-www-Website"),
+      /valid current same-repository PR/,
+    );
+  }
+  const f = fixture();
+  f.pr.number = Number.MAX_SAFE_INTEGER;
+  assert.equal(
+    previewEnvironment(
+      { action: "upload", pr: f.pr, sha: f.run.head_sha },
+      "Jamula/Jamula-www-Website",
+    ),
+    String(Number.MAX_SAFE_INTEGER),
+  );
+});
+
+test("workflow routes both operations through the validated explicit environment input", () => {
+  const workflow = fs
+    .readFileSync(
+      path.join(__dirname, "../workflows/azure-static-web-apps-preview.yml"),
+      "utf8",
+    )
+    .replace(/\r\n/g, "\n");
+  const deployment = workflow
+    .split("      - name: Deploy or close selected PR preview")[1]
+    .split("      - name: Verify isolated live preview")[0];
+  assert.match(
+    deployment,
+    /Azure\/static-web-apps-deploy@4d27395796ac319302594769cfe812bd207490b1/,
+  );
+  assert.match(
+    deployment,
+    /deployment_environment: \$\{\{ steps\.current\.outputs\.environment \}\}/,
+  );
+  assert.match(deployment, /production_branch: main/);
+  assert.match(deployment, /action: \$\{\{ steps\.gate\.outputs\.action \}\}/);
+  assert.match(deployment, /if: steps\.current\.outputs\.deploy == 'true'/);
+  assert.doesNotMatch(
+    deployment,
+    /GITHUB_(EVENT_NAME|EVENT_PATH|REF|HEAD_REF|BASE_REF|SHA):/,
+  );
+  assert.ok(
+    workflow.indexOf("previewEnvironment(selection") <
+      workflow.indexOf("downloadArtifact"),
+  );
+  assert.ok(
+    workflow.indexOf('core.setOutput("environment", previewEnvironment') <
+      workflow.indexOf("Require trusted deployment token"),
+  );
+  assert.match(workflow, /pr\.head\.ref === saved\.pull_request\.head\.ref/);
+  assert.match(workflow, /\$\{DEPLOYED_URL%\/\}" != "\$expected/);
+});
+
+test("last-minute PR recheck withholds deployment for every changed identity surface", async () => {
+  const workflow = fs
+    .readFileSync(
+      path.join(__dirname, "../workflows/azure-static-web-apps-preview.yml"),
+      "utf8",
+    )
+    .replace(/\r\n/g, "\n");
+  const block = workflow
+    .split("      - name: Recheck current PR before deployment")[1]
+    .split("      - name: Require trusted deployment token")[0];
+  const script = block
+    .split("          script: |\n")[1]
+    .replace(/^            /gm, "")
+    .replace("${{ steps.gate.outputs.action }}", "upload");
+  const mutations = [
+    null,
+    (pr) => {
+      pr.number += 1;
+    },
+    (pr) => {
+      pr.head.sha = "c".repeat(40);
+    },
+    (pr) => {
+      pr.head.ref = "changed";
+    },
+    (pr) => {
+      pr.head.repo.full_name = "fork/site";
+    },
+    (pr) => {
+      pr.base.repo.full_name = "fork/site";
+    },
+    (pr) => {
+      pr.base.ref = "other";
+    },
+    (pr) => {
+      pr.base.sha = "c".repeat(40);
+    },
+    (pr) => {
+      pr.state = "closed";
+    },
+  ];
+  for (const mutate of mutations) {
+    const f = fixture();
+    const saved = structuredClone({ number: f.pr.number, pull_request: f.pr });
+    if (mutate) mutate(f.pr);
+    const outputs = {};
+    const context = {
+      repo: f.repo,
+      payload: {},
+    };
+    const core = {
+      setOutput: (name, value) => {
+        outputs[name] = value;
+      },
+      summary: { addRaw: () => ({ write: async () => {} }) },
+    };
+    await vm.runInNewContext(`(async () => { ${script} })()`, {
+      github: f.github,
+      context,
+      core,
+      require: (name) => {
+        if (name === "node:fs") {
+          return { readFileSync: () => JSON.stringify(saved) };
+        }
+        assert.equal(name, "./trusted/.github/scripts/swa-preview.cjs");
+        return { previewEnvironment };
+      },
+    });
+    assert.equal(outputs.deploy, mutate === null);
+    assert.equal(outputs.environment, mutate === null ? "74" : undefined);
   }
 });
 

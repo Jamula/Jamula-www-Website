@@ -43,6 +43,8 @@ jobs:
         run: python scripts/validate_governance.py
       - name: Test trusted preview selection
         run: node --test .github/scripts/swa-preview.test.cjs
+      - name: Test live preview verification and bounded retries
+        run: node --test .github/scripts/verify-preview.test.cjs
       - name: Test release versioning and deployment boundary
         run: node --test .github/scripts/release.test.cjs
       - name: Test preview artifact boundary
