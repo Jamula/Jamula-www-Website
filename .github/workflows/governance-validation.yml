@@ -9,8 +9,9 @@ on:
       - ".vscode/**"
       - ".github/**"
       - "docs/**"
-      - "scripts/validate_governance.py"
-      - "scripts/*preview*.py"
+      - "scripts/validation/**"
+      - "scripts/validation.tests/**"
+      - "scripts/validation.cli.tests/**"
       - "LICENSE*"
       - "TRADEMARKS.md"
       - "CONTRIBUTING.md"
@@ -23,8 +24,9 @@ on:
       - ".vscode/**"
       - ".github/**"
       - "docs/**"
-      - "scripts/validate_governance.py"
-      - "scripts/*preview*.py"
+      - "scripts/validation/**"
+      - "scripts/validation.tests/**"
+      - "scripts/validation.cli.tests/**"
       - "LICENSE*"
       - "TRADEMARKS.md"
       - "CONTRIBUTING.md"
@@ -39,8 +41,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: scripts/validation/global.json
       - name: Validate governance files
-        run: python scripts/validate_governance.py
+        working-directory: scripts/validation
+        run: dotnet run --configuration Release -- validate-governance ../..
       - name: Test trusted preview selection
         run: node --test .github/scripts/swa-preview.test.cjs
       - name: Test live preview verification and bounded retries
@@ -48,4 +55,8 @@ jobs:
       - name: Test release versioning and deployment boundary
         run: node --test .github/scripts/release.test.cjs
       - name: Test preview artifact boundary
-        run: python -m unittest discover -s scripts -p 'test_preview*.py'
+        working-directory: scripts/validation
+        run: dotnet run --project ../validation.tests/JamulaValidation.Tests.csproj --configuration Release
+      - name: Test validation CLI happy and error paths
+        working-directory: scripts/validation
+        run: dotnet run --project ../validation.cli.tests/JamulaValidation.Cli.Tests.csproj --configuration Release

@@ -12,6 +12,7 @@
     "build": "astro check && astro build",
     "preview": "astro preview",
     "check": "astro check",
+    "coverage:astro-config": "node scripts/collect-astro-config-coverage.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -22,10 +23,12 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
     "@typescript/native": "npm:typescript@^7.0.2",
+    "c8": "9.1.0",
     "parse5": "^8.1.0",
     "postcss": "^8.5.32",
     "prettier": "^3.9.10",
     "prettier-plugin-astro": "^1.1.2",
+    "saxes": "6.0.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
   "allowScripts": {

@@ -69,8 +69,8 @@ npm run build
 For documentation/governance changes, run from the repository root:
 
 ```sh
-python scripts/validate_governance.py
+dotnet run --project scripts/validation --configuration Release -- validate-governance .
 node --test .github/scripts/swa-preview.test.cjs
 node --test .github/scripts/release.test.cjs
-python -m unittest discover -s scripts -p 'test_preview*.py'
+dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release
 ```

@@ -12,6 +12,13 @@ remain separate feasibility and approval gates. No new paid service, automatic
 billable overflow, or provider-specific deployment mechanism is authorized by
 this proposal.
 
+The offline [artifact/process experiment](../../scripts/spikes/sidequest-artifacts/README.md)
+exercises one-section publishing by default and an explicit all-sections local
+demonstration. Its separately built versioned directories and byte snapshots
+are mechanism evidence only; they do **not** implement this production contract's
+descriptors, reviewed-source binding, compatibility/fencing or authorized release
+controls. Independent Data review is still required.
+
 ## Release identities
 
 Each independently versioned component must publish an immutable artifact and
