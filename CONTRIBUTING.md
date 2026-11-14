@@ -79,7 +79,8 @@ Third-party and reserved-content paths in `LICENSE_SCOPE.md` require maintainer 
   `node --test .github/scripts/swa-preview.test.cjs`, and
   `dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release`.
 - For live preview verification changes, also run
-  `node --test .github/scripts/verify-preview.test.cjs`.
+  `node --test .github/scripts/verify-preview.test.cjs`. The live verifier uses
+  Node.js; the .NET checks cover archive validation.
 - For changes under `www/`, run `npm ci`, `npm run check`, and `npm run build`
   from `www/`; CI also checks formatting on changed website files.
 - Pass the required review and workflow checks for the files changed.
