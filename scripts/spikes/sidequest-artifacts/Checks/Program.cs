@@ -44,6 +44,20 @@ internal sealed class Fixture(string root, bool coverage) : IAsyncDisposable
 
     public async Task RunAsync(bool collective)
     {
+        await Case("CleanupFailureDetailsAreRetained", () =>
+        {
+            var first = new TimeoutException("first cleanup failure");
+            var second = new IOException("second cleanup failure");
+            InvalidOperationException? reported = null;
+            try { ThrowIfCleanupFailed([first, second]); }
+            catch (InvalidOperationException error) { reported = error; }
+            Require(reported is
+                { Message: "Bounded child cleanup failed.", InnerException: AggregateException aggregate } &&
+                aggregate.InnerExceptions.Count == 2 &&
+                ReferenceEquals(aggregate.InnerExceptions[0], first) &&
+                ReferenceEquals(aggregate.InnerExceptions[1], second));
+            return Task.CompletedTask;
+        });
         if (collective)
         {
             await Case("CollectivePublishesAndDeploysExactAllSectionSet", async () =>
@@ -252,7 +266,7 @@ internal sealed class Fixture(string root, bool coverage) : IAsyncDisposable
                     endpoint.Port == port && endpoint.Address.Equals(IPAddress.Loopback)));
             }
         });
-        Require(passed == (collective ? 2 : 19));
+        Require(passed == (collective ? 3 : 20));
         Console.WriteLine($"{passed} local artifact checks passed; 0 skipped; 0 failed.");
     }
 
@@ -349,6 +363,12 @@ internal sealed class Fixture(string root, bool coverage) : IAsyncDisposable
     {
         if (!condition) throw new InvalidOperationException("Local check failed.");
     }
+    private static void ThrowIfCleanupFailed(IReadOnlyCollection<Exception> failures)
+    {
+        if (failures.Count != 0)
+            throw new InvalidOperationException("Bounded child cleanup failed.",
+                new AggregateException(failures));
+    }
     private static async Task ExpectFailureAsync(Func<Task> action)
     {
         try { await action(); }
@@ -370,8 +390,7 @@ internal sealed class Fixture(string root, bool coverage) : IAsyncDisposable
         }
         client.Dispose();
         if (Directory.Exists(releases)) Directory.Delete(releases, recursive: true);
-        if (failures.Count != 0)
-            throw new InvalidOperationException("Bounded child cleanup failed.");
+        ThrowIfCleanupFailed(failures);
     }
 }
 

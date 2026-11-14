@@ -181,7 +181,8 @@ internal static class MbrIntegrationTests
                     return Task.CompletedTask;
                 }, raceCaller.Token, callerCancelled ? executionTimeout : TimeSpan.Zero, cleanupTimeout);
             }
-            catch (Exception ex) { observedRaceFailure = ex; }
+            catch (OperationCanceledException ex) { observedRaceFailure = ex; }
+            catch (IOException ex) { observedRaceFailure = ex; }
 
             var preservedCallerCancellation = observedRaceFailure is OperationCanceledException
                 { CancellationToken: var token } && token == raceCaller.Token;
@@ -212,7 +213,7 @@ internal static class MbrIntegrationTests
                 return Task.CompletedTask;
             }, CancellationToken.None, executionTimeout, cleanupTimeout);
         }
-        catch (Exception ex) { observedReadFailure = ex; }
+        catch (IOException ex) { observedReadFailure = ex; }
         check(ReferenceEquals(observedReadFailure, readFailure) && killed && exited && !waited,
             "GitHubCleanup_KillRacePreservesReadFailureAfterConfirmedExit");
 
@@ -266,11 +267,12 @@ internal static class MbrIntegrationTests
             {
                 neverExited.TrySetResult();
             }
-            var originalPreserved = callerCancelled
-                ? ReferenceEquals(observed?.InnerExceptions[0], cancellation)
-                : observed?.InnerExceptions[0] is IOException
-                    { Message: "GitHub read timed out.", InnerException: OperationCanceledException };
-            check(observed?.InnerExceptions.Count == 2 && originalPreserved &&
+            var originalPreserved = observed is { InnerExceptions.Count: > 0 } &&
+                (callerCancelled
+                    ? ReferenceEquals(observed.InnerExceptions[0], cancellation)
+                    : observed.InnerExceptions[0] is IOException
+                        { Message: "GitHub read timed out.", InnerException: OperationCanceledException });
+            check(observed is { InnerExceptions.Count: 2 } && originalPreserved &&
                 observed.InnerExceptions[1] is TimeoutException
                     { InnerException: OperationCanceledException } &&
                 killed && waitToken.IsCancellationRequested && waitToken != caller.Token &&
@@ -301,7 +303,7 @@ internal static class MbrIntegrationTests
                     }, CancellationToken.None, executionTimeout, cleanupTimeout);
             }
             catch (AggregateException ex) { observed = ex; }
-            check(observed?.InnerExceptions.Count == 2 &&
+            check(observed is { InnerExceptions.Count: 2 } &&
                 ReferenceEquals(observed.InnerExceptions[0], original) &&
                 (stage == "Confirmation"
                     ? observed.InnerExceptions[1] is IOException
@@ -569,7 +571,7 @@ internal static class MbrIntegrationTests
             await WithCleanupAsync(() => Task.FromException(original), () => Task.FromException(cleanup));
         }
         catch (AggregateException ex) { observed = ex; }
-        check(observed?.InnerExceptions.Count == 2 &&
+        check(observed is { InnerExceptions.Count: 2 } &&
             ReferenceEquals(observed.InnerExceptions[0], original) &&
             ReferenceEquals(observed.InnerExceptions[1], cleanup),
             "MbrFixture_CleanupFailurePreservesOriginalFailure");
