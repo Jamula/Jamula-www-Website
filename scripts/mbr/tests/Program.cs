@@ -547,18 +547,18 @@ Check(reopenedCompleted.Active!.Select(x => x.Number).SequenceEqual([71]) &&
     reopenedCompleted.OtherClosed!.Count == 0,
     "Metrics_ReopenedCompletedIssue_IsActiveButNotDelivered");
 
-var wrongRowProduct = System.Text.Json.Nodes.JsonNode.Parse(Billing())!;
-wrongRowProduct["usageItems"]![1]!["product"] = "Copilot";
+var collectedWrongRowProduct = System.Text.Json.Nodes.JsonNode.Parse(Billing())!;
+collectedWrongRowProduct["usageItems"]![1]!["product"] = "Copilot";
 var unverifiedRow = await Costs.CollectAsync(emptyCosts, month, now,
-    read: _ => Task.FromResult(wrongRowProduct.ToJsonString()));
+    read: _ => Task.FromResult(collectedWrongRowProduct.ToJsonString()));
 Check(unverifiedRow.ActionsStatus == "unavailable" && unverifiedRow.Status == "unknown" &&
     unverifiedRow.Measurements.Count == 0,
     "Actions_WrongRowProduct_RejectsEntireBillingSummary");
 
-var wrongQuantityType = System.Text.Json.Nodes.JsonNode.Parse(Billing())!;
-wrongQuantityType["usageItems"]![1]!["netQuantity"] = "private fixture detail";
+var collectedWrongQuantityType = System.Text.Json.Nodes.JsonNode.Parse(Billing())!;
+collectedWrongQuantityType["usageItems"]![1]!["netQuantity"] = "private fixture detail";
 var invalidQuantity = await Costs.CollectAsync(emptyCosts, month, now,
-    read: _ => Task.FromResult(wrongQuantityType.ToJsonString()));
+    read: _ => Task.FromResult(collectedWrongQuantityType.ToJsonString()));
 Check(invalidQuantity.ActionsStatus == "unavailable" && invalidQuantity.Measurements.Count == 0 &&
     !invalidQuantity.ActionsDetail!.Contains("private fixture detail", StringComparison.Ordinal),
     "Actions_WrongQuantityType_IsUnavailableAndSanitized");
