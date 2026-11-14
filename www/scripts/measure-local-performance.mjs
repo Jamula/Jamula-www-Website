@@ -7,6 +7,29 @@ import { pathToFileURL } from "node:url";
 
 const DEFAULT_BROWSER_EXIT_TIMEOUT_MS = 5000;
 
+export function listenMeasurementServer(server, port = 0) {
+  return new Promise((resolveListen, rejectListen) => {
+    let completed = false;
+    const finish = (error) => {
+      if (completed) return;
+      completed = true;
+      server.removeListener("error", onError);
+      server.removeListener("listening", onListening);
+      error ? rejectListen(error) : resolveListen();
+    };
+    const onError = (error) => finish(error);
+    const onListening = () => finish();
+
+    server.once("error", onError);
+    server.once("listening", onListening);
+    try {
+      server.listen(port, "127.0.0.1");
+    } catch (error) {
+      finish(error);
+    }
+  });
+}
+
 function browserHasExited(browser) {
   return (
     (browser.exitCode !== null && browser.exitCode !== undefined) ||
@@ -89,11 +112,9 @@ export async function cleanupMeasurementResources(
   let browserExited = !browser || browserHasExited(browser);
 
   if (browser && !browserExited) {
+    let killReturnedFalse = false;
     try {
-      const killSucceeded = browser.kill();
-      if (!killSucceeded && !browserHasExited(browser)) {
-        errors.push(new Error("Browser child kill() returned false before exit was confirmed."));
-      }
+      killReturnedFalse = !browser.kill();
     } catch (error) {
       errors.push(new Error("Browser child kill() failed.", { cause: error }));
     }
@@ -102,8 +123,11 @@ export async function cleanupMeasurementResources(
       await waitForBrowserExit(browser, exitTimeoutMs, timers);
       browserExited = true;
     } catch (error) {
-      errors.push(error);
       browserExited = browserHasExited(browser);
+      if (killReturnedFalse && !browserExited) {
+        errors.push(new Error("Browser child kill() returned false before exit was confirmed."));
+      }
+      errors.push(error);
     }
   }
 
@@ -200,7 +224,7 @@ export async function runMeasurement() {
       }
     });
     resources.server = server;
-    await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+    await listenMeasurementServer(server);
     const port = server.address().port;
     const edge =
       process.env.EDGE_PATH || "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
