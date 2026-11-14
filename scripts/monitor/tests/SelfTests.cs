@@ -481,24 +481,55 @@ static class SelfTests
         {
             using var cts = new CancellationTokenSource();
             var requests = new List<Uri>();
+            var requestStarted = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var pendingResponse = new TaskCompletionSource<HttpResponseMessage>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            bool handlerObservedCancellation = false;
+            bool completedWithinBudget = false;
             ScenarioHttpMessageHandler? handler = null;
-            var result = await CaptureMonitorRunAsync(() => Monitor.RunAsync(
+            var run = CaptureMonitorRunAsync(() => Monitor.RunAsync(
                 cts.Token,
                 (_, _, _) => Task.FromResult(new[] { IPAddress.Parse(Config.ApprovedIp) }),
-                () => handler = new ScenarioHttpMessageHandler(request =>
+                () => handler = new ScenarioHttpMessageHandler(async (request, token) =>
                 {
                     Uri uri = request.RequestUri!;
                     requests.Add(uri);
                     if (requests.Count == canceledRequestIndex + 1)
                     {
-                        cts.Cancel();
-                        throw new TaskCanceledException("fixture global cancellation");
+                        using var registration = token.Register(() =>
+                        {
+                            handlerObservedCancellation = true;
+                            pendingResponse.TrySetCanceled(token);
+                        });
+                        requestStarted.SetResult();
+                        return await pendingResponse.Task;
                     }
                     return DefaultResponse(uri, uri.Host);
                 })));
 
+            (int? ExitCode, bool WasCanceled) result = default;
+            try
+            {
+                await requestStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+                cts.Cancel();
+                result = await run.WaitAsync(TimeSpan.FromSeconds(2));
+                completedWithinBudget = true;
+            }
+            catch (TimeoutException)
+            {
+                // The cleanup below drains a request whose token was not propagated.
+            }
+            finally
+            {
+                cts.Cancel();
+                pendingResponse.TrySetCanceled();
+                await run.WaitAsync(TimeSpan.FromSeconds(2));
+            }
+
             assert(name,
-                result.WasCanceled && result.ExitCode is null
+                completedWithinBudget && handlerObservedCancellation
+                && result.WasCanceled && result.ExitCode is null
                 && cts.IsCancellationRequested
                 && requests.Select(uri => uri.AbsoluteUri)
                     .SequenceEqual(expectedRequests.Take(canceledRequestIndex + 1))
@@ -644,15 +675,21 @@ static class SelfTests
     }
 }
 
-sealed class ScenarioHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
+sealed class ScenarioHttpMessageHandler(
+    Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responseFactory)
     : HttpMessageHandler
 {
+    public ScenarioHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
+        : this((request, _) => Task.FromResult(responseFactory(request)))
+    {
+    }
+
     public int DisposeCount { get; private set; }
 
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken) =>
-        Task.FromResult(responseFactory(request));
+        responseFactory(request, cancellationToken);
 
     protected override void Dispose(bool disposing)
     {
