@@ -264,8 +264,15 @@ No fixtures write to GitHub or load live billing.
 The Windows integration fixtures use a private copied `gh.exe`, per-provider
 gate markers, and loopback-only web hosts. Each web host owns a Windows job
 attached before requests begin; teardown waits for the job's entire process tree
-to exit before deleting fixture files. Cancellation waits for the owned provider,
-and assertion failures release and settle pending refreshes. A cleanup failure
+to exit before deleting fixture files, with a 15-second job deadline and bounded
+parent-exit waits. Collector cancellation and the two-minute execution timeout
+allow at most 15 seconds to confirm the owned provider's exit after a tree kill.
+An unconfirmed exit or cleanup error is explicit; if collection also failed,
+both errors are retained in an aggregate (including caller cancellation).
+Successful cleanup preserves caller cancellation unchanged. Deterministic
+in-process tests confirm a kill exception is ignored only after exit is confirmed;
+non-exit and termination/wait failures remain explicit without networking.
+Assertion failures release and settle pending refreshes. A cleanup failure
 reports both the original failure and the cleanup error. These checks can run
 alongside the offline Node suites without shared fixture directories.
 
