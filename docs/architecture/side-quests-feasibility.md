@@ -44,6 +44,17 @@ test any public Azure routing mechanism. The issue's cloud/deployment
 experiment is not authorized by this task, so official documentation and the
 local spike are not substituted for that evidence.
 
+Additional local evidence dated **2026-11-13**, pending independent Data review:
+the offline [artifact/process experiment](../../scripts/spikes/sidequest-artifacts/README.md)
+now checks separately published .NET Admin, Finance and Tech artifacts behind a
+separate loopback routing process, Finance-only replacement with unchanged
+other hosts/artifacts, failure isolation, and an explicit bounded collective
+build/start/probe/stop of that local set. It preserves the original seven
+in-process checks. This is local release-mechanism evidence requiring independent
+Data review, not an approved hosting topology or a collective deployment of the
+public website. Production hosting, identity and AI blockers above remain
+unchanged; no provider is chosen or remote deployment performed.
+
 ## Candidate comparison
 
 | Candidate | Documented capabilities | Fit to hard requirements | Disposition |

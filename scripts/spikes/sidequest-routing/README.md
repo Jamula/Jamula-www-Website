@@ -21,3 +21,8 @@ preview isolation, MCP transport, inference, production quotas, availability,
 cost, or a supported deployment topology. Passing this fixture does not clear
 the feasibility gate in
 [`docs/architecture/side-quests-feasibility.md`](../../../docs/architecture/side-quests-feasibility.md).
+
+For separate local published artifacts and OS processes, see the additional
+[`sidequest-artifacts` experiment](../sidequest-artifacts/README.md). Its
+independent-default and explicit collective checks do not replace these seven
+checks or clear the production feasibility gate.
