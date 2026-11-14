@@ -4,13 +4,9 @@
   "components": [
     {
       "id": "website-browser",
-      "reports": ["website/cobertura-coverage.xml"],
-      "sources": ["www/public/analytics-consent.js"],
+      "reports": ["website/cobertura-coverage.xml", "astro-config/cobertura-coverage.xml"],
+      "sources": ["www/public/analytics-consent.js", "www/astro.config.ts"],
       "unmeasured": [
-        {
-          "path": "www/astro.config.ts",
-          "reason": "Build configuration executes during Astro builds but has no line/branch source-map report."
-        },
         {
           "path": "www/src/components/AnalyticsConsent.astro",
           "reason": "Astro build-time template code has no line/branch source-map report."
@@ -245,8 +241,16 @@
       "reason": "Offline fixture runner, not the migrated validation utility."
     },
     {
+      "path": "www/scripts/collect-astro-config-coverage.mjs",
+      "reason": "Coverage collection support runner, not shipped website behavior."
+    },
+    {
       "path": "www/scripts/test_built_site.mjs",
       "reason": "Built-site test/support runner, not shipped browser code."
+    },
+    {
+      "path": "www/tests/astro-config.test.mjs",
+      "reason": "Test-only source; its assertions are not product behavior."
     },
     {
       "path": "www/tests/homepage-contact.test.mjs",
