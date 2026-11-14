@@ -58,6 +58,12 @@ attribute names so exactly one friend—the actual test assembly—is granted
 internal access, while `Monitor` remains non-public. Run both this command and
 `node scripts\coverage\gate.test.mjs` when changing this classification.
 
+The local Edge-based performance diagnostic at
+`www/scripts/measure-local-performance.mjs` is a runnable first-party source,
+not test support. It is explicitly listed as unmeasured under `website-browser`
+until a line/branch report exists; the inventory completeness test prevents
+reclassifying it as a test-only exclusion.
+
 ## Collecting reports
 
 From the repository root in PowerShell, create isolated report directories:

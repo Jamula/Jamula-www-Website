@@ -205,6 +205,40 @@ every sample. Those browser Resource Timing estimates include per-resource
 header estimates and the favicon, and are not an encoded production transfer
 budget assessment.
 
+### Bounded-cleanup recheck — 2026-11-13
+
+The local lab runner's lifecycle and inventory changes were rechecked in a
+working tree based on rejected artifact commit `c0bb036`; these commands did
+not access production or an external measurement service:
+
+```powershell
+npm --prefix www run build
+# passed: 18 files checked, 0 errors, 0 warnings, 0 hints; 3 static pages built
+node --test www\tests\*.test.mjs
+# passed: 68 tests, 0 failures, 0 skipped
+node --test scripts\coverage\gate.test.mjs
+# passed: 29 tests, 0 failures, 0 skipped
+node --test www\tests\measure-local-performance.test.mjs
+# passed: 5 tests, 0 failures, 0 skipped
+Push-Location www
+node scripts\measure-local-performance.mjs
+Pop-Location
+# passed: 30 samples (5 for each of 6 route/viewport cells); 0 non-loopback requests observed
+```
+
+The harness still uses the same Edge/CDP collection, routes, desktop and
+mobile-emulated viewports, cache/service-worker settings, five cold contexts
+per cell, three-second post-load observation and LCP/FCP/TTFB/CLS extraction
+described above. Browser shutdown now waits at most five seconds for the
+specific child process; server shutdown has a five-second deadline and
+destroys only that measurement server's connections if its close is not
+confirmed. Cleanup failures are surfaced, the operational error remains first
+in any combined failure, and a profile is retained unless browser exit is
+confirmed. This recheck validates the harness execution, not field performance
+or a coverage percentage. The harness remains explicitly **unmeasured** in
+`scripts/coverage/inventory.json`, so the website and overall coverage gates
+remain blocked.
+
 INP was not measured: an idle synthetic visit without representative
 interactions cannot produce field INP. Total Blocking Time and long tasks were
 not measured. LCP can change after the three-second observation and CLS here

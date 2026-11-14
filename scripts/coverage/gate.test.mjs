@@ -716,6 +716,23 @@ test("CoverageGate_InventoryClassifiesTrackedExecutableSources", async () => {
   );
 });
 
+test("CoverageGate_ClassifiesPerformanceDiagnosticAsUnmeasuredNotTestOnly", async () => {
+  const manifest = JSON.parse(
+    await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
+  );
+  const sourcePath = "www/scripts/measure-local-performance.mjs";
+  const website = manifest.components.find(
+    (item) => item.id === "website-browser",
+  );
+  const blocker = website.unmeasured.find((item) => item.path === sourcePath);
+
+  assert.ok(blocker, `${sourcePath} must remain a coverage blocker`);
+  assert.match(blocker.reason, /runnable local diagnostic/i);
+  assert.match(blocker.reason, /no line\/branch coverage report/i);
+  assert.ok(!website.sources.includes(sourcePath));
+  assert.ok(!manifest.excludedSources.some((item) => item.path === sourcePath));
+});
+
 test("CoverageGate_DeduplicatesIdenticalLinkedSourceAcrossExpectedAssemblies", () => {
   const sectionHostPath = "scripts/spikes/sidequest-artifacts/SectionHost.cs";
   const gatewayPath = "scripts/spikes/sidequest-artifacts/Gateway/Program.cs";
