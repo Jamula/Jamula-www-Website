@@ -1,0 +1,321 @@
+{
+  "schemaVersion": 1,
+  "thresholdPercent": 90,
+  "components": [
+    {
+      "id": "website-browser",
+      "reports": [
+        "website/cobertura-coverage.xml",
+        "astro-config/cobertura-coverage.xml"
+      ],
+      "sources": ["www/public/analytics-consent.js", "www/astro.config.ts"],
+      "unmeasured": [
+        {
+          "path": "www/scripts/measure-local-performance.mjs",
+          "reason": "Runnable local diagnostic for built-site performance; no line/branch coverage report exists."
+        },
+        {
+          "path": "www/src/components/AnalyticsConsent.astro",
+          "reason": "Astro build-time template code has no line/branch source-map report."
+        },
+        {
+          "path": "www/src/components/SiteFooter.astro",
+          "reason": "Astro build-time template code has no line/branch source-map report."
+        },
+        {
+          "path": "www/src/components/SiteHeader.astro",
+          "reason": "Astro build-time template code has no line/branch source-map report."
+        },
+        {
+          "path": "www/src/layouts/BaseLayout.astro",
+          "reason": "Astro build-time template code has no line/branch source-map report."
+        },
+        {
+          "path": "www/src/pages/404.astro",
+          "reason": "Astro build-time template code has no line/branch source-map report."
+        },
+        {
+          "path": "www/src/pages/index.astro",
+          "reason": "Astro build-time template code has no line/branch source-map report."
+        },
+        {
+          "path": "www/src/pages/privacy.astro",
+          "reason": "Astro build-time template code has no line/branch source-map report."
+        }
+      ]
+    },
+    {
+      "id": "github-automation",
+      "reports": ["automation/cobertura-coverage.xml"],
+      "sources": [
+        ".github/scripts/production-deployment.cjs",
+        ".github/scripts/release.cjs",
+        ".github/scripts/swa-preview.cjs",
+        ".github/scripts/verify-preview.cjs",
+        ".github/scripts/verify-swa-csp.cjs"
+      ],
+      "unmeasured": [
+        {
+          "path": ".github/workflows/azure-static-web-apps-preview.yml",
+          "reason": "Embedded GitHub Actions JavaScript/shell lacks source-level coverage collection."
+        },
+        {
+          "path": ".github/workflows/azure-static-web-apps.yml",
+          "reason": "Embedded GitHub Actions shell lacks source-level coverage collection."
+        },
+        {
+          "path": ".github/workflows/governance-validation.yml",
+          "reason": "Embedded GitHub Actions shell lacks source-level coverage collection."
+        },
+        {
+          "path": ".github/workflows/required-pr-validation.yml",
+          "reason": "Embedded GitHub Actions shell lacks source-level coverage collection."
+        },
+        {
+          "path": ".github/workflows/squad-heartbeat.yml",
+          "reason": "Embedded GitHub Actions shell and JavaScript lack source-level coverage collection."
+        },
+        {
+          "path": ".github/workflows/squad-issue-assign.yml",
+          "reason": "GitHub Actions workflow control logic lacks source-level coverage collection."
+        },
+        {
+          "path": ".github/workflows/squad-triage.yml",
+          "reason": "GitHub Actions workflow control logic lacks source-level coverage collection."
+        },
+        {
+          "path": ".github/workflows/sync-squad-labels.yml",
+          "reason": "GitHub Actions workflow control logic lacks source-level coverage collection."
+        },
+        {
+          "path": ".github/workflows/uptime-apex-monitor.yml",
+          "reason": "GitHub Actions workflow control logic lacks source-level coverage collection."
+        }
+      ]
+    },
+    {
+      "id": "monitor",
+      "reports": ["monitor.cobertura.xml"],
+      "sources": ["scripts/monitor/Program.cs"],
+      "validatedMetadata": [
+        {
+          "path": "scripts/monitor/InternalsVisibleTo.cs",
+          "kind": "monitor-friend-assembly",
+          "reason": "Assembly-level InternalsVisibleTo metadata contains no executable lines for Cobertura to measure."
+        }
+      ]
+    },
+    {
+      "id": "monthly-business-review",
+      "reports": ["mbr-dotnet.cobertura.xml", "mbr-ui/cobertura-coverage.xml"],
+      "sources": [
+        "scripts/mbr/Costs.cs",
+        "scripts/mbr/GitHub.cs",
+        "scripts/mbr/Metrics.cs",
+        "scripts/mbr/Program.cs",
+        "scripts/mbr/wwwroot/dashboard.js"
+      ]
+    },
+    {
+      "id": "validation-tool",
+      "reports": ["validation.cobertura.xml"],
+      "sources": [
+        "scripts/validation/GovernanceValidator.cs",
+        "scripts/validation/PreviewArtifactValidator.cs",
+        "scripts/validation/PreviewSiteVerifier.cs",
+        "scripts/validation/Program.cs"
+      ]
+    },
+    {
+      "id": "coverage-gate",
+      "reports": ["coverage-gate/cobertura-coverage.xml"],
+      "sources": ["scripts/coverage/gate.mjs"]
+    },
+    {
+      "id": "sidequest-artifacts-local-runtime",
+      "reports": ["sidequest-artifacts/cobertura-coverage.xml"],
+      "sources": [
+        "scripts/spikes/sidequest-artifacts/SectionHost.cs",
+        "scripts/spikes/sidequest-artifacts/Gateway/Program.cs"
+      ],
+      "compiledSources": [
+        {
+          "path": "scripts/spikes/sidequest-artifacts/SectionHost.cs",
+          "modules": ["Admin", "Finance", "Tech"],
+          "requireNoBranches": true
+        },
+        {
+          "path": "scripts/spikes/sidequest-artifacts/Gateway/Program.cs",
+          "modules": ["Gateway"]
+        }
+      ],
+      "unmeasured": [
+        {
+          "path": "scripts/spikes/sidequest-artifacts/Publish-Local.ps1",
+          "reason": "Runnable local publisher; no compatible line/branch coverage report exists. Kept as a blocker, not classified as test-only."
+        }
+      ]
+    },
+    {
+      "id": "squad-maintenance-templates",
+      "reports": ["ralph-triage/cobertura-coverage.xml"],
+      "sources": [".squad/templates/ralph-triage.js"],
+      "unmeasured": [
+        {
+          "path": ".squad/templates/scripts/notes/fetch.ps1",
+          "reason": "First-party maintenance script template has no line/branch coverage report."
+        },
+        {
+          "path": ".squad/templates/scripts/notes/write-note.ps1",
+          "reason": "First-party maintenance script template has no line/branch coverage report."
+        },
+        {
+          "path": ".squad/templates/skills/distributed-mesh/sync-mesh.ps1",
+          "reason": "First-party maintenance script template has no line/branch coverage report."
+        },
+        {
+          "path": ".squad/templates/skills/distributed-mesh/sync-mesh.sh",
+          "reason": "First-party maintenance script template has no line/branch coverage report."
+        },
+        {
+          "path": ".squad/templates/workflows/squad-ci.yml",
+          "reason": "Runnable workflow template has no source-level coverage report."
+        },
+        {
+          "path": ".squad/templates/workflows/squad-docs.yml",
+          "reason": "Runnable workflow template has no source-level coverage report."
+        },
+        {
+          "path": ".squad/templates/workflows/squad-heartbeat.yml",
+          "reason": "Runnable workflow template has no source-level coverage report."
+        },
+        {
+          "path": ".squad/templates/workflows/squad-insider-release.yml",
+          "reason": "Runnable workflow template has no source-level coverage report."
+        },
+        {
+          "path": ".squad/templates/workflows/squad-issue-assign.yml",
+          "reason": "Runnable workflow template has no source-level coverage report."
+        },
+        {
+          "path": ".squad/templates/workflows/squad-label-enforce.yml",
+          "reason": "Runnable workflow template has no source-level coverage report."
+        },
+        {
+          "path": ".squad/templates/workflows/squad-preview.yml",
+          "reason": "Runnable workflow template has no source-level coverage report."
+        },
+        {
+          "path": ".squad/templates/workflows/squad-promote.yml",
+          "reason": "Runnable workflow template has no source-level coverage report."
+        },
+        {
+          "path": ".squad/templates/workflows/squad-release.yml",
+          "reason": "Runnable workflow template has no source-level coverage report."
+        },
+        {
+          "path": ".squad/templates/workflows/squad-triage.yml",
+          "reason": "Runnable workflow template has no source-level coverage report."
+        },
+        {
+          "path": ".squad/templates/workflows/sync-squad-labels.yml",
+          "reason": "Runnable workflow template has no source-level coverage report."
+        }
+      ]
+    }
+  ],
+  "excludedSources": [
+    {
+      "path": ".github/scripts/release.test.cjs",
+      "reason": "Test-only source; its assertions are not product behavior."
+    },
+    {
+      "path": ".github/scripts/swa-preview.test.cjs",
+      "reason": "Test-only source; its assertions are not product behavior."
+    },
+    {
+      "path": ".github/scripts/verify-preview.test.cjs",
+      "reason": "Test-only source; its assertions are not product behavior."
+    },
+    {
+      "path": "scripts/coverage/gate.test.mjs",
+      "reason": "Test-only source; its assertions are not product behavior."
+    },
+    {
+      "path": "scripts/coverage/ralph-triage.test.cjs",
+      "reason": "Offline test source; its assertions are not product behavior."
+    },
+    {
+      "path": "scripts/coverage/ralph-triage-fixture.cjs",
+      "reason": "Offline CLI test doubles, not production automation."
+    },
+    {
+      "path": "scripts/mbr/tests/Program.cs",
+      "reason": "Offline fixture runner, not the MBR application."
+    },
+    {
+      "path": "scripts/mbr/tests/MbrIntegrationTests.cs",
+      "reason": "Test-only integration fixtures and assertions, not MBR application behavior."
+    },
+    {
+      "path": "scripts/monitor/tests/Program.cs",
+      "reason": "Offline fixture runner, not the monitor application."
+    },
+    {
+      "path": "scripts/monitor/tests/SelfTests.cs",
+      "reason": "Test-only source; its assertions are not monitor behavior."
+    },
+    {
+      "path": "scripts/spikes/sidequest-artifacts/Checks/Program.cs",
+      "reason": "Offline spike-check runner and assertions; test support, not a publisher, host, or gateway."
+    },
+    {
+      "path": "scripts/spikes/sidequest-artifacts/Checks/Child.cs",
+      "reason": "Offline spike-check child-process lifecycle fixture; test support, not a publisher, host, or gateway."
+    },
+    {
+      "path": "scripts/mbr/tests/ui.test.mjs",
+      "reason": "Test-only source; its assertions are not product behavior."
+    },
+    {
+      "path": "scripts/spikes/sidequest-routing/Program.cs",
+      "reason": "Disposable mechanism experiment, not a maintained deployable or utility."
+    },
+    {
+      "path": "scripts/validation.tests/Program.cs",
+      "reason": "Offline fixture runner, not the migrated validation utility."
+    },
+    {
+      "path": "scripts/validation.cli.tests/Program.cs",
+      "reason": "Offline CLI fixture runner and assertions, not the migrated validation utility."
+    },
+    {
+      "path": "www/scripts/collect-astro-config-coverage.mjs",
+      "reason": "Coverage collection support runner, not shipped website behavior."
+    },
+    {
+      "path": "www/scripts/test_built_site.mjs",
+      "reason": "Built-site test/support runner, not shipped browser code."
+    },
+    {
+      "path": "www/tests/astro-config.test.mjs",
+      "reason": "Test-only source; its assertions are not product behavior."
+    },
+    {
+      "path": "www/tests/homepage-contact.test.mjs",
+      "reason": "Test-only source; its assertions are not product behavior."
+    },
+    {
+      "path": "www/tests/homepage-title.test.mjs",
+      "reason": "Test-only source; its assertions are not product behavior."
+    },
+    {
+      "path": "www/tests/measure-local-performance.test.mjs",
+      "reason": "Offline lifecycle and inventory tests; assertions are not product behavior."
+    },
+    {
+      "path": "www/tests/analytics-consent.test.mjs",
+      "reason": "Test-only source; its assertions are not product behavior."
+    }
+  ]
+}

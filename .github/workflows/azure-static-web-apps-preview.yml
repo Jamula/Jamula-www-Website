@@ -27,6 +27,11 @@ jobs:
           persist-credentials: false
           path: trusted
 
+      - name: Set up trusted .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: trusted/scripts/validation/global.json
+
       - name: Select current preview and download immutable artifact
         id: gate
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -67,8 +72,8 @@ jobs:
 
       - name: Extract only static files and verify trusted configuration
         if: steps.gate.outputs.action == 'upload'
-        shell: bash
-        run: python trusted/scripts/validate_preview_artifact.py .preview/site.zip www/dist trusted/www/public/staticwebapp.config.json
+        working-directory: trusted/scripts/validation
+        run: dotnet run --configuration Release -- validate-artifact "$GITHUB_WORKSPACE/.preview/site.zip" "$GITHUB_WORKSPACE/www/dist" "$GITHUB_WORKSPACE/trusted/www/public/staticwebapp.config.json"
 
       - name: Recheck current PR before deployment
         if: steps.gate.outputs.action != 'skip'

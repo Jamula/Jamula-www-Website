@@ -141,7 +141,7 @@ document records the required configuration, not the current secret state;
 verify repository settings before asserting migration completion.
 
 Validate the boundary with `node --test .github/scripts/swa-preview.test.cjs`
-and `python -m unittest discover -s scripts -p test_preview_artifact.py`.
+and `dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release`.
 
 Node.js live preview verification retries only timeouts, temporary DNS failures,
 connection resets/refusals, and HTTP 429/500/502/503/504 responses. Each of the
