@@ -85,6 +85,7 @@ internal static class MbrIntegrationTests
 
     public static async Task RunAsync(Action<bool, string> check)
     {
+        await VerifyProcessCleanupAsync(check);
         var root = Path.Combine(Path.GetTempPath(), "jamula-mbr-integration-" + Guid.NewGuid().ToString("N"));
         var fixtureBin = Path.Combine(root, "fake-bin");
         Directory.CreateDirectory(fixtureBin);
@@ -114,6 +115,149 @@ internal static class MbrIntegrationTests
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
             return Task.CompletedTask;
         });
+    }
+
+    private static async Task VerifyProcessCleanupAsync(Action<bool, string> check)
+    {
+        var executionTimeout = TimeSpan.FromSeconds(5);
+        var cleanupTimeout = TimeSpan.FromMilliseconds(50);
+        var killed = false;
+        var waited = false;
+        var result = await GitHub.RunWithCleanupAsync(_ => Task.FromResult("[]"), () => true,
+            () => killed = true, _ => { waited = true; return Task.CompletedTask; },
+            CancellationToken.None, executionTimeout, cleanupTimeout);
+        check(result == "[]" && !killed && !waited,
+            "GitHubCleanup_ExitedSuccessDoesNotKillOrWait");
+
+        using var caller = new CancellationTokenSource();
+        var cancellation = new OperationCanceledException(caller.Token);
+        var exited = false;
+        OperationCanceledException? observedCancellation = null;
+        try
+        {
+            await GitHub.RunWithCleanupAsync(_ =>
+            {
+                caller.Cancel();
+                return Task.FromException<string>(cancellation);
+            }, () => exited, () => killed = true, token =>
+            {
+                check(!token.IsCancellationRequested, "GitHubCleanup_UsesIndependentCleanupToken");
+                waited = true;
+                exited = true;
+                return Task.CompletedTask;
+            }, caller.Token, executionTimeout, cleanupTimeout);
+        }
+        catch (OperationCanceledException ex) { observedCancellation = ex; }
+        check(ReferenceEquals(observedCancellation, cancellation) &&
+            observedCancellation.CancellationToken == caller.Token && killed && waited && exited,
+            "GitHubCleanup_CallerCancellationPreservedAfterConfirmedExit");
+
+        exited = false;
+        killed = false;
+        waited = false;
+        IOException? timeoutFailure = null;
+        try
+        {
+            await GitHub.RunWithCleanupAsync(async token =>
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                return "unreachable";
+            }, () => exited, () => killed = true, _ =>
+            {
+                waited = true;
+                exited = true;
+                return Task.CompletedTask;
+            }, CancellationToken.None, TimeSpan.Zero, cleanupTimeout);
+        }
+        catch (IOException ex) { timeoutFailure = ex; }
+        check(timeoutFailure?.Message == "GitHub read timed out." &&
+            timeoutFailure.InnerException is OperationCanceledException && killed && waited && exited,
+            "GitHubCleanup_ExecutionTimeoutPreservedAfterConfirmedExit");
+
+        foreach (var callerCancelled in new[] { true, false })
+        {
+            var neverExited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            CancellationToken waitToken = default;
+            var watch = Stopwatch.StartNew();
+            AggregateException? observed = null;
+            killed = false;
+            try
+            {
+                await GitHub.RunWithCleanupAsync(async token =>
+                {
+                    if (callerCancelled) throw cancellation;
+                    await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                    return "unreachable";
+                }, () => false, () => killed = true, token =>
+                {
+                    waitToken = token;
+                    // Deliberately ignore cancellation: the wrapper must still enforce the deadline.
+                    return neverExited.Task;
+                }, callerCancelled ? caller.Token : CancellationToken.None,
+                    callerCancelled ? executionTimeout : TimeSpan.Zero, cleanupTimeout)
+                    .WaitAsync(TimeSpan.FromSeconds(3));
+            }
+            catch (AggregateException ex) { observed = ex; }
+            finally
+            {
+                neverExited.TrySetResult();
+            }
+            var originalPreserved = callerCancelled
+                ? ReferenceEquals(observed?.InnerExceptions[0], cancellation)
+                : observed?.InnerExceptions[0] is IOException
+                    { Message: "GitHub read timed out.", InnerException: OperationCanceledException };
+            check(observed?.InnerExceptions.Count == 2 && originalPreserved &&
+                observed.InnerExceptions[1] is TimeoutException
+                    { InnerException: OperationCanceledException } &&
+                killed && waitToken.IsCancellationRequested && waitToken != caller.Token &&
+                watch.Elapsed < TimeSpan.FromSeconds(3),
+                callerCancelled
+                    ? "GitHubCleanup_NonExitIsBoundedAndPreservesCallerCancellation"
+                    : "GitHubCleanup_NonExitIsBoundedAndPreservesExecutionTimeout");
+        }
+
+        foreach (var stage in new[] { "Kill", "Wait", "Confirmation" })
+        {
+            var original = new IOException("original read failure");
+            var cleanupFailure = new System.ComponentModel.Win32Exception(5);
+            AggregateException? observed = null;
+            killed = false;
+            waited = false;
+            try
+            {
+                await GitHub.RunWithCleanupAsync(_ => Task.FromException<string>(original), () => false,
+                    () =>
+                    {
+                        killed = true;
+                        if (stage == "Kill") throw cleanupFailure;
+                    }, _ =>
+                    {
+                        waited = true;
+                        return stage == "Wait" ? Task.FromException(cleanupFailure) : Task.CompletedTask;
+                    }, CancellationToken.None, executionTimeout, cleanupTimeout);
+            }
+            catch (AggregateException ex) { observed = ex; }
+            check(observed?.InnerExceptions.Count == 2 &&
+                ReferenceEquals(observed.InnerExceptions[0], original) &&
+                (stage == "Confirmation"
+                    ? observed.InnerExceptions[1] is IOException
+                        { Message: "GitHub process exit could not be confirmed after termination." }
+                    : ReferenceEquals(observed.InnerExceptions[1], cleanupFailure)) &&
+                killed && waited == (stage != "Kill"),
+                $"GitHubCleanup_{stage}FailurePreservesOriginalReadError");
+        }
+
+        var standaloneFailure = new IOException("standalone cleanup failure");
+        IOException? observedStandalone = null;
+        try
+        {
+            await GitHub.RunWithCleanupAsync(_ => Task.FromResult("[]"), () => false,
+                () => throw standaloneFailure, _ => Task.CompletedTask,
+                CancellationToken.None, executionTimeout, cleanupTimeout);
+        }
+        catch (IOException ex) { observedStandalone = ex; }
+        check(ReferenceEquals(observedStandalone, standaloneFailure),
+            "GitHubCleanup_CleanupOnlyFailureIsNotSwallowed");
     }
 
     private static async Task VerifyGitHubCollectionAsync(
@@ -540,10 +684,14 @@ internal static class MbrIntegrationTests
         {
             await WithCleanupAsync(() => Task.FromException(failure), async () =>
             {
-                if (job is not null) job.Dispose();
-                else if (!process.HasExited) process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync();
-                process.Dispose();
+                try
+                {
+                    if (job is not null) job.Dispose();
+                    else if (!process.HasExited) process.Kill(entireProcessTree: true);
+                    using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                    await process.WaitForExitAsync(cleanup.Token).WaitAsync(cleanup.Token);
+                }
+                finally { process.Dispose(); }
             });
             throw;
         }
@@ -559,9 +707,13 @@ internal static class MbrIntegrationTests
 
         public void Dispose()
         {
-            job.Dispose();
-            process.WaitForExit();
-            process.Dispose();
+            try
+            {
+                job.Dispose();
+                if (!process.WaitForExit(15000))
+                    throw new TimeoutException("MBR web fixture exit could not be confirmed.");
+            }
+            finally { process.Dispose(); }
         }
     }
 
@@ -603,7 +755,9 @@ internal static class MbrIntegrationTests
                 var deadline = Stopwatch.StartNew();
                 while (true)
                 {
-                    var remaining = Math.Max(0, 15000 - deadline.ElapsedMilliseconds);
+                    var remaining = 15000 - deadline.ElapsedMilliseconds;
+                    if (remaining <= 0)
+                        throw new TimeoutException("MBR fixture job did not empty after termination.");
                     if (!GetQueuedCompletionStatus(completionPort, out var message, out _, out _, (uint)remaining))
                         throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
                     // WaitForExit on the parent alone does not wait for terminated descendants.

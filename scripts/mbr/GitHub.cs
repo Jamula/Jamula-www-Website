@@ -60,26 +60,62 @@ public static class GitHub
         info.Environment["GH_PROMPT_DISABLED"] = "1";
         info.Environment["GH_PAGER"] = "cat";
         using var process = Process.Start(info) ?? throw new IOException("Cannot start gh.");
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromMinutes(2));
-        var stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
-        var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
-        try
+        return await RunWithCleanupAsync(async token =>
         {
-            await process.WaitForExitAsync(timeout.Token);
+            var stdout = process.StandardOutput.ReadToEndAsync(token);
+            var stderr = process.StandardError.ReadToEndAsync(token);
+            await process.WaitForExitAsync(token);
             await stderr;
             var result = await stdout;
             if (process.ExitCode != 0) throw new IOException("GitHub read failed.");
             return result;
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        }, () => process.HasExited, () => process.Kill(entireProcessTree: true),
+            process.WaitForExitAsync, cancellationToken, TimeSpan.FromMinutes(2), TimeSpan.FromSeconds(15));
+    }
+
+    internal static async Task<string> RunWithCleanupAsync(
+        Func<CancellationToken, Task<string>> run, Func<bool> hasExited, Action kill,
+        Func<CancellationToken, Task> waitForExit, CancellationToken cancellationToken,
+        TimeSpan executionTimeout, TimeSpan cleanupTimeout)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(executionTimeout);
+        Exception? failure = null;
+        try
         {
-            throw new IOException("GitHub read timed out.");
+            try { return await run(timeout.Token); }
+            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new IOException("GitHub read timed out.", ex);
+            }
+        }
+        catch (Exception ex)
+        {
+            failure = ex;
+            throw;
         }
         finally
         {
-            if (!process.HasExited) process.Kill(entireProcessTree: true);
-            await process.WaitForExitAsync();
+            try
+            {
+                if (!hasExited())
+                {
+                    kill();
+                    // Cleanup must outlive caller cancellation, but never wait indefinitely.
+                    using var cleanup = new CancellationTokenSource(cleanupTimeout);
+                    try { await waitForExit(cleanup.Token).WaitAsync(cleanup.Token); }
+                    catch (OperationCanceledException ex) when (cleanup.IsCancellationRequested)
+                    {
+                        throw new TimeoutException("GitHub process exit could not be confirmed after termination.", ex);
+                    }
+                    if (!hasExited())
+                        throw new IOException("GitHub process exit could not be confirmed after termination.");
+                }
+            }
+            catch (Exception ex) when (failure is not null)
+            {
+                throw new AggregateException("GitHub read failed and process cleanup also failed.", failure, ex);
+            }
         }
     }
 }
