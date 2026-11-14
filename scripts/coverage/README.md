@@ -11,11 +11,14 @@ sources only; known unmeasured sources are reported as blockers, not silently
 omitted from an otherwise green result.
 
 Tracked runnable sources in the local side-quest artifact spike are inventoried
-as `sidequest-artifacts-local-runtime`. The publisher, section host, and gateway
-are executable authored code, not test-only files; there are no compatible
-line/branch reports for them, so they remain explicit unmeasured blockers.
+as `sidequest-artifacts-local-runtime`. The PowerShell publisher is executable
+authored code, not test-only; it has no compatible line/branch report and remains
+an explicit unmeasured blocker. The section host and gateway are measured by the
+offline process checks described below; linked `SectionHost.cs` attribution is
+verified across Admin/Finance/Tech before counting one copy.
 Only the offline checks runner and its child-process fixture are excluded as
-test support. No spike coverage or passing result is implied.
+test support. The spike measurement does not imply a passing component or overall
+gate.
 
 Source attribution is anchored to this gate's actual repository root, not the
 report directory or a matching filename suffix. Without `<sources>`, relative
