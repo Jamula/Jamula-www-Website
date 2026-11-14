@@ -11,39 +11,82 @@ and response behavior independently before claiming operational success.
 
 The production workflow builds one artifact and deploys it to both apps. Pull request previews remain on the original .net app only. Deployment jobs use the `swa-deployment` GitHub environment, restricted to the `main` branch. The .net token is environment secret `SWA_NET_DEPLOYMENT_TOKEN`; the .com token is `SWA_COM_DEPLOYMENT_TOKEN`. Never commit their values.
 
-PR builds in `azure-static-web-apps.yml` do not deploy or consume deployment secrets, including for Dependabot. Production jobs require a `workflow_dispatch` event on `refs/heads/main`, latest-main SHA checks, and the main-only deployment environment; pushes do not deploy; a PR cannot unlock that environment by editing a job condition. `azure-static-web-apps-preview.yml` runs from the default branch after a successful build and uses the same restricted environment. It resolves the current same-repository PR, checks the workflow identity and head SHA, verifies the artifact's GitHub SHA-256 digest, rejects unsafe archive entries, and requires `staticwebapp.config.json` to match the trusted default branch. It never installs dependencies or executes PR scripts. A trusted PR event passed to the pinned Azure action selects the numbered PR environment; the returned URL must match that environment before live verification. Closed PRs and PRs with no remaining deployable changes remove their previews through this same trusted workflow.
+PR builds in `azure-static-web-apps.yml` do not deploy or consume deployment secrets, including for Dependabot. Production jobs require a `workflow_dispatch` event on `refs/heads/main`, latest-main SHA checks, and the main-only deployment environment; pushes do not deploy; a PR cannot unlock that environment by editing a job condition. `azure-static-web-apps-preview.yml` runs from the default branch after a successful build and uses the same restricted environment. It resolves the current same-repository PR, checks the workflow identity and head SHA, verifies the artifact's GitHub SHA-256 digest, rejects unsafe archive entries, and requires `staticwebapp.config.json` to match the trusted default branch. It never installs dependencies or executes PR scripts. The current PR is rechecked immediately before deployment; a validated positive numeric PR number is passed as the explicit `deployment_environment` input to the pinned Azure action for both upload and close. The returned URL must match that exact numbered environment before live verification. Closed PRs and PRs with no remaining deployable changes select cleanup through this same trusted workflow.
+
+### Preview routing guardrail
+
+The previous preview workflow attempted to override `GITHUB_EVENT_NAME`,
+`GITHUB_REF`, and related variables with a synthesized PR event. The GitHub
+runner's Docker handler writes runtime GitHub context over step environment
+values before launching the container. The action therefore received
+`workflow_run` on `main`, explaining why it returned the production URL despite
+the generated PR event file. This is a routing failure, not transient readiness,
+and must not be retried.
+
+Preview deployment now uses the supported named-environment contract: the
+environment name is exactly the validated PR number, preserving the numbered
+hostname. The preview action is pinned to
+`4d27395796ac319302594769cfe812bd207490b1`, whose manifest declares
+`deployment_environment`, unlike the old `v1` tag commit. Production action pins
+and production release gates are unchanged. This explicitly selects a numbered
+named preview rather than relying on automatic PR-event inference. Both upload
+and cleanup receive the same environment; reject invalid metadata before
+artifact download and revalidate it before exposing the deployment token.
+No fallback to production, empty environment, or broad workflow retry is allowed.
+
+Official sources verified on 2026-11-08:
+[runner Docker context handling](https://github.com/actions/runner/blob/main/src/Runner.Worker/Handlers/ContainerActionHandler.cs),
+[pinned Azure action inputs](https://github.com/Azure/static-web-apps-deploy/blob/4d27395796ac319302594769cfe812bd207490b1/action.yml),
+and [Azure named preview environments](https://learn.microsoft.com/azure/static-web-apps/named-environments).
+Named-environment upload/close behavior, including cleanup of existing
+PR-inferred environments, still needs an authorized exact-revision live run.
+Offline tests establish selection and request contracts, not Azure operations.
 
 ## Release operations
 
 Only an authorized operator should dispatch the workflow on current `main`:
 
 ```sh
-gh workflow run azure-static-web-apps.yml --ref main --repo Jamula/Jamula-www-Website
-# For a non-default increment, add -f bump=minor or -f bump=major.
+gh workflow run azure-static-web-apps.yml --ref main --repo Jamula/Jamula-www-Website -f change_type=material
+# For a fix-only deployment, use -f change_type=fix instead.
 ```
 
-The first release is `v0.1.0` regardless of bump choice; later releases
-increment the highest published stable `vMAJOR.MINOR.PATCH` tag (patch by
-default). Published GitHub releases and matching tags are the durable release
+Choose **material** for a material production change: the first release is
+`v0.1.0`, and subsequent material releases increment the patch component of the
+highest published stable `vMAJOR.MINOR.PATCH` tag. Choose **fix** for bug or
+script fixes only: the latest release and its immutable tag are reused, never
+moved or rewritten. Fix-only deployment without a release fails explicitly;
+use the material path to establish the first baseline. This is an operator
+classification, not an inference from changed filenames. Published GitHub releases and matching tags are the durable release
 history. `www/package.json` and its lockfile stay at the development baseline,
 not the latest release version; no bot pushes to protected main. Malformed,
 orphaned, draft, prerelease, duplicate, or pre-baseline version history fails
-closed and requires investigation. Non-version tags are ignored. Releasing the
-same SHA as the latest release is rejected.
+closed and requires investigation. Non-version tags are ignored. A material
+release of the same SHA as the latest release is rejected.
 
 The event SHA must still be current main at selection, before each deployment,
 and before publication. One build of that SHA produces an immutable artifact,
 including `release.json` with version, revision, run ID and build attempt.
+The selected release version is also displayed in the site footer and included
+in consented Google Analytics events; pull-request previews omit it.
+Before each Azure upload, the workflow creates a GitHub deployment record for
+that app with the actual deployed SHA, selected release tag and release URL,
+classification, run and build attempt in its payload. The record reports
+in-progress, then success only after that app's verification, or failure if
+the upload or verification fails. The release tag identifies the material
+release commit; for fixes the separately recorded and stamped deployed SHA may
+be newer. A material deployment's release URL may not exist until publication.
 Both apps deploy that artifact and verify this identity and the existing live
 security/configuration checks. Publication rechecks both live identities and
-history, atomically creates the tag at the selected SHA, then creates the GitHub
-Release only after both deployment jobs succeed. Runs share the production
+the complete selected release history, atomically creates the material tag at
+the selected SHA, then creates the GitHub Release only after both deployment
+jobs succeed; fixes create neither tag nor release. Runs share the production
 concurrency group; GitHub may replace a pending run, so check the specific run
 status rather than treating dispatch as success. Non-main dispatches fail.
 
 The repository must allow the workflow's `GITHUB_TOKEN` contents-write
-permission to create tags and releases; the write grant is limited to the
-publication job. Configure tag rules to reserve release tags for the authorized
+permission to create tags and releases (limited to the publication job), and
+deployments-write permission for each production deployment job. Configure tag rules to reserve release tags for the authorized
 release process without blocking that token, and maintain the existing branch
 and environment protections. Verify actual settings and secrets; this document
 is not evidence that they are configured. Other release writers and Azure
@@ -54,11 +97,19 @@ moves. A move during publication can leave a published release with a failed
 run; inspect the tag, release and live metadata before any recovery.
 
 Azure deployments to the two apps are not atomic. A failure may leave one app
-updated and the other unchanged, even though no release is published. Inspect
-both jobs, both live `/release.json` files and all four hostnames. Fix the
+updated and the other unchanged, even though no new release is published. A
+successful app record does not imply the other app or publication succeeded.
+Check the GitHub deployment records and their statuses, both jobs, both live
+`/release.json` files and all four hostnames. A canceled run, status API failure,
+or interruption may leave an in-progress record; an API failure can also
+leave an uncertain record even when the response was lost. Investigate against
+the run and live identities rather than assuming a rollback. Fix the
 cause and rerun failed jobs only while the original SHA is still current and
-history is unchanged; publication rechecks both identities. Alternatively,
-dispatch a new release on current main after reviewing the partial state. If
+history is unchanged; publication rechecks both identities and the selected
+history fingerprint. A changed history or moved tag fails closed even when the
+same version is still latest; investigate external writers before a fresh
+dispatch. Alternatively, dispatch on current main after reviewing the partial
+state and choosing the appropriate classification. If
 publication created a tag but failed to create the GitHub Release, history
 intentionally blocks retries: an authorized maintainer must investigate the tag,
 its SHA, deployments and any release first, and reconcile the orphaned tag
@@ -91,6 +142,20 @@ verify repository settings before asserting migration completion.
 
 Validate the boundary with `node --test .github/scripts/swa-preview.test.cjs`
 and `dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release`.
+
+Node.js live preview verification retries only timeouts, temporary DNS failures,
+connection resets/refusals, and HTTP 429/500/502/503/504 responses. Each of the
+home, robots, and missing-route probes allows six attempts with delays of
+2, 4, 8, 16, and 30 seconds (60 seconds of total backoff per probe); each request
+uses a 20-second deadline covering connection and response reading. Authentication failures, redirects, permanent
+DNS/TLS failures, unexpected statuses, and deterministic content/header failures
+fail immediately. The missing-route probe accepts only the expected 404 body.
+Retries are read-only verification requests, never deployment uploads or workflow
+reruns. The exact selected-PR URL check still runs before any network verification;
+a production URL or wrong PR identity must never be treated as a readiness issue.
+Run `node --test .github/scripts/verify-preview.test.cjs` for the
+focused retry checks.
+
 These tests do not establish live deployment or cleanup behavior. For that,
 inspect successful Actions runs for the exact default-branch workflow revision
 and verify the numbered preview URL, noindex/security headers, artifact digest,

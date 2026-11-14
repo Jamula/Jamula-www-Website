@@ -17,9 +17,12 @@ this proposal.
 Each independently versioned component must publish an immutable artifact and
 a machine-readable descriptor. The descriptor identifies the component and
 its immutable component artifact version, source revision, artifact digest,
-build run, contract dependencies, configuration schema, and health-check
-contract. The component version identifies that component artifact; it is not
-the website's release tag or website release version tracked separately by
+build run, provided and consumed contracts, configuration schema, and
+health-check contract. The release record pins the digest of the exact
+descriptor alongside the artifact digest. The reviewed build evidence must
+bind that descriptor digest to the artifact digest and source revision; an
+unbound or mismatched descriptor fails closed. The component version identifies
+that component artifact; it is not the website's release tag or website release version tracked separately by
 issue #104. A website tag does not identify, retag, or make mutable a
 component artifact. The exact artifact bytes are identified by their digest.
 Secrets and secret values must never be included.
@@ -38,9 +41,14 @@ Secrets and secret values must never be included.
     "workflow": "<trusted-workflow-id>",
     "runId": "<immutable-run-id>"
   },
+  "provides": {
+    "section-api": "1.0.0"
+  },
   "contracts": {
-    "content": ">=1.0.0 <2.0.0",
-    "identityPolicy": ">=1.0.0 <2.0.0"
+    "content": {
+      "producer": "content-service",
+      "range": ">=1.0.0 <2.0.0"
+    }
   },
   "configurationSchema": "1",
   "healthCheck": "/health/ready"
@@ -52,21 +60,33 @@ workflows. `schemaVersion` is required and must be the integer `1` for this
 contract. For schema version 1, all example fields above are required and
 non-null; unknown fields are rejected rather than silently ignored. A future
 schema must use an explicitly supported schema version. An absent, malformed,
-or unsupported schema version, missing required field, or unknown field fails
-closed before activation.
+or unsupported schema version, missing required field, unknown field, or
+duplicate JSON object key fails closed before activation.
 
 `version` uses `MAJOR.MINOR.PATCH` with non-negative decimal integers and no
 leading zeroes (except `0`); production descriptors do not use prerelease or
 build-metadata suffixes. A component version is never reused for different
-artifact bytes. The `sha256` field is the lowercase 64-hex digest of the exact
-artifact. A consumer must resolve the exact artifact digest and verify the
-source revision and contract versions before activation. A tag, mutable
-download URL, branch name, or successful build alone is not artifact identity.
+artifact or descriptor bytes. The `sha256` field is the lowercase 64-hex digest
+of the exact artifact. A consumer must resolve the exact artifact digest and
+verify the source revision and contract versions before activation. A tag,
+mutable download URL, branch name, or successful build alone is not artifact identity.
 Configuration references may identify a secret by name and version, but may
 not embed its value.
 
-Compatibility values use the same `MAJOR.MINOR.PATCH` form. A declared
-compatibility expression is either one exact comparator, such as `=1.2.3`, or
+`provides` maps each contract identifier to its exact produced version;
+`contracts` maps each consumed contract identifier to a `producer` component
+name and a compatibility `range`. Both maps are required, and may be empty
+when the component provides or consumes no contracts respectively. Identifiers
+and producer names are non-empty, case-sensitive strings. Each dependency
+object requires exactly `producer` and `range`. A provided version uses the same
+`MAJOR.MINOR.PATCH` format as the component version, but is independent of it.
+Resolve the named producer uniquely in the proposed active set and read the
+named contract's exact version from its verified, artifact-bound descriptor.
+Missing or ambiguous producers, absent contract identifiers, or conflicting
+descriptor bindings fail closed.
+
+A declared compatibility expression is either one exact comparator, such as
+`=1.2.3`, or
 one lower-inclusive and upper-exclusive interval separated by exactly one
 ASCII space, such as `>=1.2.0 <2.0.0`. Comparisons use numeric
 major/minor/patch ordering. Wildcards, caret and tilde shorthand, commas,
@@ -82,8 +102,8 @@ immutable artifact and descriptor only after:
 1. The source revision is reviewed and merged to protected `main`.
 2. Its focused behavior, security, accessibility, and performance checks pass.
 3. Its declared contracts are compatible with every currently active consumer.
-4. The artifact digest, source revision, test evidence, and intended target are
-   recorded together.
+4. The descriptor digest, artifact digest, source revision, test evidence, and
+   intended target are recorded together.
 5. The authorized release path confirms the target is eligible and the current
    active set remains compatible under the concurrency and fencing rules
    below.
@@ -106,7 +126,8 @@ currently enforce them.
 
 An operator may request a collective release for a specific compatibility or
 recovery reason. It must use a reviewed, immutable manifest that pins every
-included component to an exact version, source revision, and artifact digest.
+included component to an exact version, source revision, artifact digest, and
+descriptor digest.
 The manifest has this required version 1 shape:
 
 ```json
@@ -124,8 +145,15 @@ The manifest has this required version 1 shape:
         "name": "example-section-0.1.0",
         "sha256": "<64-lowercase-hex>"
       },
+      "descriptorSha256": "<64-lowercase-hex>",
+      "provides": {
+        "section-api": "1.0.0"
+      },
       "contracts": {
-        "content": ">=1.0.0 <2.0.0"
+        "content": {
+          "producer": "content-service",
+          "range": ">=1.0.0 <2.0.0"
+        }
       },
       "configurationSchema": "1",
       "healthCheck": "/health/ready",
@@ -140,7 +168,8 @@ The manifest has this required version 1 shape:
       "artifact": {
         "name": "example-section-0.1.0",
         "sha256": "<64-lowercase-hex>"
-      }
+      },
+      "descriptorSha256": "<64-lowercase-hex>"
     }
   ]
 }
@@ -149,9 +178,17 @@ The manifest has this required version 1 shape:
 `schemaVersion` is a required integer and must be `1`. All shown fields are
 required and non-null; `components` must contain at least one uniquely named
 component, and `recoverySet` must pin the complete previously validated
-compatible set. Unknown fields are rejected, and a missing, malformed, or
-unsupported schema version fails closed. A future schema is usable only after
+compatible set with unique component names. Each `descriptorSha256` is the
+lowercase 64-hex digest of the exact descriptor bytes. Verify that digest and
+the descriptor's artifact binding for each deployment and recovery pin; the
+manifest's `provides`, `contracts`, configuration schema, and health check
+must match the pinned descriptor. Unknown fields and duplicate JSON object keys
+are rejected, and a missing, malformed, or unsupported schema version fails
+closed. A future schema is usable only after
 the release path explicitly supports it.
+The illustrative manifest assumes `content-service` is already in the active
+set with a compatible provided `content` contract; the placeholder pins are
+not deployable evidence.
 
 The manifest also records the reason, required deployment order, compatibility
 expressions using the syntax above, configuration schema versions, expected
@@ -165,8 +202,9 @@ The manifest is an explicit exception to the one-component default; it does not
 relabel several independent releases as one mutable version. A partial rollout
 must remain visible as a partially applied manifest. A deployment is successful
 only when every component pinned by its manifest is active at the exact pinned
-version, source revision, and digest; every required health check passes; and
-the complete active set satisfies the declared compatibility contract. A
+version, source revision, artifact digest, and descriptor digest; every
+required health check passes; and the complete active set satisfies the
+declared compatibility contract. A
 subset of healthy components, an unknown activation outcome, or a healthy but
 incompatible active set is not success.
 
@@ -229,8 +267,13 @@ Before activation, the release path must verify:
 - The descriptor schema is supported and required fields are present.
 - The manifest schema is supported, required fields are present, and unknown
   fields or unsupported compatibility syntax are rejected.
-- The source revision and artifact digest match the reviewed release record.
-- No version or digest is duplicated or ambiguously resolved.
+- The source revision and descriptor and artifact digests match the reviewed
+  release record and their verified binding.
+- Component names are unique within each active, deployment, or recovery set.
+  Each `(component, version)` resolves unambiguously to its immutable artifact
+  and descriptor; conflicting bindings fail closed. Different components may
+  use the same version or digest, and a deployment and recovery set may pin
+  the same artifact.
 - Every producer-consumer contract version satisfies the consumer's declared
   compatibility expression for the proposed active set.
 - Required configuration schema and secret references are available without
@@ -255,10 +298,12 @@ The release-attempt state is `planned`, `in_progress`, `succeeded`, `failed`,
 states. In particular, restoring a prior healthy set makes the attempted
 deployment `recovered`, not `succeeded`; a separate recovery release may be
 reported as successful only if it independently meets the all-pinned-artifacts
-success criteria. A manifest remains `in_progress` while any required
-component is unresolved, unhealthy, or not at its exact pin. This rule also
-applies to an independent release, whose single component is its complete set
-of pins. The record includes the immutable artifact digest and sanitized
+success criteria. A manifest remains `in_progress` while activation or
+reconciliation is ongoing. An unresolved, unhealthy, or off-pin component
+precludes `succeeded` but does not prevent a `failed`, `recovered`, or
+`cancelled` terminal state when the attempt has stopped. This rule also applies
+to an independent release, whose single component is its complete set of pins.
+The record includes the immutable artifact digest and sanitized
 failure reason; it excludes credentials, prompts, private content, and
 unnecessary identities.
 
@@ -279,10 +324,11 @@ On failure:
    complete with compatible observed state. Use a separately authorized
    recovery release with exact artifact pins; do not assume rollback is
    atomic or that a prior mutable tag still points to the same bytes.
-5. Verify that every artifact pinned by the recovery manifest—not merely one
-   healthy component—is active at its exact pin, all required health checks
-   pass, and the complete active set is compatible. Record recovery of the
-   failed attempted deployment as `recovered`, not success. A recovery release
+5. Verify that every artifact and descriptor pinned by the recovery
+   manifest—not merely one healthy component—is active at its exact pin, all
+   required health checks pass, and the complete active set is compatible.
+   Record recovery of the failed attempted deployment as `recovered`, not
+   success. A recovery release
    is successful only under the same all-pinned-artifacts rule as any other
    deployment. Verify every affected route and identity boundary before
    closing the incident record.
@@ -317,6 +363,12 @@ must demonstrate:
   missing identity fields.
 - Manifest schema validation, unknown schema and field rejection, and exact
   compatibility-expression parsing.
+- Artifact-bound descriptor verification, exact producer resolution, missing
+  or ambiguous producer rejection, and provided-version compatibility checks
+  for independent and collective releases.
+- Shared versions or artifact digests across distinct components and pins
+  repeated across deployment and recovery sets are accepted; conflicting
+  bindings for the same `(component, version)` are rejected.
 - One-component release with unaffected components remaining unchanged.
 - A collective manifest with multiple pinned artifacts and a compatibility
   failure before activation.
@@ -324,6 +376,10 @@ must demonstrate:
   safe retry behavior, stale lease fencing, active-set generation changes,
   and recovery to a previously validated compatible set without recording
   the attempted deployment as successful.
+- Ongoing reconciliation stays `in_progress`; stopped unhealthy or off-pin
+  attempts may be `failed` or `cancelled`, but never `succeeded`. A restored
+  healthy recovery set permits `recovered` even when the attempted pins are
+  no longer active.
 - An independent attempt and a collective attempt for the same
   target/environment use the same lease key and token sequence across
   generation changes. For example, generation 10 with token 41 and generation
