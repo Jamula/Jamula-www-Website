@@ -44,6 +44,10 @@ For a published executable or launch from another working directory, `.local`
 is beside the executable unless the working directory contains `wwwroot`.
 An interrupted refresh leaves the previous snapshot intact; retry refresh.
 
+Use the [Side-quest operations review runbook](../../docs/operations/side-quest-operations-review.md)
+for the monthly evidence discussion that builds on this MBR. The runbook does
+not add dashboard metrics or change what the collector reads.
+
 ## Executive view and audit access
 
 The page answers four business questions: what activity was delivered, what work
