@@ -9,6 +9,7 @@ const { SaxesParser } = require("saxes");
 const inventoryPath = fileURLToPath(
   new URL("./inventory.json", import.meta.url),
 );
+const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const COUNT_KEYS = [
   "linesCovered",
   "linesValid",
@@ -16,7 +17,7 @@ const COUNT_KEYS = [
   "branchesValid",
 ];
 
-function parseCobertura(xml, reportPath) {
+function parseCobertura(xml) {
   const classes = [];
   const sources = [];
   const stack = [];
@@ -90,35 +91,65 @@ function parseCobertura(xml, reportPath) {
   try {
     parser.write(xml).close();
   } catch (error) {
-    throw new Error(`${reportPath}: invalid Cobertura XML: ${error.message}`);
+    throw new Error(`invalid Cobertura XML: ${error.message}`);
   }
   if (classes.length === 0) {
-    throw new Error(`${reportPath}: no Cobertura class measurements.`);
+    throw new Error("no Cobertura class measurements.");
   }
-  return classes.map((item) => ({
-    ...item,
-    paths: [
-      item.filename,
-      ...(/^(?:[A-Za-z]:[\\/]|[\\/]|file:)/i.test(item.filename)
-        ? []
-        : sources.map((source) => `${source}/${item.filename}`)),
-    ],
-  }));
+  return { classes, sources };
 }
 
-function normalizeSource(value) {
-  return value
-    .replace(/^file:\/+/i, "")
-    .replaceAll("\\", "/")
-    .replace(/^[A-Za-z]:/, "")
-    .replace(/^\/+/, "")
-    .replace(/\/+/g, "/");
+function sourcePath(value) {
+  if (/^file:/i.test(value)) {
+    const url = new URL(value);
+    if (url.search || url.hash) throw new Error("file URL has a query or fragment.");
+    const pathname = decodeURIComponent(url.pathname);
+    value = url.hostname && url.hostname !== "localhost"
+      ? `//${url.hostname}${pathname}`
+      : pathname.replace(/^\/([A-Za-z]:\/)/, "$1");
+  }
+  value = value.replaceAll("\\", "/");
+  const windows = /^[A-Za-z]:\//.test(value) || value.startsWith("//");
+  const api = windows ? path.win32 : path.posix;
+  if (!windows && value.includes(":")) {
+    throw new Error(`unsupported or drive-relative source path: ${value}`);
+  }
+  const normalized = api.normalize(value).replaceAll("\\", "/");
+  return {
+    value: windows ? normalized.toLowerCase() : normalized,
+    windows,
+    absolute: api.isAbsolute(value),
+  };
 }
 
-function matchesPath(reportPath, expectedPath) {
-  const report = normalizeSource(reportPath);
-  const expected = normalizeSource(expectedPath);
-  return report === expected || report.endsWith(`/${expected}`);
+function resolveSource(value, root) {
+  const parsed = sourcePath(value);
+  if (parsed.absolute && parsed.windows !== root.windows) {
+    throw new Error(`source path is on a different filesystem: ${value}`);
+  }
+  const api = root.windows ? path.win32 : path.posix;
+  const resolved = sourcePath(api.resolve(root.value, parsed.value));
+  const relative = api.relative(root.value, resolved.value).replaceAll("\\", "/");
+  if (relative === ".." || relative.startsWith("../") || api.isAbsolute(relative)) {
+    throw new Error(`source path is outside repository root: ${value}`);
+  }
+  return resolved;
+}
+
+function attributeClass(filename, sources, root) {
+  const parsed = sourcePath(filename);
+  // Absolute class filenames already identify their source; roots only qualify relative filenames.
+  const candidates = parsed.absolute || sources.length === 0
+    ? [resolveSource(filename, root).value]
+    : sources.map((source) => {
+      const sourceRoot = resolveSource(source, root);
+      const api = root.windows ? path.win32 : path.posix;
+      return resolveSource(api.resolve(sourceRoot.value, parsed.value), root).value;
+    });
+  if (new Set(candidates).size !== 1) {
+    throw new Error(`ambiguous source roots for: ${filename}`);
+  }
+  return candidates[0];
 }
 
 function emptyCounts() {
@@ -161,7 +192,9 @@ function summarize(counts, thresholdPercent) {
   };
 }
 
-export function evaluateCoverage(inventory, reports) {
+export function evaluateCoverage(inventory, reports, rootPath = repositoryRoot) {
+  const root = sourcePath(rootPath);
+  if (!root.absolute) throw new Error("Repository root must be an absolute path.");
   const errors = [];
   if (
     inventory?.schemaVersion !== 1 ||
@@ -202,26 +235,31 @@ export function evaluateCoverage(inventory, reports) {
         continue;
       }
       try {
+        const parsed = parseCobertura(xml);
         loadedReports.push({
           path: reportPath,
-          classes: parseCobertura(xml, reportPath),
+          classes: parsed.classes.map((item) => ({
+            ...item,
+            source: attributeClass(item.filename, parsed.sources, root),
+          })),
         });
       } catch (error) {
-        componentErrors.push(error.message);
+        componentErrors.push(`${reportPath}: ${error.message}`);
       }
     }
 
     for (const source of component.sources) {
-      if (seenSources.has(source)) {
+      const resolvedSource = resolveSource(source, root).value;
+      if (seenSources.has(resolvedSource)) {
         componentErrors.push(`source is assigned more than once: ${source}`);
         continue;
       }
-      seenSources.add(source);
+      seenSources.add(resolvedSource);
 
       const matches = [];
       for (const report of loadedReports) {
         const classes = report.classes.filter((item) =>
-          item.paths.some((filename) => matchesPath(filename, source)),
+          item.source === resolvedSource,
         );
         if (classes.length > 0) matches.push({ report, classes });
       }
@@ -258,11 +296,11 @@ export function evaluateCoverage(inventory, reports) {
     for (const report of loadedReports) {
       for (const measuredClass of report.classes) {
         const source = component.sources.find((item) =>
-          measuredClass.paths.some((filename) => matchesPath(filename, item)),
+          measuredClass.source === resolveSource(item, root).value,
         );
         if (source) continue;
         const excluded = exclusions.find((item) =>
-          measuredClass.paths.some((filename) => matchesPath(filename, item.path)),
+          measuredClass.source === resolveSource(item.path, root).value,
         );
         if (!excluded) {
           componentErrors.push(
