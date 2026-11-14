@@ -3,10 +3,13 @@ import { EventEmitter } from "node:events";
 import { mkdtemp, rm, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
+import { PassThrough, Writable } from "node:stream";
 import test from "node:test";
 import {
   cleanupMeasurementResources,
+  createMeasurementConnection,
   listenMeasurementServer,
+  navigateMeasurementPage,
   runMeasurementLifecycle,
 } from "../scripts/measure-local-performance.mjs";
 
@@ -194,6 +197,214 @@ function deferredDeadline(expectedMs) {
     cancelTimeout() {},
   };
 }
+
+function controlledMeasurementDeadline() {
+  const active = new Set();
+  return {
+    active,
+    scheduleTimeout(callback, milliseconds) {
+      assert.equal(milliseconds, 15000);
+      const timer = { callback };
+      active.add(timer);
+      return timer;
+    },
+    cancelTimeout(timer) {
+      active.delete(timer);
+    },
+  };
+}
+
+for (const { name, failureMode } of [
+  { name: "MeasurementPipe_WriteEpipeRejectsRequestsAndCleansResources", failureMode: "write" },
+  { name: "MeasurementPipe_ReadErrorRejectsRequestsAndCleansResources", failureMode: "read" },
+  {
+    name: "MeasurementPipe_SynchronousWriteErrorClearsRequestAndCleansResources",
+    failureMode: "throw",
+  },
+]) {
+  test(name, { timeout: 5000 }, async () => {
+    const actions = [];
+    const child = childProcessStub();
+    const pipeError = Object.assign(new Error("debugging pipe failed"), { code: "EPIPE" });
+    const input = new Writable({
+      write(chunk, encoding, callback) {
+        if (failureMode === "write") queueMicrotask(() => callback(pipeError));
+        else callback();
+      },
+    });
+    const output = new PassThrough();
+    child.stderr = { resume() {} };
+    child.stdio = [null, null, child.stderr, input, output];
+    child.kill = () => {
+      child.killCalls++;
+      actions.push("browser.kill");
+      setImmediate(() => {
+        child.exitCode = 0;
+        actions.push("browser.exit");
+        child.emit("exit", 0, null);
+      });
+      return true;
+    };
+    if (failureMode === "throw")
+      input.write = () => {
+        throw pipeError;
+      };
+    const timers = controlledMeasurementDeadline();
+    const { send } = createMeasurementConnection(child, timers);
+
+    try {
+      await assert.rejects(
+        runMeasurementLifecycle(
+          async () => {
+            const requests = Promise.all([send("Browser.getVersion"), send("Page.enable")]);
+            if (failureMode === "read") queueMicrotask(() => output.destroy(pipeError));
+            await requests;
+          },
+          { browser: child, server: serverStub(actions), profile: "pipe-failure-profile" },
+          {
+            exitTimeoutMs: 41,
+            ...deferredDeadline(41),
+            removeProfile: async (profile) => {
+              assert.equal(profile, "pipe-failure-profile");
+              actions.push("profile.remove");
+            },
+          }
+        ),
+        (error) => error === pipeError
+      );
+      assert.equal(child.killCalls, 1);
+      assert.deepEqual(actions, ["browser.kill", "browser.exit", "server.close", "profile.remove"]);
+      assert.equal(timers.active.size, 0);
+      await assert.rejects(send("Browser.getVersion"), (error) => error === pipeError);
+      assert.equal(timers.active.size, 0);
+    } finally {
+      input.destroy();
+      output.destroy();
+    }
+  });
+}
+
+test("MeasurementPipe_ResponseResolvesRequestAndClearsDeadline", async () => {
+  const child = childProcessStub();
+  const input = new PassThrough();
+  const output = new PassThrough();
+  child.stderr = { resume() {} };
+  child.stdio = [null, null, child.stderr, input, output];
+  const timers = controlledMeasurementDeadline();
+  const { send } = createMeasurementConnection(child, timers);
+  try {
+    const response = send("Page.enable", {}, "session");
+    assert.equal(
+      input.read().toString(),
+      '{"id":1,"method":"Page.enable","params":{},"sessionId":"session"}\0'
+    );
+    output.write('{"id":1,"result":{"enabled":true}}');
+    assert.equal(timers.active.size, 1);
+    output.write("\0");
+    assert.deepEqual(await response, { enabled: true });
+    assert.equal(timers.active.size, 0);
+  } finally {
+    input.destroy();
+    output.destroy();
+  }
+});
+
+for (const { name, navigationFailure } of [
+  {
+    name: "MeasurementLoad_NavigationRejectionCancelsDeadlineAndListener",
+    navigationFailure: "reject",
+  },
+  {
+    name: "MeasurementLoad_NavigationErrorTextCancelsDeadlineAndListener",
+    navigationFailure: "errorText",
+  },
+]) {
+  test(name, async () => {
+    const eventHandlers = new Map();
+    const timers = controlledMeasurementDeadline();
+    const navigationError = new Error("navigation failed");
+    await assert.rejects(
+      navigateMeasurementPage(
+        async () => {
+          assert.equal(eventHandlers.has("session:Page.loadEventFired"), true);
+          assert.equal(timers.active.size, 1);
+          if (navigationFailure === "reject") throw navigationError;
+          return { errorText: navigationError.message };
+        },
+        eventHandlers,
+        "session",
+        "http://127.0.0.1/",
+        timers
+      ),
+      (error) =>
+        navigationFailure === "reject"
+          ? error === navigationError
+          : error.message === navigationError.message
+    );
+    assert.equal(timers.active.size, 0);
+    assert.equal(eventHandlers.has("session:Page.loadEventFired"), false);
+  });
+}
+
+for (const { name, navigationPending } of [
+  {
+    name: "MeasurementLoad_TimeoutBeforeNavigationSettlesIsObservedAndCleaned",
+    navigationPending: true,
+  },
+  {
+    name: "MeasurementLoad_TimeoutAfterNavigationSettlesIsBoundedAndCleaned",
+    navigationPending: false,
+  },
+]) {
+  test(name, { timeout: 5000 }, async () => {
+    const eventHandlers = new Map();
+    const timers = controlledMeasurementDeadline();
+    let resolveNavigation;
+    const navigation = new Promise((resolveResponse) => {
+      resolveNavigation = resolveResponse;
+    });
+    const loading = navigateMeasurementPage(
+      () => navigation,
+      eventHandlers,
+      "session",
+      "http://127.0.0.1/",
+      timers
+    );
+    const rejection = assert.rejects(loading, { message: "Page load timeout" });
+    if (!navigationPending) {
+      resolveNavigation({});
+      await new Promise((resolveTurn) => setImmediate(resolveTurn));
+    }
+    const [timer] = timers.active;
+    timer.callback();
+    // Give Node a full turn to detect an unobserved rejection before navigation resolves.
+    await new Promise((resolveTurn) => setImmediate(resolveTurn));
+    assert.equal(timers.active.size, 0);
+    assert.equal(eventHandlers.has("session:Page.loadEventFired"), false);
+    if (navigationPending) resolveNavigation({});
+    await rejection;
+  });
+}
+
+test("MeasurementLoad_LoadEventBeforeNavigationResponseSucceedsAndCleansWait", async () => {
+  const eventHandlers = new Map();
+  const timers = controlledMeasurementDeadline();
+  await navigateMeasurementPage(
+    async (method, params, sessionId) => {
+      assert.equal(method, "Page.navigate");
+      assert.deepEqual(params, { url: "http://127.0.0.1/" });
+      assert.equal(sessionId, "session");
+      eventHandlers.get("session:Page.loadEventFired")();
+      return {};
+    },
+    eventHandlers,
+    "session",
+    "http://127.0.0.1/",
+    timers
+  );
+  assert.equal(timers.active.size, 0);
+  assert.equal(eventHandlers.has("session:Page.loadEventFired"), false);
+});
 
 test("MeasurementLifecycle_DelayedChildExitPrecedesServerAndProfileCleanup", async () => {
   const actions = [];

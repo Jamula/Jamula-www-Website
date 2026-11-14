@@ -96,38 +96,67 @@ internal sealed class Child : IAsyncDisposable
             }
             return child;
         }
-        catch
+        catch (Exception original)
         {
-            if (child is not null) await child.DisposeAsync();
-            else
+            await Cleanup.AfterFailureAsync(original, async () =>
             {
-                if (!process.HasExited) process.Kill(entireProcessTree: true);
-                try
-                {
-                    await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
-                    if (readiness is not null) await readiness.WaitAsync(TimeSpan.FromSeconds(10));
-                    await error.WaitAsync(TimeSpan.FromSeconds(10));
-                }
-                finally { process.Dispose(); }
-            }
+                if (child is not null) await child.DisposeAsync();
+                else await CleanupProcessAsync(
+                    () => { if (!process.HasExited) process.Kill(entireProcessTree: true); },
+                    () => process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10)),
+                    () => Task.WhenAll(readiness is null ? [error] : [readiness, error])
+                        .WaitAsync(TimeSpan.FromSeconds(10)),
+                    process.Dispose);
+            });
             throw;
         }
     }
 
-    public async Task StopAsync()
-    {
-        if (!process.HasExited) process.Kill(entireProcessTree: true);
-        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
-        await Task.WhenAll(drainOutput, drainError).WaitAsync(TimeSpan.FromSeconds(10));
-    }
+    public Task StopAsync() => CleanupProcessAsync(
+        () => { if (!process.HasExited) process.Kill(entireProcessTree: true); },
+        () => process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10)),
+        () => Task.WhenAll(drainOutput, drainError).WaitAsync(TimeSpan.FromSeconds(10)));
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync() => new(CleanupProcessAsync(
+        () => { if (!process.HasExited) process.Kill(entireProcessTree: true); },
+        () => process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10)),
+        () => Task.WhenAll(drainOutput, drainError).WaitAsync(TimeSpan.FromSeconds(10)),
+        process.Dispose));
+
+    internal static Task CleanupProcessAsync(Action terminate, Func<Task> waitForExit,
+        Func<Task> drain, Action? dispose = null)
     {
-        try { await StopAsync(); }
-        finally { process.Dispose(); }
+        List<Func<Task>> steps = [() => { terminate(); return Task.CompletedTask; }, waitForExit, drain];
+        if (dispose is not null) steps.Add(() => { dispose(); return Task.CompletedTask; });
+        return Cleanup.RunAsync(steps);
     }
     private static async Task DrainAsync(StreamReader reader)
     {
         while (await reader.ReadLineAsync() is not null) { }
+    }
+}
+
+internal static class Cleanup
+{
+    public static async Task RunAsync(IEnumerable<Func<Task>> steps)
+    {
+        List<Exception> failures = [];
+        foreach (var step in steps)
+        {
+            try { await step(); }
+            catch (Exception error) { failures.Add(error); }
+        }
+        if (failures.Count != 0)
+            throw new InvalidOperationException("Bounded child cleanup failed.",
+                new AggregateException(failures));
+    }
+
+    public static async Task AfterFailureAsync(Exception original, Func<Task> cleanup)
+    {
+        try { await cleanup(); }
+        catch (Exception error)
+        {
+            throw new AggregateException("Child startup and cleanup failed.", original, error);
+        }
     }
 }

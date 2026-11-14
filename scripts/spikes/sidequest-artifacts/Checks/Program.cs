@@ -5,10 +5,16 @@ using System.Net.NetworkInformation;
 using System.Security.Cryptography;
 using System.Text.Json;
 
-if (args.Length > 1 || (args.Length == 1 &&
-    args[0] is not ("--collective" or "--coverage")))
+if (args is ["--cleanup-child"])
 {
-    Console.Error.WriteLine("Use no arguments for independent checks, --collective, or --coverage.");
+    await Task.Delay(TimeSpan.FromSeconds(60));
+    return 0;
+}
+
+if (args.Length > 1 || (args.Length == 1 &&
+    args[0] is not ("--collective" or "--coverage" or "--cleanup")))
+{
+    Console.Error.WriteLine("Use no arguments for independent checks, --collective, --coverage, or --cleanup.");
     return 2;
 }
 var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
@@ -16,7 +22,8 @@ var coverage = args.Length == 1 && args[0] == "--coverage";
 var fixture = new Fixture(root, coverage);
 try
 {
-    await fixture.RunAsync(args.Length == 1 && args[0] == "--collective");
+    await fixture.RunAsync(args.Length == 1 && args[0] == "--collective",
+        args.Length == 1 && args[0] == "--cleanup");
     return 0;
 }
 catch (Exception error)
@@ -42,22 +49,101 @@ internal sealed class Fixture(string root, bool coverage) : IAsyncDisposable
     private string RoutingFile => Path.Combine(releases, "routes.json");
     public string CurrentCase { get; private set; } = "Setup";
 
-    public async Task RunAsync(bool collective)
+    public async Task RunAsync(bool collective, bool cleanupOnly = false)
     {
-        await Case("CleanupFailureDetailsAreRetained", () =>
+        await Case("CleanupFailureDetailsAreRetained", async () =>
         {
             var first = new TimeoutException("first cleanup failure");
             var second = new IOException("second cleanup failure");
-            InvalidOperationException? reported = null;
-            try { ThrowIfCleanupFailed([first, second]); }
-            catch (InvalidOperationException error) { reported = error; }
-            Require(reported is
-                { Message: "Bounded child cleanup failed.", InnerException: AggregateException aggregate } &&
-                aggregate.InnerExceptions.Count == 2 &&
-                ReferenceEquals(aggregate.InnerExceptions[0], first) &&
-                ReferenceEquals(aggregate.InnerExceptions[1], second));
-            return Task.CompletedTask;
+            var events = new List<string>();
+            var reported = await CaptureFailureAsync(() => CleanupAsync(
+                [new CleanupChild(() => { events.Add("first"); throw first; }),
+                 new CleanupChild(() => { events.Add("second"); throw second; })],
+                new CleanupResource(() => events.Add("client")), () => events.Add("directory")));
+            RequireCleanupFailures(reported, first, second);
+            Require(events.SequenceEqual(["first", "second", "client", "directory"]));
         });
+        await Case("ReleaseDeletionFailureRetainsEarlierCleanupFailures", async () =>
+        {
+            var first = new TimeoutException("child cleanup failure");
+            var deletion = new IOException("release deletion failure");
+            var events = new List<string>();
+            var reported = await CaptureFailureAsync(() => CleanupAsync(
+                [new CleanupChild(() => { events.Add("failed child"); throw first; }),
+                 new CleanupChild(() => events.Add("next child"))],
+                new CleanupResource(() => events.Add("client")),
+                () => { events.Add("directory"); throw deletion; }));
+            RequireCleanupFailures(reported, first, deletion);
+            Require(events.SequenceEqual(["failed child", "next child", "client", "directory"]));
+            var deletionOnly = await CaptureFailureAsync(() => CleanupAsync(
+                [], new CleanupResource(() => { }), () => throw deletion));
+            RequireCleanupFailures(deletionOnly, deletion);
+            await CleanupAsync([], new CleanupResource(() => { }), () => { });
+        });
+        await Case("TerminationFailureStillWaitsDrainsAndDisposes", async () =>
+        {
+            var kill = new InvalidOperationException("termination failure");
+            var wait = new TimeoutException("exit timeout");
+            var drain = new IOException("drain failure");
+            var events = new List<string>();
+            var reported = await CaptureFailureAsync(() => Child.CleanupProcessAsync(
+                () => { events.Add("terminate"); throw kill; },
+                () => { events.Add("wait"); return Task.FromException(wait); },
+                () => { events.Add("drain"); return Task.FromException(drain); },
+                () => events.Add("dispose")));
+            RequireCleanupFailures(reported, kill, wait, drain);
+            Require(events.SequenceEqual(["terminate", "wait", "drain", "dispose"]));
+            var disposal = new IOException("disposal failure");
+            reported = await CaptureFailureAsync(() => Child.CleanupProcessAsync(
+                () => throw kill, () => Task.CompletedTask, () => Task.CompletedTask,
+                () => throw disposal));
+            RequireCleanupFailures(reported, kill, disposal);
+        });
+        await Case("StartupAndCleanupFailuresRetainOriginalIdentityAndOrder", async () =>
+        {
+            foreach (var original in new Exception[]
+                { new TimeoutException("readiness timeout"), new InvalidOperationException("startup failure") })
+            {
+                var cleanup = new IOException("cleanup failure");
+                var reported = await CaptureFailureAsync(() =>
+                    Cleanup.AfterFailureAsync(original, () => Task.FromException(cleanup)));
+                Require(reported is AggregateException aggregate &&
+                    aggregate.InnerExceptions.Count == 2 &&
+                    ReferenceEquals(aggregate.InnerExceptions[0], original) &&
+                    ReferenceEquals(aggregate.InnerExceptions[1], cleanup));
+                var drain = new TimeoutException("drain timeout");
+                var disposed = false;
+                reported = await CaptureFailureAsync(() => Cleanup.AfterFailureAsync(original,
+                    () => Child.CleanupProcessAsync(() => throw cleanup,
+                        () => Task.CompletedTask, () => Task.FromException(drain),
+                        () => disposed = true)));
+                Require(reported is AggregateException combined &&
+                    combined.InnerExceptions.Count == 2 &&
+                    ReferenceEquals(combined.InnerExceptions[0], original) && disposed);
+                RequireCleanupFailures(((AggregateException)reported).InnerExceptions[1], cleanup, drain);
+            }
+        });
+        await Case("SuccessfulStartupCleanupRethrowsOriginalException", async () =>
+        {
+            var original = new InvalidOperationException("started callback failure");
+            var startedId = 0;
+            var reported = await CaptureFailureAsync(() => Child.StartAsync("dotnet", root,
+                [typeof(Fixture).Assembly.Location, "--cleanup-child"],
+                true, started: id => { startedId = id; throw original; }));
+            Require(ReferenceEquals(reported, original) && startedId > 0);
+            try
+            {
+                using var process = Process.GetProcessById(startedId);
+                Require(process.HasExited);
+            }
+            catch (ArgumentException) { }
+        });
+        if (cleanupOnly)
+        {
+            Require(passed == 5);
+            Console.WriteLine($"{passed} cleanup checks passed; 0 skipped; 0 failed.");
+            return;
+        }
         if (collective)
         {
             await Case("CollectivePublishesAndDeploysExactAllSectionSet", async () =>
@@ -266,7 +352,7 @@ internal sealed class Fixture(string root, bool coverage) : IAsyncDisposable
                     endpoint.Port == port && endpoint.Address.Equals(IPAddress.Loopback)));
             }
         });
-        Require(passed == (collective ? 3 : 20));
+        Require(passed == (collective ? 7 : 24));
         Console.WriteLine($"{passed} local artifact checks passed; 0 skipped; 0 failed.");
     }
 
@@ -363,11 +449,18 @@ internal sealed class Fixture(string root, bool coverage) : IAsyncDisposable
     {
         if (!condition) throw new InvalidOperationException("Local check failed.");
     }
-    private static void ThrowIfCleanupFailed(IReadOnlyCollection<Exception> failures)
+    private static async Task<Exception> CaptureFailureAsync(Func<Task> action)
     {
-        if (failures.Count != 0)
-            throw new InvalidOperationException("Bounded child cleanup failed.",
-                new AggregateException(failures));
+        try { await action(); }
+        catch (Exception error) { return error; }
+        throw new InvalidOperationException("Expected cleanup failure.");
+    }
+    private static void RequireCleanupFailures(Exception reported, params Exception[] expected)
+    {
+        Require(reported is
+            { Message: "Bounded child cleanup failed.", InnerException: AggregateException aggregate } &&
+            aggregate.InnerExceptions.Count == expected.Length &&
+            aggregate.InnerExceptions.Zip(expected).All(pair => ReferenceEquals(pair.First, pair.Second)));
     }
     private static async Task ExpectFailureAsync(Func<Task> action)
     {
@@ -380,18 +473,28 @@ internal sealed class Fixture(string root, bool coverage) : IAsyncDisposable
         Directory.Exists(directory) ? Directory.GetFiles(directory, "*", SearchOption.AllDirectories)
             .ToDictionary(file => Path.GetRelativePath(directory, file), Hash) : [];
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync() => new(CleanupAsync(children, client, () =>
     {
-        List<Exception> failures = [];
-        foreach (var child in children)
-        {
-            try { await child.DisposeAsync(); }
-            catch (Exception error) { failures.Add(error); }
-        }
-        client.Dispose();
         if (Directory.Exists(releases)) Directory.Delete(releases, recursive: true);
-        ThrowIfCleanupFailed(failures);
-    }
+    }));
+
+    internal static Task CleanupAsync(IEnumerable<IAsyncDisposable> children,
+        IDisposable client, Action deleteReleases) => Cleanup.RunAsync(
+        children.Select<IAsyncDisposable, Func<Task>>(child => () => child.DisposeAsync().AsTask())
+            .Concat([
+                () => { client.Dispose(); return Task.CompletedTask; },
+                () => { deleteReleases(); return Task.CompletedTask; },
+            ]));
+}
+
+internal sealed class CleanupChild(Action dispose) : IAsyncDisposable
+{
+    public ValueTask DisposeAsync() { dispose(); return ValueTask.CompletedTask; }
+}
+
+internal sealed class CleanupResource(Action dispose) : IDisposable
+{
+    public void Dispose() => dispose();
 }
 
 internal sealed record Probe(string Section, string Version, int ProcessId, int RequestNumber,

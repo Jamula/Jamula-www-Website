@@ -154,6 +154,12 @@ public static class PreviewSiteVerifier
         deadline.CancelAfter(clientTimeout == Timeout.InfiniteTimeSpan || clientTimeout > MaxBodyReadTime
             ? MaxBodyReadTime
             : clientTimeout);
+        deadline.Token.ThrowIfCancellationRequested();
+        if (content.Headers.ContentLength is > MaxBodyBytes)
+        {
+            throw new InvalidDataException("The preview response body exceeds the 5 MiB limit.");
+        }
+
         await using var stream = await content.ReadAsStreamAsync(deadline.Token);
         var buffer = new byte[MaxBodyBytes];
         var count = 0;
@@ -166,6 +172,15 @@ public static class PreviewSiteVerifier
             }
 
             count += read;
+        }
+
+        if (count == buffer.Length)
+        {
+            var overflowProbe = new byte[1];
+            if (await stream.ReadAsync(overflowProbe, deadline.Token) != 0)
+            {
+                throw new InvalidDataException("The preview response body exceeds the 5 MiB limit.");
+            }
         }
 
         return StrictUtf8.GetString(buffer, 0, count);

@@ -75,6 +75,10 @@ runner.Run("Preview_AllowedIsolatedHostnameAndRoot_AreAccepted", PreviewAllowedU
 runner.Run("Preview_ProductionExternalPortQueryAndFragmentUrls_AreRejected", PreviewInvalidUrlsRejected);
 runner.Run("Preview_HttpClientUsesTimeoutAndDisablesRedirects", PreviewClientPolicyIsConfigured);
 runner.Run("Preview_ValidResponseContract_IsVerified", PreviewValidResponseVerified);
+runner.Run("Preview_ResponseBodyAtExactLimit_IsAccepted", PreviewBodyAtExactLimitAccepted);
+runner.Run("Preview_DeclaredOversizedResponse_IsRejectedAndDisposed", PreviewDeclaredOversizedResponseRejected);
+runner.Run("Preview_StreamedOversizedResponse_IsRejectedAndDisposed", PreviewStreamedOversizedResponseRejected);
+runner.Run("Preview_CancellationDuringLimitProbe_DisposesResponseWithoutRetry", PreviewCancellationDuringLimitProbeDisposesResponse);
 runner.Run("Preview_MalformedHomeUtf8_IsRejected", PreviewMalformedHomeUtf8Rejected);
 runner.Run("Preview_TitleMismatch_IsRejected", () => PreviewResponseFailure("title", "unexpected title"));
 runner.Run("Preview_ConfiguredHeaderMismatch_IsRejected", () => PreviewResponseFailure("header", "X-Frame-Options"));
@@ -588,6 +592,55 @@ void PreviewValidResponseVerified()
     Equal(PreviewFixture.Url + "/__jamula_missing_route__", fixture.Requests[2]);
 }
 
+void PreviewBodyAtExactLimitAccepted()
+{
+    using var fixture = new PreviewFixture();
+    using var client = fixture.ClientFor("body-at-limit");
+    PreviewSiteVerifier.VerifyAsync(PreviewFixture.Url, fixture.ConfigPath, client, TextWriter.Null,
+        (_, _) => Task.CompletedTask).GetAwaiter().GetResult();
+    Equal(3, fixture.Requests.Count);
+    Check(fixture.HomeContentDisposed, "exact-limit-home-response-is-disposed");
+    Check(fixture.MissingContentDisposed, "exact-limit-404-response-is-disposed");
+}
+
+void PreviewDeclaredOversizedResponseRejected()
+{
+    using var fixture = new PreviewFixture();
+    using var client = fixture.ClientFor("declared-oversized-home");
+    Throws<InvalidDataException>(() => PreviewSiteVerifier.VerifyAsync(
+        PreviewFixture.Url, fixture.ConfigPath, client, TextWriter.Null, (_, _) => Task.CompletedTask)
+        .GetAwaiter().GetResult(), "5 MiB limit");
+    Equal(1, fixture.Requests.Count);
+    Check(fixture.HomeContentDisposed, "declared-oversized-home-content-is-disposed");
+}
+
+void PreviewStreamedOversizedResponseRejected()
+{
+    using var fixture = new PreviewFixture();
+    using var client = fixture.ClientFor("streamed-oversized");
+    Throws<InvalidDataException>(() => PreviewSiteVerifier.VerifyAsync(
+        PreviewFixture.Url, fixture.ConfigPath, client, TextWriter.Null, (_, _) => Task.CompletedTask)
+        .GetAwaiter().GetResult(), "5 MiB limit");
+    Equal(3, fixture.Requests.Count);
+    Check(fixture.MissingStreamContentLength is null, "streamed-response-has-no-declared-length");
+    Check(fixture.MissingStreamDisposed, "streamed-response-body-is-disposed");
+    Check(fixture.MissingContentDisposed, "streamed-oversized-response-content-is-disposed");
+}
+
+void PreviewCancellationDuringLimitProbeDisposesResponse()
+{
+    using var fixture = new PreviewFixture();
+    using var cancellation = new CancellationTokenSource();
+    using var client = fixture.ClientFor("cancel-at-limit", cancellation.Cancel);
+    var error = Throws<OperationCanceledException>(() => PreviewSiteVerifier.VerifyAsync(
+        PreviewFixture.Url, fixture.ConfigPath, client, TextWriter.Null, (_, _) => Task.CompletedTask, cancellation.Token)
+        .GetAwaiter().GetResult());
+    Equal(cancellation.Token, error.CancellationToken);
+    Equal(1, fixture.Requests.Count);
+    Check(fixture.HomeStreamDisposed, "cancelled-limit-probe-disposes-body-stream");
+    Check(fixture.HomeContentDisposed, "cancelled-limit-probe-disposes-response-content");
+}
+
 void PreviewMalformedHomeUtf8Rejected()
 {
     using var fixture = new PreviewFixture();
@@ -1022,10 +1075,15 @@ sealed class ArtifactFixture : IDisposable
 sealed class PreviewFixture : IDisposable
 {
     public const string Url = "https://ashy-beach-033c7d01e-74.7.azurestaticapps.net";
+    public const int MaxBodyBytes = 5 * 1024 * 1024;
     private readonly TemporaryDirectory _directory = new();
     public List<string> Requests { get; } = [];
     public string ConfigPath { get; }
     public bool HomeContentDisposed { get; private set; }
+    public bool HomeStreamDisposed { get; private set; }
+    public bool MissingContentDisposed { get; private set; }
+    public bool MissingStreamDisposed { get; private set; }
+    public long? MissingStreamContentLength { get; private set; }
     private readonly Dictionary<string, string> _headers;
 
     public PreviewFixture()
@@ -1042,6 +1100,10 @@ sealed class PreviewFixture : IDisposable
     {
         Requests.Clear();
         HomeContentDisposed = false;
+        HomeStreamDisposed = false;
+        MissingContentDisposed = false;
+        MissingStreamDisposed = false;
+        MissingStreamContentLength = null;
         return new HttpClient(new CallbackHandler(request =>
         {
             var path = request.RequestUri!.AbsolutePath;
@@ -1060,12 +1122,7 @@ sealed class PreviewFixture : IDisposable
             {
                 var response = new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = mode == "home-stall-once" && Requests.Count == 1
-                        ? new StreamContent(new StalledStream(onStalledRead))
-                        : mode == "malformed-utf8-title"
-                            ? new DisposalTrackingContent(Encoding.UTF8.GetBytes("<title>Jamula</title>")
-                                .Concat(new byte[] { 0xC3, 0x28 }).ToArray(), () => HomeContentDisposed = true)
-                            : TextContent(mode == "title" ? "<title>Unexpected</title>" : "<title>Jamula</title>")
+                    Content = CreateHomeContent(mode, onStalledRead)
                 };
                 foreach (var (name, value) in _headers)
                 {
@@ -1087,6 +1144,25 @@ sealed class PreviewFixture : IDisposable
                 content.Headers.ContentType = new MediaTypeHeaderValue(mode == "robots-mime" ? "text/html" : "text/plain");
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
             }
+            if (mode == "body-at-limit")
+            {
+                return new HttpResponseMessage(HttpStatusCode.NotFound)
+                {
+                    Content = new DisposalTrackingContent(
+                        BodyOfLength("Page not found", MaxBodyBytes),
+                        () => MissingContentDisposed = true)
+                };
+            }
+            if (mode == "streamed-oversized")
+            {
+                var stream = new TrackingBodyStream(
+                    BodyOfLength("Page not found", MaxBodyBytes + 1),
+                    () => MissingStreamDisposed = true);
+                var content = new DisposalTrackingStreamContent(stream, () => MissingContentDisposed = true);
+                MissingStreamContentLength = content.Headers.ContentLength;
+                return new HttpResponseMessage(HttpStatusCode.NotFound) { Content = content };
+            }
+
             return mode switch
             {
                 "missing-route-success" => new HttpResponseMessage(HttpStatusCode.OK) { Content = TextContent("Page not found") },
@@ -1097,9 +1173,62 @@ sealed class PreviewFixture : IDisposable
         }));
     }
 
+    private HttpContent CreateHomeContent(string mode, Action? onStalledRead)
+    {
+        if (mode == "home-stall-once" && Requests.Count == 1)
+        {
+            return new StreamContent(new StalledStream(onStalledRead));
+        }
+
+        if (mode == "malformed-utf8-title")
+        {
+            return new DisposalTrackingContent(Encoding.UTF8.GetBytes("<title>Jamula</title>")
+                .Concat(new byte[] { 0xC3, 0x28 }).ToArray(), () => HomeContentDisposed = true);
+        }
+
+        if (mode == "body-at-limit")
+        {
+            return new DisposalTrackingContent(
+                BodyOfLength("<title>Jamula</title>", MaxBodyBytes),
+                () => HomeContentDisposed = true);
+        }
+
+        if (mode == "declared-oversized-home")
+        {
+            return new DisposalTrackingContent(
+                BodyOfLength("<title>Jamula</title>", MaxBodyBytes + 1),
+                () => HomeContentDisposed = true);
+        }
+
+        if (mode == "cancel-at-limit")
+        {
+            var body = BodyOfLength("<title>Jamula</title>", MaxBodyBytes);
+            var stream = new TrackingBodyStream(
+                body,
+                () => HomeStreamDisposed = true,
+                onStalledRead,
+                waitAtEnd: true);
+            return new DisposalTrackingStreamContent(stream, () => HomeContentDisposed = true);
+        }
+
+        return TextContent(mode == "title" ? "<title>Unexpected</title>" : "<title>Jamula</title>");
+    }
+
+    private static byte[] BodyOfLength(string prefix, int length) =>
+        Encoding.UTF8.GetBytes(prefix + new string('x', length - Encoding.UTF8.GetByteCount(prefix)));
+
     private static StringContent TextContent(string text) => new(text, Encoding.UTF8, "text/html");
 
     private sealed class DisposalTrackingContent(byte[] bytes, Action onDispose) : ByteArrayContent(bytes)
+    {
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) onDispose();
+            base.Dispose(disposing);
+        }
+    }
+
+    private sealed class DisposalTrackingStreamContent(Stream stream, Action onDispose) : StreamContent(stream)
     {
         protected override void Dispose(bool disposing)
         {
@@ -1121,6 +1250,50 @@ sealed class PreviewFixture : IDisposable
     }
 
     public void Dispose() => _directory.Dispose();
+}
+
+sealed class TrackingBodyStream(
+    byte[] body,
+    Action? onDispose = null,
+    Action? onEndOfStream = null,
+    bool waitAtEnd = false) : Stream
+{
+    private int _offset;
+
+    public override bool CanRead => true;
+    public override bool CanSeek => false;
+    public override bool CanWrite => false;
+    public override long Length => throw new NotSupportedException();
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override void Flush() => throw new NotSupportedException();
+    public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        if (_offset == body.Length)
+        {
+            onEndOfStream?.Invoke();
+            if (waitAtEnd)
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            return 0;
+        }
+
+        var count = Math.Min(buffer.Length, body.Length - _offset);
+        body.AsMemory(_offset, count).CopyTo(buffer);
+        _offset += count;
+        return count;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) onDispose?.Invoke();
+        base.Dispose(disposing);
+    }
 }
 
 sealed class CallbackHandler(Func<HttpRequestMessage, HttpResponseMessage> callback) : HttpMessageHandler

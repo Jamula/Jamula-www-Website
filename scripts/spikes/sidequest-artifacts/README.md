@@ -37,6 +37,18 @@ $env:DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE = 'true'
 dotnet run --project scripts\spikes\sidequest-artifacts\Checks\Checks.csproj --configuration Release
 ```
 
+For only the five focused cleanup regressions (no publishing or hosting), run:
+
+```powershell
+dotnet run --project scripts\spikes\sidequest-artifacts\Checks\Checks.csproj --configuration Release -- --cleanup
+```
+
+These checks inject ordered cleanup failures deterministically and use one
+owned sleeping .NET child (the checks assembly's internal `--cleanup-child`
+mode, bounded to 60 seconds) to verify that successful startup cleanup rethrows
+the original callback exception and terminates the child. This focused command
+requires only the existing .NET SDK/runtime, not PowerShell.
+
 The fixture separately publishes each project, launches each published DLL in
 its own OS process from its release directory, and starts a fourth routing
 process. All hosts bind `127.0.0.1:0`; the OS allocates distinct ports. Readiness
@@ -89,10 +101,19 @@ actors are outside the cleanup/availability guarantee. Do not run simultaneous
 publishes against the same project: build intermediates are shared even though
 release roots and listening ports are isolated.
 
+Cleanup attempts termination, bounded exit/drain waits and handle disposal even
+when an earlier step fails. Failures retain their original exception objects in
+attempt order. If startup and cleanup both fail, the aggregate contains the
+startup error first and the cleanup error second; successful cleanup rethrows
+the original startup error unchanged. Fixture cleanup also attempts every child,
+client disposal and release deletion, retaining deletion errors after any
+earlier failures rather than replacing them.
+
 ## Exact check inventory
 
-The default command must exit 0 with **20 passed, 0 skipped, 0 failed**. The
-collective command must exit 0 with **3 passed, 0 skipped, 0 failed**. Names are
+The default command must exit 0 with **24 passed, 0 skipped, 0 failed**. The
+collective command must exit 0 with **7 passed, 0 skipped, 0 failed**. The focused
+`--cleanup` command must exit 0 with **5 passed, 0 skipped, 0 failed**. Names are
 static, unique report metadata, never interpolated request data. This console
 fixture follows the existing spike convention; it does not emit a TRX/JUnit
 result report or enforce an in-run coverage threshold. The coverage gate
@@ -102,6 +123,10 @@ consumes the separate `dotnet-coverage` report described in
 | Requirement | Evidence |
 | --- | --- |
 | Child cleanup failures retain their original exception details | `CleanupFailureDetailsAreRetained` |
+| Release deletion errors follow earlier child cleanup errors | `ReleaseDeletionFailureRetainsEarlierCleanupFailures` |
+| Termination failure still attempts bounded waits, drains and disposal | `TerminationFailureStillWaitsDrainsAndDisposes` |
+| Startup and cleanup errors retain identity and order | `StartupAndCleanupFailuresRetainOriginalIdentityAndOrder` |
+| Successful startup cleanup preserves the original exception and stops its child | `SuccessfulStartupCleanupRethrowsOriginalException` |
 | Independent builds/releases | `IndependentPublishesDoNotBuildOtherSections` |
 | Separate processes/ports and runnable artifacts | `IndependentArtifactsRunInDistinctProcessesAndPorts` |
 | Direct section roots, nested paths and encoded/repeated/empty query values | `AllSectionsPreserveNestedPathAndEncodedQuery` |

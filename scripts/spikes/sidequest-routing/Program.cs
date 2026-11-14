@@ -1,7 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.Sockets;
+using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http.Features;
 
 const string Admin = "admin";
 const string Finance = "finance";
@@ -16,7 +20,11 @@ var backends = new Dictionary<string, BackendHost>(StringComparer.Ordinal)
 await using var gateway = await GatewayHost.StartAsync(backends);
 
 var tests = 0;
-var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
+var client = new HttpClient(new HttpClientHandler
+{
+    AllowAutoRedirect = false,
+    UseProxy = false,
+});
 try
 {
     foreach (var section in new[] { Admin, Finance, Tech })
@@ -31,6 +39,9 @@ try
     await AssertRouteAsync(Finance, "v2");
     await AssertRouteAsync(Admin, "v1");
     await AssertRouteAsync(Tech, "v1");
+    await AssertEncodedPathAsync();
+    await AssertDotSegmentPathAsync();
+    await AssertUnsafeTargetAsync();
     using var missing = await client.GetAsync(new Uri(gateway.Address, "/unknown/status"));
     if (missing.StatusCode != HttpStatusCode.NotFound)
     {
@@ -57,21 +68,173 @@ async Task AssertRouteAsync(string section, string version)
     using var response = await client.GetAsync(new Uri(gateway.Address, requestedPath));
     response.EnsureSuccessStatusCode();
     var result = await response.Content.ReadFromJsonAsync<ProbeResponse>();
+    var expectedRawTarget = requestedPath;
     if (result is null ||
         result.Section != section ||
         result.Version != version ||
         result.Path != requestedPath[..requestedPath.IndexOf('?')] ||
-        result.Query != "?probe=sidequest")
+        result.Query != "?probe=sidequest" ||
+        result.RawTarget != expectedRawTarget)
     {
         throw new InvalidOperationException(
-            $"Expected {section}/{version} with the original path and query.");
+            $"Expected {section}/{version} with the original path and query; received " +
+            $"{result?.Section}/{result?.Version}, path={result?.Path}, " +
+            $"query={result?.Query}, raw target={result?.RawTarget}.");
     }
 
     tests++;
     Console.WriteLine($"PASS: {section} routes to {version} and preserves path/query");
 }
 
-internal sealed record ProbeResponse(string Section, string Version, string Path, string Query);
+async Task AssertEncodedPathAsync()
+{
+    const string requestedTarget =
+        "/finance/item%2Fpart%3Fmark%23hash?probe=one%3Ftwo%23three";
+    var response = await SendRawGetAsync(gateway.Address, requestedTarget);
+    if (response.StatusCode != (int)HttpStatusCode.OK ||
+        response.Probe is not { } result ||
+        result.Section != Finance ||
+        result.Version != "v2" ||
+        result.RawTarget != requestedTarget)
+    {
+        throw new InvalidOperationException(
+            "Encoded slash, question-mark, and hash delimiters must remain in the forwarded request target.");
+    }
+
+    tests++;
+    Console.WriteLine("PASS: raw HTTP preserves encoded path delimiters in the request target");
+}
+
+async Task AssertDotSegmentPathAsync()
+{
+    const string requestedTarget = "/finance/%2e%2e/admin/status?probe=dot-segment";
+    var response = await SendRawGetAsync(gateway.Address, requestedTarget);
+    if (response.StatusCode != (int)HttpStatusCode.OK ||
+        response.Probe is not { } result ||
+        result.Section != Finance ||
+        result.Version != "v2" ||
+        result.RawTarget != requestedTarget)
+    {
+        throw new InvalidOperationException(
+            "Encoded dot segments must be forwarded byte-for-byte without changing section dispatch; " +
+            $"received status={response.StatusCode}, section={response.Probe?.Section}, " +
+            $"version={response.Probe?.Version}, raw target={response.Probe?.RawTarget}.");
+    }
+
+    tests++;
+    Console.WriteLine("PASS: raw HTTP preserves encoded dot segments and finance dispatch");
+}
+
+async Task AssertUnsafeTargetAsync()
+{
+    var response = await SendRawGetAsync(gateway.Address, "//finance/status");
+    if (response.StatusCode != (int)HttpStatusCode.BadRequest)
+    {
+        throw new InvalidOperationException("Network-path request targets must not be forwarded.");
+    }
+
+    tests++;
+    Console.WriteLine("PASS: network-path request targets are rejected");
+}
+
+async Task<WireResponse> SendRawGetAsync(Uri address, string requestTarget)
+{
+    using var socket = new TcpClient();
+    await socket.ConnectAsync(IPAddress.Parse(address.Host), address.Port);
+    await using var stream = socket.GetStream();
+    var request = Encoding.ASCII.GetBytes(
+        $"GET {requestTarget} HTTP/1.1\r\nHost: {address.Authority}\r\nConnection: close\r\n\r\n");
+    await stream.WriteAsync(request);
+    await stream.FlushAsync();
+
+    using var received = new MemoryStream();
+    await stream.CopyToAsync(received);
+    var responseBytes = received.ToArray();
+    var headerEnd = FindHeaderEnd(responseBytes);
+    if (headerEnd < 0)
+    {
+        throw new InvalidOperationException("The gateway returned an incomplete HTTP response.");
+    }
+
+    var headerText = Encoding.ASCII.GetString(responseBytes, 0, headerEnd);
+    var statusLine = headerText[..headerText.IndexOf("\r\n", StringComparison.Ordinal)];
+    var statusParts = statusLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    if (statusParts.Length < 2 || !int.TryParse(statusParts[1], out var statusCode))
+    {
+        throw new InvalidOperationException($"Unexpected gateway status line: {statusLine}");
+    }
+
+    var bodyOffset = headerEnd + 4;
+    var bodyLength = responseBytes.Length - bodyOffset;
+    var body = responseBytes.AsSpan(bodyOffset, bodyLength).ToArray();
+    if (headerText.Contains("Transfer-Encoding: chunked", StringComparison.OrdinalIgnoreCase))
+    {
+        body = DecodeChunkedBody(body);
+    }
+
+    var probe = statusCode == (int)HttpStatusCode.OK
+        ? JsonSerializer.Deserialize<ProbeResponse>(body, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+        })
+        : null;
+    return new WireResponse(statusCode, probe);
+}
+
+int FindHeaderEnd(byte[] response)
+{
+    for (var index = 0; index <= response.Length - 4; index++)
+    {
+        if (response[index] == '\r' &&
+            response[index + 1] == '\n' &&
+            response[index + 2] == '\r' &&
+            response[index + 3] == '\n')
+        {
+            return index;
+        }
+    }
+
+    return -1;
+}
+
+byte[] DecodeChunkedBody(byte[] encodedBody)
+{
+    using var decoded = new MemoryStream();
+    var bodyText = Encoding.ASCII.GetString(encodedBody);
+    var offset = 0;
+    while (true)
+    {
+        var lineEnd = bodyText.IndexOf("\r\n", offset, StringComparison.Ordinal);
+        if (lineEnd < 0 ||
+            !int.TryParse(
+                bodyText[offset..lineEnd].Split(';')[0],
+                System.Globalization.NumberStyles.HexNumber,
+                provider: null,
+                out var chunkLength))
+        {
+            throw new InvalidOperationException("The gateway returned an invalid chunked response.");
+        }
+
+        if (chunkLength == 0)
+        {
+            return decoded.ToArray();
+        }
+
+        offset = lineEnd + 2;
+        var chunk = Encoding.ASCII.GetBytes(bodyText.Substring(offset, chunkLength));
+        decoded.Write(chunk);
+        offset += chunkLength + 2;
+    }
+}
+
+internal sealed record WireResponse(int StatusCode, ProbeResponse? Probe);
+
+internal sealed record ProbeResponse(
+    string Section,
+    string Version,
+    string Path,
+    string Query,
+    string RawTarget);
 
 internal sealed class BackendHost : IAsyncDisposable
 {
@@ -94,7 +257,9 @@ internal sealed class BackendHost : IAsyncDisposable
             section,
             version,
             context.Request.Path.Value ?? "/",
-            context.Request.QueryString.Value ?? "")));
+            context.Request.QueryString.Value ?? "",
+            context.Features.Get<IHttpRequestFeature>()?.RawTarget
+                ?? "")));
         await app.StartAsync();
         return new BackendHost(app, GetAddress(app));
     }
@@ -135,20 +300,45 @@ internal sealed class GatewayHost : IAsyncDisposable
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         var app = builder.Build();
-        var upstream = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
-
-        app.Map("/{section}/{**path}", async (HttpContext context) =>
+        var upstream = new HttpClient(new HttpClientHandler
         {
-            var section = context.Request.RouteValues["section"]?.ToString();
-            if (section is null || !backends.TryGetValue(section, out var backend))
+            AllowAutoRedirect = false,
+            UseProxy = false,
+        });
+
+        app.Run(async context =>
+        {
+            var rawTarget = context.Features
+                .Get<IHttpRequestFeature>()?.RawTarget
+                ?? throw new InvalidOperationException("The original request target is unavailable.");
+            if (!IsSafeOriginFormTarget(rawTarget))
+            {
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                return;
+            }
+
+            var pathEnd = rawTarget.IndexOf('?');
+            var rawPath = pathEnd < 0 ? rawTarget : rawTarget[..pathEnd];
+            var sectionEnd = rawPath.IndexOf('/', 1);
+            var section = sectionEnd < 0 ? rawPath[1..] : rawPath[1..sectionEnd];
+            if (!backends.TryGetValue(section, out var backend))
             {
                 context.Response.StatusCode = StatusCodes.Status404NotFound;
                 return;
             }
 
-            var target = new Uri(
-                backend.Address,
-                (context.Request.Path.Value ?? "/") + context.Request.QueryString);
+            var uriOptions = new UriCreationOptions
+            {
+                DangerousDisablePathAndQueryCanonicalization = true,
+            };
+            if (!Uri.TryCreate(
+                    backend.Address.GetLeftPart(UriPartial.Authority) + rawTarget,
+                    in uriOptions,
+                    out var target))
+            {
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                return;
+            }
             using var request = new HttpRequestMessage(
                 new HttpMethod(context.Request.Method),
                 target);
@@ -160,6 +350,41 @@ internal sealed class GatewayHost : IAsyncDisposable
 
         await app.StartAsync();
         return new GatewayHost(app, BackendHost.GetAddress(app), upstream);
+    }
+
+    private static bool IsSafeOriginFormTarget(string rawTarget)
+    {
+        if (!rawTarget.StartsWith("/", StringComparison.Ordinal) ||
+            rawTarget.StartsWith("//", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        for (var index = 0; index < rawTarget.Length; index++)
+        {
+            var character = rawTarget[index];
+            if (character < '!' ||
+                character > '~' ||
+                character is '\\' or '#')
+            {
+                return false;
+            }
+
+            if (character == '%' &&
+                (index + 2 >= rawTarget.Length ||
+                 !Uri.IsHexDigit(rawTarget[index + 1]) ||
+                 !Uri.IsHexDigit(rawTarget[index + 2])))
+            {
+                return false;
+            }
+
+            if (character == '%')
+            {
+                index += 2;
+            }
+        }
+
+        return true;
     }
 
     public async ValueTask DisposeAsync()

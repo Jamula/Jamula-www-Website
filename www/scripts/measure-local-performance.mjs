@@ -182,6 +182,104 @@ export async function runMeasurementLifecycle(operation, resources = {}, cleanup
   return result;
 }
 
+export function createMeasurementConnection(
+  browser,
+  { scheduleTimeout = setTimeout, cancelTimeout = clearTimeout } = {}
+) {
+  let id = 0;
+  let buffer = "";
+  const pending = new Map();
+  const eventHandlers = new Map();
+  let browserFailure;
+  function failBrowser(error) {
+    browserFailure ??= error;
+    for (const callback of pending.values()) {
+      cancelTimeout(callback.timer);
+      callback.reject(browserFailure);
+    }
+    pending.clear();
+  }
+  browser.on("error", failBrowser);
+  browser.on("exit", (code) => {
+    failBrowser(new Error(`Browser exited: ${code}`));
+  });
+  browser.stdio[3].on("error", failBrowser);
+  browser.stdio[4].on("error", failBrowser);
+  browser.stderr.resume();
+  browser.stdio[4].setEncoding("utf8");
+  browser.stdio[4].on("data", (chunk) => {
+    buffer += chunk;
+    let end;
+    while ((end = buffer.indexOf("\0")) !== -1) {
+      const message = JSON.parse(buffer.slice(0, end));
+      buffer = buffer.slice(end + 1);
+      if (message.id) {
+        const callback = pending.get(message.id);
+        if (callback) {
+          pending.delete(message.id);
+          cancelTimeout(callback.timer);
+          message.error
+            ? callback.reject(new Error(JSON.stringify(message.error)))
+            : callback.resolve(message.result);
+        }
+      } else {
+        eventHandlers.get(`${message.sessionId}:${message.method}`)?.(message.params);
+      }
+    }
+  });
+  function send(method, params = {}, sessionId) {
+    return new Promise((resolveSend, reject) => {
+      if (browserFailure) return reject(browserFailure);
+      const requestId = ++id;
+      const timer = scheduleTimeout(() => {
+        pending.delete(requestId);
+        reject(new Error(`CDP timeout: ${method}`));
+      }, 15000);
+      pending.set(requestId, { resolve: resolveSend, reject, timer });
+      try {
+        browser.stdio[3].write(`${JSON.stringify({ id: requestId, method, params, sessionId })}\0`);
+      } catch (error) {
+        failBrowser(error);
+      }
+    });
+  }
+  return { send, eventHandlers };
+}
+
+export async function navigateMeasurementPage(
+  send,
+  eventHandlers,
+  sessionId,
+  url,
+  { scheduleTimeout = setTimeout, cancelTimeout = clearTimeout } = {}
+) {
+  const eventKey = `${sessionId}:Page.loadEventFired`;
+  let timer;
+  const cancelLoad = () => {
+    cancelTimeout(timer);
+    eventHandlers.delete(eventKey);
+  };
+  const loaded = new Promise((resolveLoaded, reject) => {
+    timer = scheduleTimeout(() => {
+      cancelLoad();
+      reject(new Error("Page load timeout"));
+    }, 15000);
+    eventHandlers.set(eventKey, () => {
+      cancelLoad();
+      resolveLoaded();
+    });
+  });
+  // Loading can time out while the navigation command is still pending.
+  loaded.catch(() => {});
+  try {
+    const navigation = await send("Page.navigate", { url }, sessionId);
+    if (navigation.errorText) throw new Error(navigation.errorText);
+    await loaded;
+  } finally {
+    cancelLoad();
+  }
+}
+
 export async function runMeasurement() {
   const resources = {};
   return runMeasurementLifecycle(async () => {
@@ -250,57 +348,7 @@ export async function runMeasurement() {
     );
     resources.browser = browser;
 
-    let id = 0;
-    let buffer = "";
-    const pending = new Map();
-    const eventHandlers = new Map();
-    let browserFailure;
-    browser.stderr.resume();
-    browser.stdio[4].setEncoding("utf8");
-    browser.stdio[4].on("data", (chunk) => {
-      buffer += chunk;
-      let end;
-      while ((end = buffer.indexOf("\0")) !== -1) {
-        const message = JSON.parse(buffer.slice(0, end));
-        buffer = buffer.slice(end + 1);
-        if (message.id) {
-          const callback = pending.get(message.id);
-          if (callback) {
-            pending.delete(message.id);
-            clearTimeout(callback.timer);
-            message.error
-              ? callback.reject(new Error(JSON.stringify(message.error)))
-              : callback.resolve(message.result);
-          }
-        } else {
-          eventHandlers.get(`${message.sessionId}:${message.method}`)?.(message.params);
-        }
-      }
-    });
-    function failBrowser(error) {
-      browserFailure = error;
-      for (const callback of pending.values()) {
-        clearTimeout(callback.timer);
-        callback.reject(error);
-      }
-      pending.clear();
-    }
-    browser.on("error", failBrowser);
-    browser.on("exit", (code) => {
-      failBrowser(new Error(`Browser exited: ${code}`));
-    });
-    function send(method, params = {}, sessionId) {
-      return new Promise((resolveSend, reject) => {
-        if (browserFailure) return reject(browserFailure);
-        const requestId = ++id;
-        const timer = setTimeout(() => {
-          pending.delete(requestId);
-          reject(new Error(`CDP timeout: ${method}`));
-        }, 15000);
-        pending.set(requestId, { resolve: resolveSend, reject, timer });
-        browser.stdio[3].write(`${JSON.stringify({ id: requestId, method, params, sessionId })}\0`);
-      });
-    }
+    const { send, eventHandlers } = createMeasurementConnection(browser);
     const instrumentation = `(() => {
   const state = window.__measurement = { lcp: null, shifts: [] };
   new PerformanceObserver(list => {
@@ -377,20 +425,12 @@ export async function runMeasurement() {
             { source: instrumentation },
             sessionId
           );
-          const loaded = new Promise((resolveLoaded, reject) => {
-            const timer = setTimeout(() => reject(new Error("Page load timeout")), 15000);
-            eventHandlers.set(`${sessionId}:Page.loadEventFired`, () => {
-              clearTimeout(timer);
-              resolveLoaded();
-            });
-          });
-          const navigation = await send(
-            "Page.navigate",
-            { url: `http://127.0.0.1:${port}${route}` },
-            sessionId
+          await navigateMeasurementPage(
+            send,
+            eventHandlers,
+            sessionId,
+            `http://127.0.0.1:${port}${route}`
           );
-          if (navigation.errorText) throw new Error(navigation.errorText);
-          await loaded;
           await new Promise((r) => setTimeout(r, 3000));
           const result = await send(
             "Runtime.evaluate",
@@ -407,7 +447,6 @@ export async function runMeasurement() {
             JSON.stringify({ device, route, run, externalRequests, ...result.result.value })
           );
           eventHandlers.delete(`${sessionId}:Fetch.requestPaused`);
-          eventHandlers.delete(`${sessionId}:Page.loadEventFired`);
           await send("Target.disposeBrowserContext", { browserContextId });
         }
       }
