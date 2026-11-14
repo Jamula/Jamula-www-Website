@@ -101,12 +101,35 @@ dotnet-coverage collect --output "$reports\mbr-dotnet.cobertura.xml" --output-fo
   dotnet run --project scripts\mbr\tests\JamulaMbr.Tests.csproj --configuration Release
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+# Never leave a previous combined result available after a failed collection.
+if (Test-Path -LiteralPath "$reports\validation.cobertura.xml") {
+  Remove-Item -LiteralPath "$reports\validation.cobertura.xml" -Force -ErrorAction Stop
+}
+$validationRunners = @'
+dotnet run --project scripts\validation.tests\JamulaValidation.Tests.csproj --configuration Release
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+dotnet run --project scripts\validation.cli.tests\JamulaValidation.Cli.Tests.csproj --configuration Release
+exit $LASTEXITCODE
+'@
 dotnet-coverage collect --output "$reports\validation.cobertura.xml" --output-format cobertura `
-  dotnet run --project scripts\validation.tests\JamulaValidation.Tests.csproj --configuration Release
+  pwsh -NoProfile -Command $validationRunners
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 node scripts\coverage\gate.mjs $reports "$reports\summary.json"
 ```
+
+The validation command requires PowerShell 7 (`pwsh`). Both offline runners and
+their subprocesses run inside one collector session, combining execution into
+the single inventoried `validation.cobertura.xml` without counting shared
+assembly/class/line identities twice. Either runner or collector failing stops
+the command sequence before the gate; a partial report is not valid evidence.
+Do not merge separately exported Cobertura reports with `dotnet-coverage merge`
+18.12.0: a local check reduced branch denominators from 160 to 138 for
+`PreviewArtifactValidator.cs` and from 78 to 74 for `PreviewSiteVerifier.cs`.
+Merging native `.coverage` inputs then exporting also lost the branch evidence.
+The shared-session Cobertura export preserves the original denominators.
+The CLI tests exercise offline dispatch/error paths, not successful live
+verification; the remaining production paths stay in the denominator.
 
 The final command currently exits **1**: missing measurements and
 below-threshold components remain blockers. The printed aggregate is only the
@@ -161,7 +184,11 @@ console-only runner summary as a successful gate.
   instead of being treated as third-party or silently omitted.
 - The migrated validation utility is measured separately from its offline test
   runner. Its current test file is locked to the existing #110 review and is
-  not modified by this coverage work.
+  not modified by this coverage work. Combining both runners measured
+  374/391 lines (95.65%) and 279/302 branches (92.38%) locally, passing this
+  component only. `Program.cs` still has 8/24 uncovered lines, and
+  `PreviewSiteVerifier.cs` has 11/78 uncovered branches; the component result
+  is not comprehensive behavior coverage or an overall first-party pass.
 
 The inventory and gate are measurement infrastructure, not proof that #109 is
 accepted. Resolve every unmeasured path and threshold failure before claiming a
