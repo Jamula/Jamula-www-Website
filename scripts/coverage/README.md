@@ -55,7 +55,7 @@ From the repository root in PowerShell, create isolated report directories:
 ```powershell
 $reports = Join-Path (Get-Location) "coverage-reports"
 New-Item -ItemType Directory -Force `
-  "$reports\website", "$reports\astro-config", "$reports\automation", "$reports\mbr-ui", "$reports\coverage-gate" | Out-Null
+  "$reports\website", "$reports\astro-config", "$reports\automation", "$reports\mbr-ui", "$reports\coverage-gate", "$reports\ralph-triage" | Out-Null
 ```
 
 Install website dependencies with `npm ci --prefix www` if needed. The gate
@@ -104,7 +104,20 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   --include="scripts/coverage/gate.mjs" --exclude="scripts/coverage/gate.test.mjs" `
   node --test scripts/coverage/gate.test.mjs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+& .\www\node_modules\.bin\c8.cmd --all --include=".squad/templates/ralph-triage.js" `
+  --exclude="" --reporter=text --reporter=cobertura --reporter=json-summary `
+  --reports-dir="$reports\ralph-triage" --check-coverage --lines=90 --branches=90 --per-file `
+  node --test scripts/coverage/ralph-triage.test.cjs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 ```
+
+The Ralph collector explicitly includes the hidden source and clears c8's
+default exclusions. Run from the repository root: Cobertura records that
+absolute root, which the gate checks against its own checkout. Its offline CLI
+tests stub Git, HTTPS and output writes; no GitHub request or result file is
+created. c8 reports V8 line and branch counts, not independent boolean
+condition coverage. Other Squad templates remain unmeasured.
 
 The Astro collector writes a fresh temporary directory on each run; the copy
 above uses the directory printed by that successful run. Its Cobertura
@@ -211,8 +224,8 @@ console-only runner summary as a successful gate.
   totals met the 90% line and branch thresholds. Some individual sources remain
   below 90%; external DNS/GitHub/server paths remain in their denominators.
 - `.squad/templates/` contains first-party Node, PowerShell, shell, and 11
-  runnable workflow templates. They are named as an unmeasured component
-  instead of being treated as third-party or silently omitted.
+  runnable workflow templates. Only `ralph-triage.js` is measured; all other
+  executable templates remain unmeasured blockers.
 - The migrated validation utility is measured separately from its offline test
   runner. Its current test file is locked to the existing #110 review and is
   not modified by this coverage work. Combining both runners measured

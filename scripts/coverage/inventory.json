@@ -126,13 +126,9 @@
     },
     {
       "id": "squad-maintenance-templates",
-      "reports": [],
-      "sources": [],
+      "reports": ["ralph-triage/cobertura-coverage.xml"],
+      "sources": [".squad/templates/ralph-triage.js"],
       "unmeasured": [
-        {
-          "path": ".squad/templates/ralph-triage.js",
-          "reason": "First-party maintenance automation template has no line/branch coverage report."
-        },
         {
           "path": ".squad/templates/scripts/notes/fetch.ps1",
           "reason": "First-party maintenance script template has no line/branch coverage report."
@@ -212,6 +208,14 @@
     {
       "path": "scripts/coverage/gate.test.mjs",
       "reason": "Test-only source; its assertions are not product behavior."
+    },
+    {
+      "path": "scripts/coverage/ralph-triage.test.cjs",
+      "reason": "Offline test source; its assertions are not product behavior."
+    },
+    {
+      "path": "scripts/coverage/ralph-triage-fixture.cjs",
+      "reason": "Offline CLI test doubles, not production automation."
     },
     {
       "path": "scripts/mbr/tests/Program.cs",
