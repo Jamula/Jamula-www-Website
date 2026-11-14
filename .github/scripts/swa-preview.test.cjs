@@ -655,12 +655,14 @@ test("live CSP verifier rejects the stale self-only policy", () => {
 });
 
 test("live CSP verifier rejects missing or duplicate CSP headers", () => {
+  const config = JSON.parse(fs.readFileSync(staticWebAppConfig, "utf8"));
+  const policy = config.globalHeaders["Content-Security-Policy"];
   const headersDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-csp-"));
   const headersPath = path.join(headersDirectory, "headers.txt");
   try {
     for (const response of [
       "HTTP/2 200\r\nX-Frame-Options: DENY\r\n",
-      "HTTP/2 200\r\nContent-Security-Policy: one\r\nContent-Security-Policy: two\r\n",
+      `HTTP/2 200\r\nContent-Security-Policy: ${policy}\r\nContent-Security-Policy: ${policy}\r\n`,
     ]) {
       fs.writeFileSync(headersPath, response);
       assert.throws(
@@ -694,6 +696,107 @@ test("live CSP verifier never inherits CSP from an earlier response", () => {
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("live CSP verifier rejects missing, empty, and non-string configured policies", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-csp-config-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const configPath = path.join(directory, "config.json");
+  for (const config of [
+    {},
+    { globalHeaders: {} },
+    { globalHeaders: { "Content-Security-Policy": "" } },
+    { globalHeaders: { "Content-Security-Policy": 42 } },
+  ]) {
+    fs.writeFileSync(configPath, JSON.stringify(config));
+    assert.throws(
+      () =>
+        assertConfiguredCsp(configPath, path.join(directory, "unused-headers")),
+      { message: "Built Static Web Apps configuration has no CSP." },
+    );
+  }
+});
+
+test("live CSP verifier propagates malformed configuration and file errors", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-csp-errors-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const configPath = path.join(directory, "config.json");
+  const headersPath = path.join(directory, "missing-headers");
+  assert.throws(() => assertConfiguredCsp(configPath, headersPath), {
+    code: "ENOENT",
+  });
+  fs.writeFileSync(configPath, "{");
+  assert.throws(() => assertConfiguredCsp(configPath, headersPath), SyntaxError);
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify({
+      globalHeaders: { "Content-Security-Policy": "default-src 'self'" },
+    }),
+  );
+  assert.throws(() => assertConfiguredCsp(configPath, headersPath), {
+    code: "ENOENT",
+  });
+});
+
+test("live CSP verifier handles header casing, whitespace, and malformed response blocks", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-csp-headers-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const configPath = path.join(directory, "config.json");
+  const headersPath = path.join(directory, "headers.txt");
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify({
+      globalHeaders: { "Content-Security-Policy": "default-src 'self'" },
+    }),
+  );
+  fs.writeFileSync(
+    headersPath,
+    "HTTP/2 200\ncontent-security-policy \t:  default-src 'self'  \n\nHTTP/2 nope\nContent-Security-Policy: stale\n",
+  );
+  assert.doesNotThrow(() => assertConfiguredCsp(configPath, headersPath));
+  fs.writeFileSync(
+    headersPath,
+    "HTTP/2 nope\nContent-Security-Policy: default-src 'self'\n",
+  );
+  assert.throws(() => assertConfiguredCsp(configPath, headersPath), {
+    message: "Live response has no HTTP header block.",
+  });
+});
+
+test("live CSP verifier command reports success, usage, and verification errors", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-csp-cli-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const configPath = path.join(directory, "config.json");
+  const headersPath = path.join(directory, "headers.txt");
+  const verifier = path.join(__dirname, "verify-swa-csp.cjs");
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify({
+      globalHeaders: { "Content-Security-Policy": "default-src 'self'" },
+    }),
+  );
+  fs.writeFileSync(
+    headersPath,
+    "HTTP/2 200\nContent-Security-Policy: default-src 'self'\n",
+  );
+  const run = (...args) =>
+    spawnSync(process.execPath, [verifier, ...args], { encoding: "utf8" });
+  const success = run(configPath, headersPath);
+  assert.equal(success.status, 0);
+  assert.equal(success.stderr, "");
+  const usage = run(configPath);
+  assert.equal(usage.status, 1);
+  assert.equal(
+    usage.stderr.trim(),
+    "Usage: verify-swa-csp.cjs <staticwebapp.config.json> <curl-headers>",
+  );
+  fs.writeFileSync(headersPath, "HTTP/2 200\nContent-Security-Policy: stale\n");
+  const mismatch = run(configPath, headersPath);
+  assert.equal(mismatch.status, 1);
+  assert.equal(
+    mismatch.stderr.trim(),
+    "Live Content-Security-Policy does not match the built configuration.",
+  );
 });
 
 test("both production verifiers compare live CSP against the built config", () => {
