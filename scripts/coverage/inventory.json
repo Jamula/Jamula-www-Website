@@ -90,9 +90,10 @@
       "id": "monitor",
       "reports": ["monitor.cobertura.xml"],
       "sources": ["scripts/monitor/Program.cs"],
-      "unmeasured": [
+      "validatedMetadata": [
         {
           "path": "scripts/monitor/InternalsVisibleTo.cs",
+          "kind": "monitor-friend-assembly",
           "reason": "Assembly-level InternalsVisibleTo metadata contains no executable lines for Cobertura to measure."
         }
       ]

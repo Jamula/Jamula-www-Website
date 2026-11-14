@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Runtime.CompilerServices;
 
 // ── Self-tests (offline; no network or third-party packages) ──────────────────
 
@@ -29,6 +30,15 @@ static class SelfTests
                 failures++;
             }
         }
+
+        var monitorAssembly = typeof(Monitor).Assembly;
+        Assert("AssemblyMetadata_GrantsInternalsOnlyToMonitorTests",
+            monitorAssembly.GetCustomAttributes(typeof(InternalsVisibleToAttribute), false)
+                .Cast<InternalsVisibleToAttribute>()
+                .Select(attribute => attribute.AssemblyName)
+                .SequenceEqual(new[] { typeof(SelfTests).Assembly.GetName().Name })
+            && typeof(SelfTests).Assembly.GetName().Name == "JamulaMonitor.Tests"
+            && !typeof(Monitor).IsPublic);
 
         RunCanonicalParserTests(Assert);
         await RunDnsTestsAsync(Assert);

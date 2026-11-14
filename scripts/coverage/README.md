@@ -21,7 +21,32 @@ roots, and unsupported URLs fail closed. Windows paths compare case-insensitivel
 POSIX paths remain case-sensitive. Reports from another checkout must be collected
 again in the checkout being evaluated; a similar trailing directory is not evidence
 of source identity. Imported tests can supply an explicit absolute repository root
-as the third argument to `evaluateCoverage`; the CLI always uses its own checkout.
+as the third argument to `evaluateCoverage`; its fourth argument is a `Map` of
+validated metadata file contents. The CLI always uses its own checkout and loads
+the metadata content from that checkout.
+
+The monitor's `InternalsVisibleTo.cs` is explicitly inventoried under
+`validatedMetadata`, not excluded or measured. On every gate invocation, the
+CLI reads that file from its own repository root (not the reports directory or
+current working directory). Its narrowly allowlisted classification accepts
+only `using System.Runtime.CompilerServices;` followed by the literal assembly
+attribute `[assembly: InternalsVisibleTo("JamulaMonitor.Tests")]`, with ASCII
+spaces, tabs, and line endings around the declarations. Missing content, any
+other path/kind/component, duplicate classifications, comments, directives,
+additional attributes, declarations, expressions, or executable code fail
+closed. A reported executable class for this path is still unclassified and
+fails. Changes to the permitted syntax require explicit review of the guard;
+this is intentionally not a general C# parser or a metadata exclusion glob.
+
+The summary retains this source's path, kind, reason, and validation result
+separately, with **no** invented line/branch counts and no effect on thresholds.
+The gate tests mutate the content and classification to verify rejection.
+`dotnet run --project scripts\monitor\tests\JamulaMonitor.Tests.csproj --configuration Release`
+also compiles the friend's existing internal API calls and runs
+`AssemblyMetadata_GrantsInternalsOnlyToMonitorTests`, checking the emitted
+attribute names so exactly one friend—the actual test assembly—is granted
+internal access, while `Monitor` remains non-public. Run both this command and
+`node scripts\coverage\gate.test.mjs` when changing this classification.
 
 ## Collecting reports
 
@@ -143,13 +168,14 @@ diagnostic for that run, not a full-coverage claim; rerun for each revision.
 
 For the 2026-11-13 local run at `56a25e2`, all collectors succeeded but the
 gate exited **1**. Counts below are covered/valid for inventoried production
-sources; component results include unmeasured-source blockers.
+sources; component results include unmeasured-source blockers. The metadata
+guard was integrated afterward and does not change these measurement counts.
 
 | Component | Lines | Branches | Gate result |
 | --- | ---: | ---: | --- |
 | Website browser and config | 301/301 | 102/106 | Fail: seven unmeasured templates |
 | GitHub automation | 575/604 | 211/226 | Fail: nine unmeasured workflows |
-| Monitor | 186/205 | 80/86 | Fail: unmeasured assembly metadata |
+| Monitor | 186/205 | 80/86 | Fail: assembly metadata was unclassified in this baseline |
 | Monthly business review | 460/463 | 395/401 | Pass |
 | Validation tool | 358/391 | 279/302 | Pass |
 | Coverage gate | 427/429 | 175/180 | Pass |
@@ -167,12 +193,17 @@ console-only runner summary as a successful gate.
 
 ## Current blockers
 
-- `scripts/monitor/InternalsVisibleTo.cs` is production assembly metadata with
-  no executable lines for Cobertura to measure. It is inventoried as
-  unmeasured and therefore blocks the gate, rather than being excluded.
 - The website has seven `.astro` templates with build-time logic that remain
   unmeasured. The separate configuration and browser reports do not measure
   those templates; build and generated-site tests are not source coverage.
+- `scripts/monitor/InternalsVisibleTo.cs` has no executable lines for Cobertura
+  to measure. The exact-content guard validates only the allowlisted friend
+  assembly declaration; it contributes no invented coverage counts. Any other
+  content or classification fails closed.
+- The website has seven `.astro` templates with build-time logic and an
+  executable `www/astro.config.ts`. The runtime coverage report measures only
+  `www/public/analytics-consent.js`; separate configuration coverage does not
+  measure the templates.
 - Workflow YAML contains inline shell/JavaScript and workflow control logic not
   represented by the `.github/scripts/*.cjs` Cobertura report. All tracked
   workflows are named in the inventory.

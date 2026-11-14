@@ -3,7 +3,9 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const require = createRequire(new URL("../../www/package.json", import.meta.url));
+const require = createRequire(
+  new URL("../../www/package.json", import.meta.url),
+);
 const { SaxesParser } = require("saxes");
 
 const inventoryPath = fileURLToPath(
@@ -16,6 +18,11 @@ const COUNT_KEYS = [
   "branchesCovered",
   "branchesValid",
 ];
+const MONITOR_METADATA_PATH = "scripts/monitor/InternalsVisibleTo.cs";
+const MONITOR_METADATA_KIND = "monitor-friend-assembly";
+// Deliberately accept only this declaration, not general C# or attribute arguments.
+const MONITOR_METADATA_PATTERN =
+  /^[ \t\r\n]*using System\.Runtime\.CompilerServices;[ \t\r\n]*\[assembly:[ \t\r\n]*InternalsVisibleTo\("JamulaMonitor\.Tests"\)\][ \t\r\n]*(?![\s\S])/;
 
 function parseCobertura(xml) {
   const classes = [];
@@ -68,7 +75,11 @@ function parseCobertura(xml) {
           throw new Error("invalid branch condition counts.");
         }
       }
-      currentClass.lines.push({ covered: hits > 0, branchCovered, branchValid });
+      currentClass.lines.push({
+        covered: hits > 0,
+        branchCovered,
+        branchValid,
+      });
     }
     stack.push(tag.name);
   });
@@ -192,7 +203,12 @@ function summarize(counts, thresholdPercent) {
   };
 }
 
-export function evaluateCoverage(inventory, reports, rootPath = repositoryRoot) {
+export function evaluateCoverage(
+  inventory,
+  reports,
+  rootPath = repositoryRoot,
+  sourceContents = new Map(),
+) {
   const root = sourcePath(rootPath);
   if (!root.absolute) throw new Error("Repository root must be an absolute path.");
   const errors = [];
@@ -204,6 +220,9 @@ export function evaluateCoverage(inventory, reports, rootPath = repositoryRoot) 
     !Array.isArray(inventory.excludedSources)
   ) {
     throw new Error("Coverage inventory has an unsupported or invalid schema.");
+  }
+  if (!(sourceContents instanceof Map)) {
+    throw new Error("Metadata source contents must be a Map.");
   }
 
   const seenComponents = new Set();
@@ -218,6 +237,7 @@ export function evaluateCoverage(inventory, reports, rootPath = repositoryRoot) 
       seenComponents.has(component.id) ||
       !Array.isArray(component.sources) ||
       !Array.isArray(component.reports) ||
+      !Array.isArray(component.validatedMetadata ?? []) ||
       !Array.isArray(component.unmeasured ?? [])
     ) {
       throw new Error("Coverage inventory contains an invalid component.");
@@ -228,6 +248,79 @@ export function evaluateCoverage(inventory, reports, rootPath = repositoryRoot) 
     const componentErrors = [];
     const measuredSources = [];
     const loadedReports = [];
+    const validatedMetadata = [];
+    if (
+      component.id === "monitor" &&
+      !(component.validatedMetadata ?? []).some(
+        (metadata) => metadata?.path === MONITOR_METADATA_PATH,
+      )
+    ) {
+      componentErrors.push(
+        `missing metadata classification: ${MONITOR_METADATA_PATH}`,
+      );
+    }
+    for (const metadata of component.validatedMetadata ?? []) {
+      if (
+        component.id !== "monitor" ||
+        metadata?.path !== MONITOR_METADATA_PATH ||
+        metadata.kind !== MONITOR_METADATA_KIND ||
+        typeof metadata.reason !== "string" ||
+        !metadata.reason.trim()
+      ) {
+        componentErrors.push("unsupported metadata classification.");
+        continue;
+      }
+      const metadataIdentity = resolveSource(metadata.path, root).value;
+      const expectedMetadataIdentity = resolveSource(
+        MONITOR_METADATA_PATH,
+        root,
+      ).value;
+      if (
+        metadataIdentity !== expectedMetadataIdentity ||
+        seenSources.has(metadataIdentity) ||
+        inventory.components.some(
+          (item) => {
+            const assignedSources = Array.isArray(item.sources)
+              ? item.sources
+              : [];
+            const unmeasuredSources = Array.isArray(item.unmeasured)
+              ? item.unmeasured
+              : [];
+            return (
+              assignedSources.some(
+                (source) =>
+                  resolveSource(source, root).value === metadataIdentity,
+              ) ||
+              unmeasuredSources.some(
+                (source) =>
+                  resolveSource(source.path, root).value === metadataIdentity,
+              )
+            );
+          },
+        ) ||
+        exclusions.some(
+          (source) =>
+            resolveSource(source.path, root).value === metadataIdentity,
+        )
+      ) {
+        componentErrors.push(
+          `metadata source is assigned more than once: ${metadata.path}`,
+        );
+        continue;
+      }
+      seenSources.add(metadataIdentity);
+      const content = sourceContents.get(MONITOR_METADATA_PATH);
+      if (
+        typeof content !== "string" ||
+        !MONITOR_METADATA_PATTERN.test(content)
+      ) {
+        componentErrors.push(
+          `metadata content is missing or unsupported: ${metadata.path}`,
+        );
+        continue;
+      }
+      validatedMetadata.push({ ...metadata, validated: true });
+    }
     for (const reportPath of component.reports) {
       const xml = reports.get(reportPath);
       if (typeof xml !== "string" || xml.trim().length === 0) {
@@ -334,6 +427,7 @@ export function evaluateCoverage(inventory, reports, rootPath = repositoryRoot) 
       ...summary,
       passed: summary.passed && componentErrors.length === 0,
       sources: measuredSources,
+      validatedMetadata,
       unmeasured,
       errors: componentErrors,
     });
@@ -368,6 +462,11 @@ export function formatReport(report) {
     lines.push(
       `${component.id} | ${line} (${component.linesCovered}/${component.linesValid}) | ${branch} (${component.branchesCovered}/${component.branchesValid}) | ${component.passed ? "PASS" : "FAIL"}`,
     );
+    for (const metadata of component.validatedMetadata ?? []) {
+      lines.push(
+        `${component.id} | validated non-executable metadata: ${metadata.path} (${metadata.kind}; no coverage counts)`,
+      );
+    }
   }
   const aggregate = report.aggregate;
   lines.push(
@@ -409,7 +508,26 @@ async function main(args) {
     }
   }
 
-  const report = evaluateCoverage(inventory, reports);
+  const sourceContents = new Map();
+  if (
+    inventory.components.some(
+      (component) => component.validatedMetadata?.length,
+    )
+  ) {
+    sourceContents.set(
+      MONITOR_METADATA_PATH,
+      await readFile(
+        new URL("../monitor/InternalsVisibleTo.cs", import.meta.url),
+        "utf8",
+      ),
+    );
+  }
+  const report = evaluateCoverage(
+    inventory,
+    reports,
+    repositoryRoot,
+    sourceContents,
+  );
   printReport(report);
   if (args[1]) {
     const outputPath = path.resolve(args[1]);

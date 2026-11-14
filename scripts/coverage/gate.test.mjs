@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -43,6 +42,237 @@ const component = (id, sources, reports, unmeasured = []) => ({
   sources,
   reports,
   unmeasured,
+});
+const metadataPath = "scripts/monitor/InternalsVisibleTo.cs";
+const metadataContent =
+  'using System.Runtime.CompilerServices;\n[assembly: InternalsVisibleTo("JamulaMonitor.Tests")]\n';
+const metadataEntry = {
+  path: metadataPath,
+  kind: "monitor-friend-assembly",
+  reason: "Literal assembly metadata; no executable lines.",
+};
+function metadataFixture(entries = [metadataEntry]) {
+  return inventory([
+    {
+      ...component("monitor", ["scripts/monitor/Program.cs"], ["monitor.xml"]),
+      validatedMetadata: entries,
+    },
+  ]);
+}
+const monitorReports = () =>
+  new Map([
+    ["monitor.xml", classReport("scripts/monitor/Program.cs", [1], [[1, 1]])],
+  ]);
+
+test("CoverageGate_ValidatesExactMonitorMetadataWithoutInventingCounts", () => {
+  for (const content of [
+    metadataContent,
+    metadataContent.replaceAll("\n", "\r\n"),
+    ` \t${metadataContent}\t`,
+  ]) {
+    const input = metadataFixture();
+    const result = evaluateCoverage(
+      input,
+      monitorReports(),
+      repositoryRoot,
+      new Map([[metadataPath, content]]),
+    );
+    const baseline = evaluateCoverage(
+      inventory([
+        component("monitor", ["scripts/monitor/Program.cs"], ["monitor.xml"]),
+      ]),
+      monitorReports(),
+    );
+    assert.equal(result.passed, true);
+    assert.deepEqual(result.aggregate, baseline.aggregate);
+    assert.deepEqual(
+      result.components[0].sources,
+      baseline.components[0].sources,
+    );
+    assert.deepEqual(result.components[0].validatedMetadata, [
+      { ...metadataEntry, validated: true },
+    ]);
+    assert.match(
+      formatReport(result).lines.join("\n"),
+      /InternalsVisibleTo\.cs.*no coverage counts/,
+    );
+  }
+});
+
+test("CoverageGate_RejectsMissingExecutableAndUnsupportedMetadataContent", () => {
+  for (const content of [
+    undefined,
+    "",
+    " ",
+    metadataContent + "Console.WriteLine(1);\n",
+    metadataContent + "class Hidden { static int Run() => 1; }\n",
+    metadataContent + "namespace Hidden {}\n",
+    metadataContent + "#if DEBUG\nConsole.WriteLine(1);\n#endif\n",
+    metadataContent + "// Unsupported comment\n",
+    metadataContent +
+      '[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]\n',
+    metadataContent + '[assembly: InternalsVisibleTo("Other.Tests")]\n',
+    metadataContent.replace('"JamulaMonitor.Tests"', "GetFriendName()"),
+    metadataContent.replace("JamulaMonitor.Tests", "Other.Tests"),
+    metadataContent.replace(
+      "using System.Runtime.CompilerServices;",
+      "using InternalsVisibleTo = CustomAttribute;",
+    ),
+    metadataContent.replace("[assembly:", "[module:"),
+    metadataContent + "\0",
+  ]) {
+    const result = evaluateCoverage(
+      metadataFixture(),
+      monitorReports(),
+      repositoryRoot,
+      new Map([[metadataPath, content]]),
+    );
+    assert.equal(result.passed, false, String(content));
+    assert.deepEqual(result.components[0].validatedMetadata, []);
+    assert.match(
+      result.errors.join("\n"),
+      /metadata content is missing or unsupported/,
+    );
+  }
+});
+
+test("CoverageGate_RejectsMissingMonitorMetadataClassification", () => {
+  const result = evaluateCoverage(
+    metadataFixture([]),
+    monitorReports(),
+    repositoryRoot,
+    new Map([[metadataPath, metadataContent]]),
+  );
+  assert.equal(result.passed, false);
+  assert.match(
+    result.errors.join("\n"),
+    /monitor: missing metadata classification: scripts\/monitor\/InternalsVisibleTo\.cs/,
+  );
+});
+
+test("CoverageGate_RejectsUnsupportedAndDuplicateMetadataClassifications", () => {
+  for (const entry of [
+    { ...metadataEntry, path: "scripts/monitor/Program.cs" },
+    { ...metadataEntry, kind: "arbitrary-csharp" },
+    { ...metadataEntry, reason: "" },
+    null,
+  ]) {
+    const result = evaluateCoverage(
+      metadataFixture([entry]),
+      monitorReports(),
+      repositoryRoot,
+      new Map([[metadataPath, metadataContent]]),
+    );
+    assert.equal(result.passed, false);
+    assert.match(
+      result.errors.join("\n"),
+      /unsupported metadata classification/,
+    );
+  }
+  for (const placement of [
+    "duplicate",
+    "measured",
+    "unmeasured",
+    "excluded",
+    "other-component",
+    "normalized-measured",
+    "normalized-unmeasured",
+    "normalized-excluded",
+  ]) {
+    const input = metadataFixture();
+    if (placement === "duplicate")
+      input.components[0].validatedMetadata.push(metadataEntry);
+    if (placement === "measured")
+      input.components[0].sources.push(metadataPath);
+    if (placement === "unmeasured")
+      input.components[0].unmeasured.push({
+        path: metadataPath,
+        reason: "blocker",
+      });
+    if (placement === "excluded")
+      input.excludedSources.push({ path: metadataPath, reason: "not allowed" });
+    if (placement === "normalized-measured")
+      input.components[0].sources.push(
+        "scripts/monitor/./InternalsVisibleTo.cs",
+      );
+    if (placement === "normalized-unmeasured")
+      input.components[0].unmeasured.push({
+        path: "scripts/monitor/./InternalsVisibleTo.cs",
+        reason: "blocker",
+      });
+    if (placement === "normalized-excluded")
+      input.excludedSources.push({
+        path: "scripts/monitor/./InternalsVisibleTo.cs",
+        reason: "not allowed",
+      });
+    if (placement === "other-component") input.components[0].id = "other";
+    const result = evaluateCoverage(
+      input,
+      monitorReports(),
+      repositoryRoot,
+      new Map([[metadataPath, metadataContent]]),
+    );
+    assert.equal(result.passed, false, placement);
+    assert.match(
+      result.errors.join("\n"),
+      /metadata.*(?:assigned more than once|classification)/,
+    );
+  }
+  const input = metadataFixture();
+  input.components[0].validatedMetadata = {};
+  assert.throws(
+    () => evaluateCoverage(input, monitorReports()),
+    /invalid component/,
+  );
+});
+
+test("CoverageGate_MetadataDoesNotMaskMeasurementsBlockersOrThresholds", () => {
+  for (const failure of [
+    "missing-report",
+    "threshold",
+    "unmeasured",
+    "metadata-measured",
+  ]) {
+    const input = metadataFixture();
+    const reports = monitorReports();
+    if (failure === "missing-report") reports.clear();
+    if (failure === "threshold")
+      reports.set(
+        "monitor.xml",
+        classReport("scripts/monitor/Program.cs", [0], [[0, 1]]),
+      );
+    if (failure === "unmeasured")
+      input.components[0].unmeasured.push({
+        path: "other.cs",
+        reason: "still blocking",
+      });
+    if (failure === "metadata-measured")
+      reports.set(
+        "monitor.xml",
+        reports
+          .get("monitor.xml")
+          .replace(
+            "</classes>",
+            '<class filename="' +
+              metadataPath +
+              '"><lines><line hits="1"/></lines></class></classes>',
+          ),
+      );
+    const result = evaluateCoverage(
+      input,
+      reports,
+      repositoryRoot,
+      new Map([[metadataPath, metadataContent]]),
+    );
+    assert.equal(result.passed, false, failure);
+    assert.deepEqual(result.components[0].validatedMetadata, [
+      { ...metadataEntry, validated: true },
+    ]);
+    assert.match(
+      result.errors.join("\n"),
+      /missing report|requires >=90%|unmeasured source|unclassified report source/,
+    );
+  }
 });
 
 test("CoverageGate_RejectsSimilarlyNamedOutsideSourceRoots", () => {
@@ -383,47 +613,79 @@ test("CoverageGate_RejectsMalformedCoberturaAndBranchCounts", () => {
 
 test("CoverageGate_InventoryClassifiesTrackedExecutableSources", async () => {
   const root = fileURLToPath(new URL("../../", import.meta.url));
-  const manifest = JSON.parse(await readFile(new URL("./inventory.json", import.meta.url), "utf8"));
+  const manifest = JSON.parse(
+    await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
+  );
   const entries = [
     ...manifest.components.flatMap((item) => [
       ...item.sources,
+      ...(item.validatedMetadata ?? []).map((source) => source.path),
       ...(item.unmeasured ?? []).map((source) => source.path),
     ]),
     ...manifest.excludedSources.map((item) => item.path),
   ];
-  assert.equal(entries.length, new Set(entries).size, "inventory paths must be unique");
+  assert.equal(
+    entries.length,
+    new Set(entries).size,
+    "inventory paths must be unique",
+  );
   const git = spawnSync("git", ["ls-files", "--cached"], {
     cwd: root,
     encoding: "utf8",
   });
   assert.equal(git.status, 0, git.stderr);
   const tracked = new Set(git.stdout.trim().split(/\r?\n/));
-  const executable = [...tracked].filter((file) =>
-    /\.(?:cjs|mjs|js|cs|ts|astro|ps1|sh)$/.test(file) ||
-    /^(?:\.github\/workflows|\.squad\/templates\/workflows)\/.*\.ya?ml$/.test(file),
+  const executable = [...tracked].filter(
+    (file) =>
+      /\.(?:cjs|mjs|js|cs|ts|astro|ps1|sh)$/.test(file) ||
+      /^(?:\.github\/workflows|\.squad\/templates\/workflows)\/.*\.ya?ml$/.test(
+        file,
+      ),
   );
-  assert.deepEqual(executable.filter((file) => !entries.includes(file)), []);
-  assert.deepEqual(entries.filter((file) => !tracked.has(file)), []);
+  assert.deepEqual(
+    executable.filter((file) => !entries.includes(file)),
+    [],
+  );
+  assert.deepEqual(
+    entries.filter((file) => !tracked.has(file)),
+    [],
+  );
 
-  const monitor = manifest.components.find((item) => item.id === "monitor");
-  const metadataPath = "scripts/monitor/InternalsVisibleTo.cs";
   assert.ok(
-    monitor.unmeasured.some((item) => item.path === metadataPath && item.reason.trim()),
+    manifest.excludedSources.some(
+      (item) =>
+        item.path === "scripts/mbr/tests/MbrIntegrationTests.cs" &&
+        item.reason.trim(),
+    ),
   );
-  assert.ok(!manifest.excludedSources.some((item) => item.path === metadataPath));
+});
+
+test("CoverageGate_RepositoryMonitorMetadataUsesGuardedClassification", async () => {
+  const manifest = JSON.parse(
+    await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
+  );
+  const monitor = manifest.components.find((item) => item.id === "monitor");
+  assert.equal(monitor.validatedMetadata.length, 1);
+  assert.equal(monitor.validatedMetadata[0].path, metadataPath);
+  assert.equal(monitor.validatedMetadata[0].kind, metadataEntry.kind);
+  assert.ok(monitor.validatedMetadata[0].reason.trim());
+  assert.ok(
+    !(monitor.unmeasured ?? []).some((item) => item.path === metadataPath),
+  );
+  assert.ok(
+    !manifest.excludedSources.some((item) => item.path === metadataPath),
+  );
   const metadata = await readFile(
     new URL("../monitor/InternalsVisibleTo.cs", import.meta.url),
     "utf8",
   );
-  assert.match(
-    metadata,
-    /^\s*using System\.Runtime\.CompilerServices;\s*\[assembly:\s*InternalsVisibleTo\("JamulaMonitor\.Tests"\)\]\s*$/,
+  const result = evaluateCoverage(
+    metadataFixture(monitor.validatedMetadata),
+    monitorReports(),
+    repositoryRoot,
+    new Map([[metadataPath, metadata]]),
   );
-  assert.ok(
-    manifest.excludedSources.some(
-      (item) => item.path === "scripts/mbr/tests/MbrIntegrationTests.cs" && item.reason.trim(),
-    ),
-  );
+  assert.equal(result.passed, true);
 });
 
 test("CoverageGate_RejectsInvalidInventoryAndRepeatedSourceAssignments", () => {
@@ -525,13 +787,15 @@ test("CoverageGate_CLIReportsUsageAndWritesFailClosedSummary", async () => {
   assert.equal(usage.status, 1);
   assert.match(usage.stderr, /Usage: node scripts\/coverage\/gate\.mjs/);
 
-  const directory = await mkdtemp(path.join(os.tmpdir(), "coverage-gate-"));
+  const directory = await mkdtemp(
+    path.join(repositoryRoot, ".coverage-gate-cli-"),
+  );
   const summaryPath = path.join(directory, "summary.json");
   try {
     const result = spawnSync(
       process.execPath,
       [gatePath, directory, summaryPath],
-      { encoding: "utf8" },
+      { encoding: "utf8", cwd: directory },
     );
     assert.equal(result.status, 1);
     assert.match(result.stdout, /Component \| Lines \| Branches \| Result/);
@@ -539,6 +803,12 @@ test("CoverageGate_CLIReportsUsageAndWritesFailClosedSummary", async () => {
     const summary = JSON.parse(await readFile(summaryPath, "utf8"));
     assert.equal(summary.passed, false);
     assert.ok(summary.components.every((item) => !item.passed));
+    assert.equal(
+      summary.components.find((item) => item.id === "monitor")
+        .validatedMetadata[0].path,
+      metadataPath,
+    );
+    assert.ok(!summary.errors.some((item) => item.includes(metadataPath)));
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
