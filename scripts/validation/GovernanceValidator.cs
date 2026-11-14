@@ -31,9 +31,8 @@ public static class GovernanceValidator
 
     public static void ValidateJson(string root)
     {
-        foreach (var directory in new[] { ".copilot", ".vscode" })
+        foreach (var path in new[] { ".copilot", ".vscode" }.Select(directory => Path.Combine(root, directory)))
         {
-            var path = Path.Combine(root, directory);
             if (!Directory.Exists(path))
             {
                 continue;
