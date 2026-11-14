@@ -12,6 +12,7 @@
     "build": "astro check && astro build",
     "preview": "astro preview",
     "check": "astro check",
+    "coverage:astro-config": "node scripts/collect-astro-config-coverage.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
