@@ -47,6 +47,9 @@ published and started; an atomic local routing-file replacement switches that
 route to the new port. SHA-256 snapshots verify all old release files remain
 unchanged, the Finance binaries differ, and no other v2 release exists. The old
 Finance artifact is then run alongside the new one to distinguish them.
+Coverage of the published hosts is collected separately with
+`dotnet-coverage`; see `scripts\coverage\README.md` for the fresh-report
+command and linked-source identity checks.
 
 The router supports GET probes only; unknown/case-mismatched sections return
 404 without dispatch, other methods return 405, an unavailable upstream returns
@@ -91,8 +94,10 @@ release roots and listening ports are isolated.
 The default command must exit 0 with **19 passed, 0 skipped, 0 failed**. The
 collective command must exit 0 with **2 passed, 0 skipped, 0 failed**. Names are
 static, unique report metadata, never interpolated request data. This console
-fixture follows the existing spike convention; no TRX/JUnit reporter or coverage
-threshold is configured or claimed.
+fixture follows the existing spike convention; it does not emit a TRX/JUnit
+result report or enforce an in-run coverage threshold. The coverage gate
+consumes the separate `dotnet-coverage` report described in
+`scripts\coverage\README.md`.
 
 | Requirement | Evidence |
 | --- | --- |

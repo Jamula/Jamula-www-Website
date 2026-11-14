@@ -126,20 +126,26 @@
     },
     {
       "id": "sidequest-artifacts-local-runtime",
-      "reports": [],
-      "sources": [],
+      "reports": ["sidequest-artifacts/cobertura-coverage.xml"],
+      "sources": [
+        "scripts/spikes/sidequest-artifacts/SectionHost.cs",
+        "scripts/spikes/sidequest-artifacts/Gateway/Program.cs"
+      ],
+      "compiledSources": [
+        {
+          "path": "scripts/spikes/sidequest-artifacts/SectionHost.cs",
+          "modules": ["Admin", "Finance", "Tech"],
+          "requireNoBranches": true
+        },
+        {
+          "path": "scripts/spikes/sidequest-artifacts/Gateway/Program.cs",
+          "modules": ["Gateway"]
+        }
+      ],
       "unmeasured": [
         {
           "path": "scripts/spikes/sidequest-artifacts/Publish-Local.ps1",
           "reason": "Runnable local publisher; no compatible line/branch coverage report exists. Kept as a blocker, not classified as test-only."
-        },
-        {
-          "path": "scripts/spikes/sidequest-artifacts/SectionHost.cs",
-          "reason": "Runnable section host linked into the published artifacts; no compatible line/branch coverage report exists. Kept as a blocker, not classified as test-only."
-        },
-        {
-          "path": "scripts/spikes/sidequest-artifacts/Gateway/Program.cs",
-          "reason": "Runnable local gateway; no compatible line/branch coverage report exists. Kept as a blocker, not classified as test-only."
         }
       ]
     },

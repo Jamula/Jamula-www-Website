@@ -18,7 +18,7 @@ internal sealed class Child : IAsyncDisposable
 
     public static async Task<Child> StartAsync(string executable, string directory,
         IEnumerable<string> arguments, bool host, TimeSpan? readinessTimeout = null,
-        Action<int>? started = null)
+        Action<int>? started = null, bool instrumentForCoverage = false)
     {
         var info = new ProcessStartInfo(executable)
         {
@@ -32,10 +32,39 @@ internal sealed class Child : IAsyncDisposable
         var allowed = new[] { "PATH", "PATHEXT", "SystemRoot", "WINDIR", "DOTNET_ROOT", "TEMP", "TMP",
             "USERPROFILE", "APPDATA", "LOCALAPPDATA", "HOME", "ProgramFiles",
             "ProgramFiles(x86)", "ProgramData", "ALLUSERSPROFILE" };
+        var coverageEnvironment = instrumentForCoverage
+            ? new[]
+            {
+                "CORECLR_ENABLE_PROFILING",
+                "CORECLR_PROFILER",
+                "CORECLR_PROFILER_PATH",
+                "CORECLR_PROFILER_PATH_32",
+                "CORECLR_PROFILER_PATH_64",
+                "CORECLR_PROFILER_PATH_ARM64",
+                "COR_ENABLE_PROFILING",
+                "COR_PROFILER",
+                "COR_PROFILER_PATH",
+                "COR_PROFILER_PATH_32",
+                "COR_PROFILER_PATH_64",
+                "CODE_COVERAGE_DATA_PREFIX",
+                "CODE_COVERAGE_FLAGS",
+                "CODE_COVERAGE_PIPE_COUNT",
+                "CODE_COVERAGE_SESSION_NAME",
+                "DOTNET_STARTUP_HOOKS",
+                "MicrosoftInstrumentationEngine_ConfigPath32_VanguardInstrumentationProfiler",
+                "MicrosoftInstrumentationEngine_ConfigPath64_VanguardInstrumentationProfiler",
+                "MicrosoftInstrumentationEngine_ConfigPathARM64_VanguardInstrumentationProfiler",
+                "MicrosoftInstrumentationEngine_DisableCodeSignatureValidation",
+            }.Select(name => (Name: name, Value: Environment.GetEnvironmentVariable(name)))
+            .Where(item => item.Value is not null)
+            .ToArray()
+            : [];
         info.Environment.Clear();
         foreach (var name in allowed)
             if (Environment.GetEnvironmentVariable(name) is { } value)
                 info.Environment[name] = value;
+        foreach (var (name, value) in coverageEnvironment)
+            info.Environment[name] = value!;
         info.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
         info.Environment["DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE"] = "true";
         info.Environment["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1";

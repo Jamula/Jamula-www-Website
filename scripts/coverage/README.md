@@ -62,7 +62,7 @@ From the repository root in PowerShell, create isolated report directories:
 ```powershell
 $reports = Join-Path (Get-Location) "coverage-reports"
 New-Item -ItemType Directory -Force `
-  "$reports\website", "$reports\astro-config", "$reports\automation", "$reports\mbr-ui", "$reports\coverage-gate", "$reports\ralph-triage" | Out-Null
+  "$reports\website", "$reports\astro-config", "$reports\automation", "$reports\mbr-ui", "$reports\coverage-gate", "$reports\ralph-triage", "$reports\sidequest-artifacts" | Out-Null
 ```
 
 Install website dependencies with `npm ci --prefix www` if needed. The gate
@@ -146,6 +146,17 @@ dotnet-coverage collect --output "$reports\mbr-dotnet.cobertura.xml" --output-fo
   dotnet run --project scripts\mbr\tests\JamulaMbr.Tests.csproj --configuration Release
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+# The fixture publishes fresh artifacts and exercises the running child processes
+# in one collector session. Its explicit coverage mode forwards only dotnet-coverage's
+# profiler/session variables to the published .NET hosts; all other child environment
+# isolation remains unchanged. Never reuse a previous report.
+if (Test-Path -LiteralPath "$reports\sidequest-artifacts\cobertura-coverage.xml") {
+  Remove-Item -LiteralPath "$reports\sidequest-artifacts\cobertura-coverage.xml" -Force -ErrorAction Stop
+}
+dotnet-coverage collect --output "$reports\sidequest-artifacts\cobertura-coverage.xml" --output-format cobertura `
+  dotnet run --project scripts\spikes\sidequest-artifacts\Checks\Checks.csproj --configuration Release -- --coverage
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 # Never leave a previous combined result available after a failed collection.
 if (Test-Path -LiteralPath "$reports\validation.cobertura.xml") {
   Remove-Item -LiteralPath "$reports\validation.cobertura.xml" -Force -ErrorAction Stop
@@ -175,6 +186,39 @@ Merging native `.coverage` inputs then exporting also lost the branch evidence.
 The shared-session Cobertura export preserves the original denominators.
 The CLI tests exercise offline dispatch/error paths, not successful live
 verification; the remaining production paths stay in the denominator.
+
+The side-quest spike report is collected from the actual published child
+processes, not inferred from the `Checks` runner's own coverage. `--coverage`
+passes only collector profiler/session variables to host children while
+preserving the fixture's clean environment for all other settings. The report
+must identify the current checkout's absolute source paths and the expected
+`Admin`, `Finance`, `Tech`, and `Gateway` modules. `SectionHost.cs` is linked
+into three assemblies; the gate requires identical class/line identities and
+hit states for all three, then counts one verified copy. It also requires that
+all three copies report no branches, so a future branch addition fails closed
+instead of collapsing branch counts. Gateway is expected only in its single
+`Gateway` module; its branch condition denominators are retained directly from
+that module without report merging. This identity rule is specific to these
+declared builds, not a general-purpose Cobertura merge.
+
+The fresh 2026-11-13 local collection ran
+`dotnet-coverage collect --output artifacts\sidequest-coverage\sidequest-artifacts\cobertura-coverage.xml --output-format cobertura dotnet run --project scripts\spikes\sidequest-artifacts\Checks\Checks.csproj --configuration Release -- --coverage`
+and passed **19 checks, 0 skipped, 0 failed**. The report resolved both source
+paths to this checkout and measured:
+
+| Source | Lines | Branches |
+| --- | ---: | ---: |
+| `SectionHost.cs` (verified once across Admin/Finance/Tech) | 32/32 (100%) | 0/0 (N/A; no branches) |
+| `Gateway/Program.cs` (Gateway module only) | 61/62 (98.39%) | 38/40 (95.00%) |
+| Measured runtime-source subtotal | 93/94 (98.94%) | 38/40 (95.00%) |
+
+These are class/line identities from Cobertura, not unique physical line
+numbers. The `SectionHost.cs` count is taken from one of three verified
+identical module copies; its zero branch denominator is reported as N/A, never
+as 100%. The PowerShell publisher remains unmeasured. Running the gate with
+only this report produced the above spike subtotal and exited **1**, retaining
+the publisher blocker and missing reports for every other component; no
+overall coverage pass is established.
 
 The final command currently exits **1**: missing measurements and
 below-threshold components remain blockers. The printed aggregate is only the
@@ -230,6 +274,11 @@ console-only runner summary as a successful gate.
 - In the 2026-11-13 run, the measured monitor, MBR, and validation component
   totals met the 90% line and branch thresholds. Some individual sources remain
   below 90%; external DNS/GitHub/server paths remain in their denominators.
+- The side-quest local runtime report measures only the linked section host and
+  gateway. The PowerShell publisher remains unmeasured and keeps that component
+  and the overall gate blocked; `SectionHost.cs` has no branch points in any of
+  its three compiled modules, so its branch result is explicitly N/A (`0/0`),
+  not a fabricated 100%.
 - `.squad/templates/` contains first-party Node, PowerShell, shell, and 11
   runnable workflow templates. Only `ralph-triage.js` is measured; all other
   executable templates remain unmeasured blockers.

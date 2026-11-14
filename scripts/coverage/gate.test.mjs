@@ -28,6 +28,27 @@ function sourceReport(filename, sources) {
   );
 }
 
+function compiledSourceReport(modules) {
+  const classes = modules
+    .map(
+      ({ name, classes }) =>
+        `<package name="${name}"><classes>${classes
+          .map(({ name: className, filename, lines }) => {
+            const entries = lines
+              .map(({ number, hits, branch }) =>
+                branch
+                  ? `<line number="${number}" hits="${hits}" branch="true" condition-coverage="${Math.floor((branch.covered / branch.valid) * 100)}% (${branch.covered}/${branch.valid})"/>`
+                  : `<line number="${number}" hits="${hits}" branch="false"/>`,
+              )
+              .join("");
+            return `<class name="${className}" filename="${filename}"><lines>${entries}</lines></class>`;
+          })
+          .join("")}</classes></package>`,
+    )
+    .join("");
+  return `<coverage><packages>${classes}</packages></coverage>`;
+}
+
 function inventory(components, excludedSources = []) {
   return {
     schemaVersion: 1,
@@ -695,7 +716,169 @@ test("CoverageGate_InventoryClassifiesTrackedExecutableSources", async () => {
   );
 });
 
-test("CoverageGate_SidequestArtifactRuntimeStaysBlockingAndChecksStayTestSupport", async () => {
+test("CoverageGate_DeduplicatesIdenticalLinkedSourceAcrossExpectedAssemblies", () => {
+  const sectionHostPath = "scripts/spikes/sidequest-artifacts/SectionHost.cs";
+  const gatewayPath = "scripts/spikes/sidequest-artifacts/Gateway/Program.cs";
+  const hostClasses = [
+    {
+      name: "Program.Main",
+      filename: sectionHostPath,
+      lines: [
+        { number: 5, hits: 1 },
+        { number: 6, hits: 1 },
+      ],
+    },
+    {
+      name: "Program.Handler",
+      filename: sectionHostPath,
+      lines: [
+        { number: 14, hits: 1 },
+        { number: 15, hits: 1 },
+      ],
+    },
+  ];
+  const gatewayClass = {
+    name: "Gateway.Handler",
+    filename: gatewayPath,
+    lines: [{ number: 21, hits: 1, branch: { covered: 10, valid: 10 } }],
+  };
+  const report = compiledSourceReport(
+    ["Admin", "Finance", "Tech"].map((name) => ({
+      name,
+      classes: hostClasses,
+    })).concat([{ name: "Gateway", classes: [gatewayClass] }]),
+  );
+  const result = evaluateCoverage(
+    inventory([
+      {
+        ...component(
+          "sidequest-artifacts-local-runtime",
+          [sectionHostPath, gatewayPath],
+          ["sidequest.xml"],
+        ),
+        compiledSources: [
+          {
+            path: sectionHostPath,
+            modules: ["Admin", "Finance", "Tech"],
+            requireNoBranches: true,
+          },
+          { path: gatewayPath, modules: ["Gateway"] },
+        ],
+      },
+    ]),
+    new Map([["sidequest.xml", report]]),
+  );
+
+  assert.equal(result.passed, true);
+  assert.deepEqual(result.components[0].sources, [
+    {
+      path: sectionHostPath,
+      compiledModules: ["Admin", "Finance", "Tech"],
+      linesCovered: 4,
+      linesValid: 4,
+      branchesCovered: 0,
+      branchesValid: 0,
+      linePercent: 100,
+      branchPercent: null,
+    },
+    {
+      path: gatewayPath,
+      compiledModules: ["Gateway"],
+      linesCovered: 1,
+      linesValid: 1,
+      branchesCovered: 10,
+      branchesValid: 10,
+      linePercent: 100,
+      branchPercent: 100,
+    },
+  ]);
+});
+
+test("CoverageGate_RejectsAmbiguousLinkedSourceInstances", () => {
+  const sectionHostPath = "scripts/spikes/sidequest-artifacts/SectionHost.cs";
+  const identicalClasses = [
+    {
+      name: "Program.Main",
+      filename: sectionHostPath,
+      lines: [{ number: 5, hits: 1 }],
+    },
+  ];
+  const fixture = (modules) =>
+    evaluateCoverage(
+      inventory([
+        {
+          ...component(
+            "sidequest-artifacts-local-runtime",
+            [sectionHostPath],
+            ["sidequest.xml"],
+          ),
+          compiledSources: [
+            {
+              path: sectionHostPath,
+              modules: ["Admin", "Finance", "Tech"],
+              requireNoBranches: true,
+            },
+          ],
+        },
+      ]),
+      new Map([["sidequest.xml", compiledSourceReport(modules)]]),
+    );
+  const missingModule = fixture([
+    { name: "Admin", classes: identicalClasses },
+    { name: "Finance", classes: identicalClasses },
+  ]);
+  assert.equal(missingModule.components[0].sources.length, 0);
+  assert.match(
+    missingModule.errors.join("\n"),
+    /compiled source module identities do not match inventory/,
+  );
+
+  const divergentLines = fixture(
+    ["Admin", "Finance", "Tech"].map((name) => ({
+      name,
+      classes: identicalClasses.map((item) => ({
+        ...item,
+        lines: item.lines.map((line) => ({
+          ...line,
+          hits: name === "Tech" ? 0 : line.hits,
+        })),
+      })),
+    })),
+  );
+  assert.equal(divergentLines.components[0].sources.length, 0);
+  assert.match(
+    divergentLines.errors.join("\n"),
+    /compiled source class line or branch identities differ between modules/,
+  );
+
+  const unexpectedBranch = fixture(
+    ["Admin", "Finance", "Tech"].map((name) => ({
+      name,
+      classes:
+        name === "Finance"
+          ? [
+              {
+                ...identicalClasses[0],
+                lines: [
+                  {
+                    number: 5,
+                    hits: 1,
+                    branch: { covered: 1, valid: 1 },
+                  },
+                ],
+              },
+            ]
+          : identicalClasses,
+    })),
+  );
+  assert.equal(unexpectedBranch.components[0].sources.length, 0);
+  assert.match(
+    unexpectedBranch.errors.join("\n"),
+    /compiled source unexpectedly contains branches/,
+  );
+});
+
+test("CoverageGate_MeasuresLinkedHostsAndKeepsPublisherBlocking", async () => {
   const manifest = JSON.parse(
     await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
   );
@@ -704,6 +887,8 @@ test("CoverageGate_SidequestArtifactRuntimeStaysBlockingAndChecksStayTestSupport
   );
   const runtimePaths = [
     "scripts/spikes/sidequest-artifacts/Publish-Local.ps1",
+  ];
+  const measuredPaths = [
     "scripts/spikes/sidequest-artifacts/SectionHost.cs",
     "scripts/spikes/sidequest-artifacts/Gateway/Program.cs",
   ];
@@ -716,8 +901,24 @@ test("CoverageGate_SidequestArtifactRuntimeStaysBlockingAndChecksStayTestSupport
     component,
     "local runnable spike sources need their own classification",
   );
-  assert.deepEqual(component.sources, []);
-  assert.deepEqual(component.reports, []);
+  assert.deepEqual(
+    component.sources.slice().sort(),
+    [...measuredPaths].sort(),
+  );
+  assert.deepEqual(component.reports, [
+    "sidequest-artifacts/cobertura-coverage.xml",
+  ]);
+  assert.deepEqual(component.compiledSources, [
+    {
+      path: "scripts/spikes/sidequest-artifacts/SectionHost.cs",
+      modules: ["Admin", "Finance", "Tech"],
+      requireNoBranches: true,
+    },
+    {
+      path: "scripts/spikes/sidequest-artifacts/Gateway/Program.cs",
+      modules: ["Gateway"],
+    },
+  ]);
   assert.deepEqual(
     component.unmeasured.map((source) => source.path).sort(),
     [...runtimePaths].sort(),
@@ -759,6 +960,14 @@ test("CoverageGate_SidequestArtifactRuntimeStaysBlockingAndChecksStayTestSupport
         error.includes(`unmeasured source: ${path}`),
       ),
       `${path} must block the gate until measured`,
+    );
+  }
+  for (const path of measuredPaths) {
+    assert.ok(
+      result.errors.some((error) =>
+        error.includes(`missing source measurement: ${path}`),
+      ),
+      `${path} must have a fresh process-execution report`,
     );
   }
 });

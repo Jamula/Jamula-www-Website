@@ -30,6 +30,7 @@ function parseCobertura(xml) {
   const stack = [];
   let currentClass;
   let currentSource;
+  let currentPackage;
   const parser = new SaxesParser();
   parser.on("opentag", (tag) => {
     const parent = stack.at(-1);
@@ -38,10 +39,17 @@ function parseCobertura(xml) {
     }
     if (tag.name === "source" && parent === "sources") {
       currentSource = "";
+    } else if (tag.name === "package") {
+      currentPackage = tag.attributes.name;
     } else if (tag.name === "class") {
       if (currentClass) throw new Error("nested Cobertura classes.");
       if (!tag.attributes.filename) throw new Error("class has no filename.");
-      currentClass = { filename: tag.attributes.filename, lines: [] };
+      currentClass = {
+        filename: tag.attributes.filename,
+        name: tag.attributes.name,
+        package: currentPackage,
+        lines: [],
+      };
     } else if (
       tag.name === "line" &&
       currentClass &&
@@ -76,6 +84,9 @@ function parseCobertura(xml) {
         }
       }
       currentClass.lines.push({
+        number: /^\d+$/.test(line.number ?? "")
+          ? Number(line.number)
+          : undefined,
         covered: hits > 0,
         branchCovered,
         branchValid,
@@ -98,6 +109,8 @@ function parseCobertura(xml) {
       }
       classes.push(currentClass);
       currentClass = undefined;
+    } else if (tag.name === "package") {
+      currentPackage = undefined;
     }
     stack.pop();
   });
@@ -183,6 +196,91 @@ function addClass(counts, measuredClass) {
   }
 }
 
+function selectCompiledSourceClasses(classes, rule, componentErrors, source) {
+  const expectedModules = rule.modules;
+  const actualModules = [...new Set(classes.map((item) => item.package))].sort();
+  if (
+    actualModules.length !== expectedModules.length ||
+    [...expectedModules].sort().some((module, index) => module !== actualModules[index])
+  ) {
+    componentErrors.push(
+      `compiled source module identities do not match inventory: ${source}`,
+    );
+    return undefined;
+  }
+
+  const moduleClasses = new Map();
+  for (const module of expectedModules) {
+    const entries = classes.filter((item) => item.package === module);
+    if (
+      entries.some((item) => typeof item.name !== "string" || !item.name) ||
+      new Set(entries.map((item) => item.name)).size !== entries.length
+    ) {
+      componentErrors.push(
+        `compiled source class identities are missing or duplicated: ${source} (${module})`,
+      );
+      return undefined;
+    }
+    moduleClasses.set(module, entries);
+  }
+
+  const canonical = moduleClasses.get(expectedModules[0]);
+  const canonicalNames = canonical.map((item) => item.name).sort();
+  for (const module of expectedModules) {
+    const entries = moduleClasses.get(module);
+    if (
+      entries.length !== canonical.length ||
+      entries.map((item) => item.name).sort().some(
+        (name, index) => name !== canonicalNames[index],
+      )
+    ) {
+      componentErrors.push(
+        `compiled source class sets differ between modules: ${source}`,
+      );
+      return undefined;
+    }
+    for (const item of entries) {
+      if (
+        item.lines.some((line) => !Number.isSafeInteger(line.number) || line.number < 1) ||
+        new Set(item.lines.map((line) => line.number)).size !== item.lines.length
+      ) {
+        componentErrors.push(
+          `compiled source line identities are missing or duplicated: ${source} (${module}/${item.name})`,
+        );
+        return undefined;
+      }
+      if (
+        rule.requireNoBranches &&
+        item.lines.some((line) => line.branchValid !== 0)
+      ) {
+        componentErrors.push(
+          `compiled source unexpectedly contains branches: ${source} (${module}/${item.name})`,
+        );
+        return undefined;
+      }
+      const peer = canonical.find((candidate) => candidate.name === item.name);
+      const signature = (candidate) =>
+        JSON.stringify(
+          [...candidate.lines]
+            .sort((left, right) => left.number - right.number)
+            .map(({ number, covered, branchCovered, branchValid }) => ({
+              number,
+              covered,
+              branchCovered,
+              branchValid,
+            })),
+        );
+      if (signature(item) !== signature(peer)) {
+        componentErrors.push(
+          `compiled source class line or branch identities differ between modules: ${source} (${item.name})`,
+        );
+        return undefined;
+      }
+    }
+  }
+  return canonical;
+}
+
 function percentage(covered, valid) {
   return valid > 0 ? Number(((covered / valid) * 100).toFixed(2)) : null;
 }
@@ -239,6 +337,7 @@ export function evaluateCoverage(
       seenComponents.has(component.id) ||
       !Array.isArray(component.sources) ||
       !Array.isArray(component.reports) ||
+      !Array.isArray(component.compiledSources ?? []) ||
       !Array.isArray(component.validatedMetadata ?? []) ||
       !Array.isArray(component.unmeasured ?? [])
     ) {
@@ -251,6 +350,35 @@ export function evaluateCoverage(
     const measuredSources = [];
     const loadedReports = [];
     const validatedMetadata = [];
+    const compiledSources = new Map();
+    const invalidCompiledSources = new Set();
+    const sourceIdentities = new Set(
+      component.sources.map((source) => resolveSource(source, root).value),
+    );
+    for (const compiledSource of component.compiledSources ?? []) {
+      let identity;
+      if (typeof compiledSource?.path === "string") {
+        identity = resolveSource(compiledSource.path, root).value;
+      }
+      const modules = compiledSource?.modules;
+      const invalid =
+        !identity ||
+        !sourceIdentities.has(identity) ||
+        compiledSources.has(identity) ||
+        !Array.isArray(modules) ||
+        modules.length === 0 ||
+        modules.some((module) => typeof module !== "string" || !module.trim()) ||
+        new Set(modules).size !== modules.length ||
+        (compiledSource.requireNoBranches !== undefined &&
+          typeof compiledSource.requireNoBranches !== "boolean") ||
+        (modules.length > 1 && compiledSource.requireNoBranches !== true);
+      if (invalid) {
+        componentErrors.push("invalid compiled source identity classification.");
+        if (identity) invalidCompiledSources.add(identity);
+        continue;
+      }
+      compiledSources.set(identity, compiledSource);
+    }
     if (
       component.id === "monitor" &&
       !(component.validatedMetadata ?? []).some(
@@ -367,8 +495,20 @@ export function evaluateCoverage(
         continue;
       }
 
+      if (invalidCompiledSources.has(resolvedSource)) continue;
+      const compiledSource = compiledSources.get(resolvedSource);
+      const sourceClasses = compiledSource
+        ? selectCompiledSourceClasses(
+            matches[0].classes,
+            compiledSource,
+            componentErrors,
+            source,
+          )
+        : matches[0].classes;
+      if (!sourceClasses) continue;
+
       const sourceCounts = emptyCounts();
-      for (const measuredClass of matches[0].classes) {
+      for (const measuredClass of sourceClasses) {
         addClass(sourceCounts, measuredClass);
       }
       Object.assign(sourceCounts, {
@@ -382,6 +522,9 @@ export function evaluateCoverage(
           sourceCounts.branchesValid,
         ),
       });
+      if (compiledSource) {
+        sourceCounts.compiledModules = compiledSource.modules;
+      }
       for (const key of COUNT_KEYS) {
         componentCounts[key] += sourceCounts[key];
       }

@@ -5,16 +5,18 @@ using System.Net.NetworkInformation;
 using System.Security.Cryptography;
 using System.Text.Json;
 
-if (args.Length > 1 || (args.Length == 1 && args[0] != "--collective"))
+if (args.Length > 1 || (args.Length == 1 &&
+    args[0] is not ("--collective" or "--coverage")))
 {
-    Console.Error.WriteLine("Use no arguments for independent checks, or --collective.");
+    Console.Error.WriteLine("Use no arguments for independent checks, --collective, or --coverage.");
     return 2;
 }
 var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
-var fixture = new Fixture(root);
+var coverage = args.Length == 1 && args[0] == "--coverage";
+var fixture = new Fixture(root, coverage);
 try
 {
-    await fixture.RunAsync(args.Length == 1);
+    await fixture.RunAsync(args.Length == 1 && args[0] == "--collective");
     return 0;
 }
 catch (Exception error)
@@ -25,7 +27,7 @@ catch (Exception error)
 }
 finally { await fixture.DisposeAsync(); }
 
-internal sealed class Fixture(string root) : IAsyncDisposable
+internal sealed class Fixture(string root, bool coverage) : IAsyncDisposable
 {
     private static readonly string[] Sections = ["Admin", "Finance", "Tech"];
     private readonly string releases = Path.Combine(root, "artifacts", Guid.NewGuid().ToString("N"));
@@ -205,7 +207,8 @@ internal sealed class Fixture(string root) : IAsyncDisposable
             await Case("GatewayStartupFailureIsBoundedAndLeavesSectionsAvailable", async () =>
             {
                 await ExpectFailureAsync(() => Child.StartAsync("dotnet", releases,
-                    [Artifact("Gateway", "1.0.0"), Path.Combine(releases, "missing.json")], true));
+                    [Artifact("Gateway", "1.0.0"), Path.Combine(releases, "missing.json")], true,
+                    instrumentForCoverage: coverage));
                 await AssertAllAsync("2.0.0");
             });
             await Case("ReadinessTimeoutKillsOnlyTheOwnedChild", async () =>
@@ -272,7 +275,8 @@ internal sealed class Fixture(string root) : IAsyncDisposable
         var artifact = Artifact(component, version);
         if (!File.Exists(artifact)) throw new InvalidOperationException("Missing local artifact.");
         var arguments = component == "Gateway" ? new[] { artifact, RoutingFile } : [artifact];
-        var child = await Child.StartAsync("dotnet", Path.GetDirectoryName(artifact)!, arguments, true);
+        var child = await Child.StartAsync("dotnet", Path.GetDirectoryName(artifact)!, arguments, true,
+            instrumentForCoverage: coverage);
         children.Add(child);
         return child;
     }
