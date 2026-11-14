@@ -197,6 +197,7 @@ test("deployment records associate release and actual SHA with both app statuses
       );
       execute("status", ["42", "failure", ""], env, request);
       assert.equal(output, "id=42\n");
+      assert.equal(calls[0].endpoint, "repos/test/repo/deployments");
       assert.equal(calls[0].body.ref, sha);
       assert.equal(calls[0].body.environment, `production-${app}`);
       assert.deepEqual(calls[0].body.payload, {
@@ -212,7 +213,25 @@ test("deployment records associate release and actual SHA with both app statuses
         ["in_progress", "success", "failure"],
       );
       assert.equal(calls[2].body.environment_url, `https://${app}.example`);
-      assert.equal(calls[3].body.auto_inactive, false);
+      assert.deepEqual(calls.slice(2), [
+        {
+          endpoint: "repos/test/repo/deployments/42/statuses",
+          body: {
+            state: "success",
+            log_url: "https://github.com/test/repo/actions/runs/2",
+            auto_inactive: false,
+            environment_url: `https://${app}.example`,
+          },
+        },
+        {
+          endpoint: "repos/test/repo/deployments/42/statuses",
+          body: {
+            state: "failure",
+            log_url: "https://github.com/test/repo/actions/runs/2",
+            auto_inactive: false,
+          },
+        },
+      ]);
     }
 });
 
@@ -248,6 +267,191 @@ test("deployment record must exist before its in-progress status and output surv
   );
   assert.equal(output, "id=42\n");
   assert.throws(() => execute("status", ["42", "invalid", ""], env, () => {}));
+});
+
+test("deployment record rejects invalid identity and status before any side effects", () => {
+  const env = {
+    GITHUB_REPOSITORY: "test/repo",
+    GITHUB_SERVER_URL: "https://github.com",
+    DEPLOYMENT_SHA: sha,
+    RELEASE_VERSION: "0.1.0",
+    GITHUB_RUN_ID: "2",
+    RELEASE_ATTEMPT: "1",
+    CHANGE_TYPE: "fix",
+    DEPLOYMENT_APP: "net",
+    GITHUB_OUTPUT: "out",
+  };
+  const invalid = [
+    ["DEPLOYMENT_SHA", "A".repeat(40)],
+    ["DEPLOYMENT_SHA", "a".repeat(39)],
+    ["RELEASE_VERSION", "01.1.0"],
+    ["RELEASE_VERSION", "1.0.0-rc.1"],
+    ["GITHUB_RUN_ID", "0"],
+    ["GITHUB_RUN_ID", "01"],
+    ["RELEASE_ATTEMPT", "0"],
+    ["RELEASE_ATTEMPT", "01"],
+    ["CHANGE_TYPE", "other"],
+    ["DEPLOYMENT_APP", "org"],
+  ];
+  let effects = 0;
+  const effect = () => {
+    effects++;
+  };
+  for (const [key, value] of invalid) {
+    assert.throws(
+      () => execute("start", [], { ...env, [key]: value }, effect, effect),
+      /Invalid production deployment identity/,
+      key,
+    );
+  }
+  for (const args of [
+    ["0", "success"],
+    ["01", "failure"],
+    ["42", "pending"],
+    [],
+  ]) {
+    assert.throws(
+      () => execute("status", args, env, effect, effect),
+      /Invalid deployment status/,
+    );
+  }
+  assert.throws(
+    () => execute("unknown", [], env, effect, effect),
+    /Unknown deployment command/,
+  );
+  assert.equal(effects, 0);
+});
+
+test("deployment record stops on create, invalid ID, and output failures", () => {
+  const env = {
+    GITHUB_REPOSITORY: "test/repo",
+    GITHUB_SERVER_URL: "https://github.com",
+    DEPLOYMENT_SHA: sha,
+    RELEASE_VERSION: "0.1.0",
+    GITHUB_RUN_ID: "2",
+    RELEASE_ATTEMPT: "1",
+    CHANGE_TYPE: "material",
+    DEPLOYMENT_APP: "com",
+    GITHUB_OUTPUT: "out",
+  };
+  for (const [scenario, result, expected] of [
+    ["create failure", new Error("create failed"), ["request"]],
+    ["invalid ID", "0", ["request"]],
+    ["output failure", "42", ["request", "append"]],
+  ]) {
+    const events = [];
+    assert.throws(
+      () =>
+        execute(
+          "start",
+          [],
+          env,
+          () => {
+            events.push("request");
+            if (result instanceof Error) throw result;
+            return result;
+          },
+          () => {
+            events.push("append");
+            throw new Error("output failed");
+          },
+        ),
+      scenario === "invalid ID" ? /Invalid deployment ID/ : /failed/,
+      scenario,
+    );
+    assert.deepEqual(events, expected, scenario);
+  }
+});
+
+test("deployment record GitHub adapter posts JSON and propagates command failures", () => {
+  const script = `
+    const calls = [], output = [];
+    require("node:child_process").execFileSync = (command, args, options) => {
+      calls.push({ command, args, options });
+      if (calls.length === 3) throw new Error("gh failed");
+      return calls.length === 1 ? " 42\\n" : "\\n";
+    };
+    const { execute } = require(process.argv[1]);
+    const env = {
+      GITHUB_REPOSITORY: "test/repo",
+      GITHUB_SERVER_URL: "https://github.com",
+      DEPLOYMENT_SHA: "a".repeat(40),
+      RELEASE_VERSION: "0.1.0",
+      GITHUB_RUN_ID: "2",
+      RELEASE_ATTEMPT: "1",
+      CHANGE_TYPE: "fix",
+      DEPLOYMENT_APP: "net",
+      GITHUB_OUTPUT: "out",
+    };
+    execute("start", [], env, undefined, (file, value) => output.push([file, value]));
+    let error;
+    try { execute("status", ["42", "failure"], env); } catch (e) { error = e.message; }
+    process.stdout.write(JSON.stringify({ calls, output, error }));
+  `;
+  const result = spawnSync(
+    process.execPath,
+    ["-e", script, path.join(__dirname, "production-deployment.cjs")],
+    { encoding: "utf8" },
+  );
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  const { calls, output, error } = JSON.parse(result.stdout);
+  assert.deepEqual(output, [["out", "id=42\n"]]);
+  assert.equal(calls.length, 3);
+  assert.equal(calls[0].command, "gh");
+  assert.deepEqual(calls[0].args, [
+    "api",
+    "--method",
+    "POST",
+    "repos/test/repo/deployments",
+    "--input",
+    "-",
+    "--jq",
+    ".id",
+  ]);
+  assert.deepEqual(JSON.parse(calls[0].options.input), {
+    ref: sha,
+    auto_merge: false,
+    required_contexts: [],
+    environment: "production-net",
+    production_environment: true,
+    description: "Jamula net deployment for v0.1.0",
+    payload: {
+      release_tag: "v0.1.0",
+      release_url: "https://github.com/test/repo/releases/tag/v0.1.0",
+      deployed_sha: sha,
+      run_id: "2",
+      build_attempt: "1",
+      change_type: "fix",
+    },
+  });
+  assert.deepEqual(calls[1].args, [
+    "api",
+    "--method",
+    "POST",
+    "repos/test/repo/deployments/42/statuses",
+    "--input",
+    "-",
+  ]);
+  assert.deepEqual(JSON.parse(calls[1].options.input), {
+    state: "in_progress",
+    log_url: "https://github.com/test/repo/actions/runs/2",
+    auto_inactive: false,
+  });
+  assert.equal(calls[1].options.encoding, "utf8");
+  assert.deepEqual(calls[1].options.stdio, ["pipe", "pipe", "inherit"]);
+  assert.equal(error, "gh failed");
+});
+
+test("deployment record CLI rejects unknown commands without contacting GitHub", () => {
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "production-deployment.cjs"), "unknown"],
+    { encoding: "utf8" },
+  );
+  assert.ifError(result.error);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Unknown deployment command/);
 });
 
 test("live metadata must match version, revision and build run attempt", () => {
