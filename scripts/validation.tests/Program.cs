@@ -65,6 +65,7 @@ runner.Run("Artifact_TrustedConfigurationParity_IsEnforced", ArtifactConfigParit
 runner.Run("Artifact_JsonObjectPropertyOrder_IsNotMaterial", ArtifactConfigPropertyOrderIgnored);
 runner.Run("Artifact_NonRegularEntry_IsRejected", ArtifactNonRegularEntryRejected);
 runner.Run("Artifact_FileDirectoryCollision_IsRejected", ArtifactTreeConflictRejected);
+runner.Run("Artifact_DeeplySegmentedDirectory_IsValidatedWithBoundedAllocations", ArtifactDeeplySegmentedDirectoryValidated);
 runner.Run("Artifact_NonEmptyDestination_IsPreserved", ArtifactNonEmptyDestinationPreserved);
 runner.Run("Artifact_FileDestination_IsRejected", ArtifactFileDestinationRejected);
 runner.Run("Artifact_SymlinkDestination_IsRejected", ArtifactSymlinkDestinationRejected);
@@ -436,6 +437,21 @@ void ArtifactTreeConflictRejected()
         Throws<InvalidDataException>(() => PreviewArtifactValidator.ExtractPreview(
             fixture.CreateArchive(entries), Path.Combine(fixture.Root, "dist"), fixture.ConfigPath), "duplicated");
     }
+}
+
+void ArtifactDeeplySegmentedDirectoryValidated()
+{
+    using var fixture = new ArtifactFixture();
+    var deepDirectory = string.Join('/', Enumerable.Repeat("d", 12_000)) + "/";
+    var archive = fixture.CreateArchive(Entry(deepDirectory, "", 0x4000));
+    var destination = Path.Combine(fixture.Root, "dist");
+    var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+
+    PreviewArtifactValidator.ExtractPreview(archive, destination, fixture.ConfigPath);
+
+    var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+    Check(allocatedBytes < 32 * 1024 * 1024, "deep-path-tree-validation-allocations-are-bounded");
+    Check(File.Exists(Path.Combine(destination, "index.html")), "deep-directory-does-not-block-archive-extraction");
 }
 
 void ArtifactNonEmptyDestinationPreserved()
