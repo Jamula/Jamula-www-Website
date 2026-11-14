@@ -10,6 +10,19 @@ sources is below 90% in either metric. The printed aggregate is measured
 sources only; known unmeasured sources are reported as blockers, not silently
 omitted from an otherwise green result.
 
+Source attribution is anchored to this gate's actual repository root, not the
+report directory or a matching filename suffix. Without `<sources>`, relative
+class filenames are repository-relative. With `<sources>`, relative filenames
+are resolved against every declared root (itself absolute or repository-relative);
+all roots must be inside the checkout and identify the same file. Absolute class
+filenames identify the file directly. POSIX, Windows drive/UNC paths, and local
+`file:` URLs are supported, but foreign checkout roots, escaping paths, ambiguous
+roots, and unsupported URLs fail closed. Windows paths compare case-insensitively;
+POSIX paths remain case-sensitive. Reports from another checkout must be collected
+again in the checkout being evaluated; a similar trailing directory is not evidence
+of source identity. Imported tests can supply an explicit absolute repository root
+as the third argument to `evaluateCoverage`; the CLI always uses its own checkout.
+
 ## Collecting reports
 
 From the repository root in PowerShell, create isolated report directories:
