@@ -32,6 +32,7 @@ static class SelfTests
 
         RunCanonicalParserTests(Assert);
         await RunDnsTestsAsync(Assert);
+        await RunHttpCancellationTestsAsync(Assert);
         await RunCliTestsAsync(Assert);
 
         var successfulRun = await RunWebScenarioAsync(DefaultResponse, Config.ApprovedHosts);
@@ -440,6 +441,69 @@ static class SelfTests
             unexpectedCancellationRun.WasCanceled
             && unexpectedCancellationRun.ExitCode is null
             && !unexpectedCancellationHandlerCreated);
+
+        bool unexpectedFailureCreatedHandler = false;
+        var resolverFailure = new InvalidOperationException("unexpected resolver failure");
+        Exception? observedFailure = null;
+        try
+        {
+            await Monitor.RunAsync(
+                CancellationToken.None,
+                (_, _, _) => Task.FromException<IPAddress[]>(resolverFailure),
+                () =>
+                {
+                    unexpectedFailureCreatedHandler = true;
+                    return CreateUnusedHandler();
+                });
+        }
+        catch (InvalidOperationException ex)
+        {
+            observedFailure = ex;
+        }
+        assert("Monitor_UnexpectedDnsFailurePropagatesBeforeHttp",
+            ReferenceEquals(observedFailure, resolverFailure) && !unexpectedFailureCreatedHandler);
+    }
+
+    private static async Task RunHttpCancellationTestsAsync(Action<string, bool> assert)
+    {
+        string[] expectedRequests =
+        [
+            "https://jamula.net/",
+            "http://jamula.net/__jamula_monitor_path_check__?jamula-monitor=1",
+            "https://jamula.net/__jamula_monitor_not_found__"
+        ];
+        foreach (var (name, canceledRequestIndex) in new[]
+        {
+            ("Monitor_HomeCancellationPropagatesAndDisposesHandler", 0),
+            ("Monitor_UpgradeCancellationPropagatesAndDisposesHandler", 1),
+            ("Monitor_NotFoundCancellationPropagatesAndDisposesHandler", 2)
+        })
+        {
+            using var cts = new CancellationTokenSource();
+            var requests = new List<Uri>();
+            ScenarioHttpMessageHandler? handler = null;
+            var result = await CaptureMonitorRunAsync(() => Monitor.RunAsync(
+                cts.Token,
+                (_, _, _) => Task.FromResult(new[] { IPAddress.Parse(Config.ApprovedIp) }),
+                () => handler = new ScenarioHttpMessageHandler(request =>
+                {
+                    Uri uri = request.RequestUri!;
+                    requests.Add(uri);
+                    if (requests.Count == canceledRequestIndex + 1)
+                    {
+                        cts.Cancel();
+                        throw new TaskCanceledException("fixture global cancellation");
+                    }
+                    return DefaultResponse(uri, uri.Host);
+                })));
+
+            assert(name,
+                result.WasCanceled && result.ExitCode is null
+                && cts.IsCancellationRequested
+                && requests.Select(uri => uri.AbsoluteUri)
+                    .SequenceEqual(expectedRequests.Take(canceledRequestIndex + 1))
+                && handler?.DisposeCount == 1);
+        }
     }
 
     private static async Task<(int? ExitCode, bool WasCanceled)> CaptureMonitorRunAsync(
