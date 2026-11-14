@@ -100,16 +100,26 @@ public static class GitHub
             {
                 if (!hasExited())
                 {
-                    kill();
-                    // Cleanup must outlive caller cancellation, but never wait indefinitely.
-                    using var cleanup = new CancellationTokenSource(cleanupTimeout);
-                    try { await waitForExit(cleanup.Token).WaitAsync(cleanup.Token); }
-                    catch (OperationCanceledException ex) when (cleanup.IsCancellationRequested)
+                    var exitedAfterKillFailure = false;
+                    try { kill(); }
+                    catch (Exception)
                     {
-                        throw new TimeoutException("GitHub process exit could not be confirmed after termination.", ex);
+                        if (!hasExited()) throw;
+                        exitedAfterKillFailure = true;
                     }
-                    if (!hasExited())
-                        throw new IOException("GitHub process exit could not be confirmed after termination.");
+
+                    // Cleanup must outlive caller cancellation, but never wait indefinitely.
+                    if (!exitedAfterKillFailure)
+                    {
+                        using var cleanup = new CancellationTokenSource(cleanupTimeout);
+                        try { await waitForExit(cleanup.Token).WaitAsync(cleanup.Token); }
+                        catch (OperationCanceledException ex) when (cleanup.IsCancellationRequested)
+                        {
+                            throw new TimeoutException("GitHub process exit could not be confirmed after termination.", ex);
+                        }
+                        if (!hasExited())
+                            throw new IOException("GitHub process exit could not be confirmed after termination.");
+                    }
                 }
             }
             catch (Exception ex) when (failure is not null)
