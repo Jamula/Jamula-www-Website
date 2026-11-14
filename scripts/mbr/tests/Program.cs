@@ -120,10 +120,14 @@ Check(pulls.MedianMergeHours == 26 && pulls.MergeSampleSize == 1, "open-to-merge
 var issues = Metrics.Summarize(new([
     Item(1, "open"), Item(2, "closed", "completed", month.Start),
     Item(3, "closed", "not_planned", month.Start), Item(4, "closed", null, month.Start),
-    Item(5, "open", "reopened", month.Start)
+    Item(5, "open", "completed", month.Start)
 ], "ok", ""), month, now, false);
 Check(issues.Active?.Count == 2 && issues.Completed?.Single().Number == 2 &&
     issues.OtherClosed?.Count == 2, "completed versus not-planned, missing reason and reopened");
+Check(issues.Active?.Any(x => x.Number == 5) == true &&
+    issues.Completed?.Any(x => x.Number == 5) == false &&
+    issues.OtherClosed?.Any(x => x.Number == 5) == false,
+    "Metrics_ReopenedCompletedIssue_RemainsActiveAndNotCompleted");
 var missing = Metrics.Summarize(new(null, "unavailable", ""), month, now, true);
 Check(missing.Active is null && missing.Completed is null && missing.MedianMergeHours is null, "missing access remains unknown");
 var empty = Metrics.Summarize(new([], "ok", ""), month, now, true);
@@ -218,13 +222,12 @@ foreach (var (bad, label) in new[]
     (Billing().Replace("\"month\":11", "\"month\":10"), "wrong period"),
     (Billing().Replace("\"year\":2026", "\"year\":2025"), "wrong year"),
     (Billing().Replace("\"month\":11", "\"month\":11,\"day\":1"), "daily instead of monthly"),
-    (Billing().Replace("\"product\":\"Actions\"", "\"product\":\"Copilot\""), "wrong product"),
+    (Billing().Replace("\"product\":\"Actions\"", "\"product\":\"Copilot\""), "wrong report product"),
     (Billing().Replace("\"minutes\"", "\"credits\""), "unknown units"),
     (Billing().Replace("\"netAmount\":0.006", "\"netAmount\":-1"), "negative amount"),
     (Billing().Replace("\"netAmount\":0.006", "\"unexpected\":0.006"), "missing amount"),
     (Billing().Replace("\"netQuantity\":1", "\"netQuantity\":3"), "net exceeds gross"),
     (Billing().Replace("\"grossQuantity\":2", "\"grossQuantity\":-2"), "negative usage"),
-    (Billing().Replace("\"grossQuantity\":2", "\"grossQuantity\":\"two\""), "malformed usage"),
     ("""{"organization":"Jamula","repository":"Jamula/Jamula-www-Website","product":"Actions","timePeriod":{"year":2026,"month":11},"usageItems":[]}""", "no usage evidence")
 })
 {
@@ -232,6 +235,14 @@ foreach (var (bad, label) in new[]
     catch (Exception ex) when (ex is JsonException or InvalidOperationException)
     { Check(true, "Actions rejects " + label); }
 }
+var wrongRowProduct = System.Text.Json.Nodes.JsonNode.Parse(Billing())!;
+wrongRowProduct["usageItems"]![0]!["product"] = "Copilot";
+Expect<JsonException>(() => Costs.ReadActions(wrongRowProduct.ToJsonString(), month, now),
+    "Actions_RowWithWrongProduct_IsRejected");
+var wrongQuantityType = System.Text.Json.Nodes.JsonNode.Parse(Billing())!;
+wrongQuantityType["usageItems"]![0]!["grossQuantity"] = "798";
+Expect<InvalidOperationException>(() => Costs.ReadActions(wrongQuantityType.ToJsonString(), month, now),
+    "Actions_QuantityWithWrongType_IsRejected");
 var storageOnly = Costs.ReadActions("""
 {"organization":"Jamula","repository":"Jamula/Jamula-www-Website","product":"Actions",
 "timePeriod":{"year":2026,"month":11},"usageItems":[
@@ -425,7 +436,29 @@ try
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(new CostImport(repo ?? GitHub.Repo, month.Value, [value])));
         return await Costs.ReadAsync(path, month, now);
     }
-    Check((await Import(measurement)).Status == "imported", "valid scoped cost provenance");
+    var readableImport = await Import(measurement);
+    Check(readableImport.Status == "imported" &&
+        readableImport.Measurements.Single() == measurement,
+        "CostImport_ValidFile_IsImportedWhenUnlocked");
+    var originalError = Console.Error;
+    using var capturedError = new StringWriter();
+    CostResult lockedImport;
+    try
+    {
+        Console.SetError(capturedError);
+        await using (var lockedFile = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
+            lockedImport = await Costs.ReadAsync(path, month, now);
+    }
+    finally
+    {
+        Console.SetError(originalError);
+    }
+    Check(lockedImport.Status == "invalid" && lockedImport.Measurements.Count == 0 &&
+        lockedImport.Detail == "Cost import is unreadable or invalid. Check the README schema and attribution; then refresh." &&
+        capturedError.ToString().Trim() == "MBR: cost import rejected (IOException)." &&
+        !capturedError.ToString().Contains(path, StringComparison.Ordinal) &&
+        !capturedError.ToString().Contains(measurement.Source, StringComparison.Ordinal),
+        "CostImport_LockedValidFile_IsInvalidAndSanitized");
     Check((await Import(measurement with { Value = 0 })).Measurements.Single().Value == 0, "documented zero preserved");
     var omittedValue = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(
         new CostImport(GitHub.Repo, month.Value, [measurement with { Key = "aiUsd", Value = 0 }])))!;
