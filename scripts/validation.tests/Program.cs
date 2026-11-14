@@ -13,7 +13,8 @@ runner.Run("Governance_MalformedVscodeJson_Fails", GovernanceMalformedVscodeJson
 runner.Run("Governance_MissingRequiredFile_Fails", GovernanceMissingRequiredFileFails);
 runner.Run("Governance_MissingLocalSkillLink_Fails", GovernanceMissingLocalSkillLinkFails);
 runner.Run("Governance_EnvironmentFileIgnoreBoundary_IsEnforced", GovernanceIgnoreBoundaryIsEnforced);
-runner.Run("Governance_PrepareJobSecret_IsRejected", () => GovernanceWorkflowMutationFails("prepare:", "secret: bad", "The PR prepare job"));
+runner.Run("Governance_PrepareJobSecret_IsRejected", () => GovernanceWorkflowMutationFails(
+    "  prepare:\n    steps: []", "  prepare:\n    env:\n      TOKEN: ${{ secrets.TEST_TOKEN }}\n    steps: []", "The PR prepare job"));
 runner.Run("Governance_BuildJobEnvironment_IsRejected", () => GovernanceWorkflowMutationFails("  build:\n    steps: []", "  build:\n    environment: swa-deployment", "The PR build job"));
 runner.Run("Governance_DeployRequiresManualMainEnvironment_IsEnforced", () => GovernanceWorkflowMutationFails(
     "  deploy:\n    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'",
@@ -53,6 +54,7 @@ runner.Run("Artifact_MalformedZipDirectories_AreRejectedBeforeWrites", ArtifactM
 runner.Run("Artifact_SymlinkEntry_IsRejected", ArtifactSymlinkEntryRejected);
 runner.Run("Artifact_EncryptedEntry_IsRejectedBeforeWrites", ArtifactEncryptedEntryRejected);
 runner.Run("Artifact_DeclaredSizeMismatch_IsRejectedBeforeWrites", ArtifactDeclaredSizeMismatchRejected);
+runner.Run("Artifact_ConfigSizeAndChecksum_AreValidatedBeforeJsonParsing", ArtifactConfigIntegrityBeforeParsing);
 runner.Run("Artifact_CompressedSizeLimit_IsEnforced", ArtifactCompressedSizeLimitEnforced);
 runner.Run("Artifact_ExpandedSizeLimit_IsEnforced", ArtifactExpandedSizeLimitEnforced);
 runner.Run("Artifact_ExpandedSizeAtLimit_PassesSizeCheck", ArtifactExpandedSizeAtLimitAccepted);
@@ -80,6 +82,9 @@ runner.Run("Preview_RobotsServerError_IsRejected", PreviewRobotsServerErrorRejec
 runner.Run("Preview_MissingRouteSuccess_IsRejected", () => PreviewResponseFailure("missing-route-success", "did not return 404"));
 runner.Run("Preview_MissingRouteWrongBody_IsRejected", () => PreviewResponseFailure("missing-route-body", "expected 404 page"));
 runner.Run("Preview_ReadinessRetries_AreBoundedAndVisible", PreviewReadinessRetriesBounded);
+runner.Run("Preview_StalledHomeBody_RetriesAndRecovers", PreviewStalledHomeBodyRetries);
+runner.Run("Preview_StalledMissingBody_TimesOut", PreviewStalledMissingBodyTimesOut);
+runner.Run("Preview_CallerCancellation_DoesNotRetry", PreviewCallerCancellationDoesNotRetry);
 runner.Run("Preview_Redirects_AreNotFollowed", PreviewRedirectIsNotFollowed);
 Console.WriteLine($"{runner.Count} deterministic offline checks passed.");
 
@@ -326,6 +331,19 @@ void ArtifactDeclaredSizeMismatchRejected()
     Check(!Directory.Exists(destination), "invalid-size-validation-created-no-output");
 }
 
+void ArtifactConfigIntegrityBeforeParsing()
+{
+    using var fixture = new ArtifactFixture();
+    foreach (var corruptSize in new[] { true, false })
+    {
+        var archive = fixture.CreateArchive(config: "not json");
+        CorruptConfigMetadata(archive, corruptSize);
+        var destination = Path.Combine(fixture.Root, corruptSize ? "size" : "checksum");
+        Throws<InvalidDataException>(() => PreviewArtifactValidator.ExtractPreview(archive, destination, fixture.ConfigPath), "invalid size or checksum");
+        Check(!Directory.Exists(destination), "invalid-config-integrity-created-no-output");
+    }
+}
+
 void ArtifactCompressedSizeLimitEnforced()
 {
     using var fixture = new ArtifactFixture();
@@ -409,9 +427,15 @@ void ArtifactNonRegularEntryRejected()
 void ArtifactTreeConflictRejected()
 {
     using var fixture = new ArtifactFixture();
-    Throws<InvalidDataException>(() => PreviewArtifactValidator.ExtractPreview(
-        fixture.CreateArchive(("assets", "file"), ("assets/icon.svg", "child")),
-        Path.Combine(fixture.Root, "dist"), fixture.ConfigPath), "duplicated");
+    foreach (var entries in new[]
+    {
+        new[] { new ZipEntryFixture("assets", "file"), new ZipEntryFixture("assets/icon.svg", "child") },
+        new[] { new ZipEntryFixture("assets/icon.svg", "child"), new ZipEntryFixture("assets", "file") }
+    })
+    {
+        Throws<InvalidDataException>(() => PreviewArtifactValidator.ExtractPreview(
+            fixture.CreateArchive(entries), Path.Combine(fixture.Root, "dist"), fixture.ConfigPath), "duplicated");
+    }
 }
 
 void ArtifactNonEmptyDestinationPreserved()
@@ -565,6 +589,43 @@ void PreviewReadinessRetriesBounded()
     Check(errors.ToString().Contains("attempt 18 failed", StringComparison.Ordinal), "eighteenth-readiness-failure-is-logged");
 }
 
+void PreviewStalledHomeBodyRetries()
+{
+    using var fixture = new PreviewFixture();
+    using var client = fixture.ClientFor("home-stall-once");
+    client.Timeout = TimeSpan.FromMilliseconds(50);
+    var errors = new StringWriter();
+    PreviewSiteVerifier.VerifyAsync(PreviewFixture.Url, fixture.ConfigPath, client, errors,
+        (_, _) => Task.CompletedTask).GetAwaiter().GetResult();
+    Equal(4, fixture.Requests.Count);
+    Check(errors.ToString().Contains("attempt 1 failed", StringComparison.Ordinal), "body-timeout-is-logged-and-retried");
+}
+
+void PreviewStalledMissingBodyTimesOut()
+{
+    using var fixture = new PreviewFixture();
+    using var client = fixture.ClientFor("missing-stall");
+    client.Timeout = TimeSpan.FromMilliseconds(50);
+    Throws<OperationCanceledException>(() => PreviewSiteVerifier.VerifyAsync(
+        PreviewFixture.Url, fixture.ConfigPath, client, TextWriter.Null, (_, _) => Task.CompletedTask)
+        .GetAwaiter().GetResult());
+    Equal(3, fixture.Requests.Count);
+}
+
+void PreviewCallerCancellationDoesNotRetry()
+{
+    using var fixture = new PreviewFixture();
+    using var cancellation = new CancellationTokenSource();
+    using var client = fixture.ClientFor("home-stall-once", cancellation.Cancel);
+    var errors = new StringWriter();
+    var error = Throws<OperationCanceledException>(() => PreviewSiteVerifier.VerifyAsync(
+        PreviewFixture.Url, fixture.ConfigPath, client, errors, (_, _) => Task.CompletedTask, cancellation.Token)
+        .GetAwaiter().GetResult());
+    Equal(cancellation.Token, error.CancellationToken);
+    Equal(1, fixture.Requests.Count);
+    Equal("", errors.ToString());
+}
+
 void PreviewRedirectIsNotFollowed()
 {
     using var fixture = new PreviewFixture();
@@ -585,6 +646,29 @@ static void SetEncryptedBit(string archive)
     bytes[central + 8] |= 1;
     bytes[local + 6] |= 1;
     File.WriteAllBytes(archive, bytes);
+}
+
+static void CorruptConfigMetadata(string archive, bool corruptSize)
+{
+    var bytes = File.ReadAllBytes(archive);
+    var end = FindSignature(bytes, 0x06054b50);
+    var position = BitConverter.ToInt32(bytes, end + 16);
+    while (position < end)
+    {
+        var nameLength = BitConverter.ToUInt16(bytes, position + 28);
+        var extraLength = BitConverter.ToUInt16(bytes, position + 30);
+        var commentLength = BitConverter.ToUInt16(bytes, position + 32);
+        var name = Encoding.UTF8.GetString(bytes, position + 46, nameLength);
+        if (name == "staticwebapp.config.json")
+        {
+            if (corruptSize) Array.Clear(bytes, position + 24, 4);
+            else bytes[position + 16] ^= 1;
+            File.WriteAllBytes(archive, bytes);
+            return;
+        }
+        position += 46 + nameLength + extraLength + commentLength;
+    }
+    throw new InvalidDataException("Configuration ZIP entry not found.");
 }
 
 static void SetFirstEntrySizeToZero(string archive)
@@ -906,7 +990,7 @@ sealed class PreviewFixture : IDisposable
 
     public HttpClient ValidClient() => ClientFor("valid");
 
-    public HttpClient ClientFor(string mode)
+    public HttpClient ClientFor(string mode, Action? onStalledRead = null)
     {
         Requests.Clear();
         return new HttpClient(new CallbackHandler(request =>
@@ -927,7 +1011,9 @@ sealed class PreviewFixture : IDisposable
             {
                 var response = new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = TextContent(mode == "title" ? "<title>Unexpected</title>" : "<title>Jamula</title>")
+                    Content = mode == "home-stall-once" && Requests.Count == 1
+                        ? new StreamContent(new StalledStream(onStalledRead))
+                        : TextContent(mode == "title" ? "<title>Unexpected</title>" : "<title>Jamula</title>")
                 };
                 foreach (var (name, value) in _headers)
                 {
@@ -953,6 +1039,7 @@ sealed class PreviewFixture : IDisposable
             {
                 "missing-route-success" => new HttpResponseMessage(HttpStatusCode.OK) { Content = TextContent("Page not found") },
                 "missing-route-body" => new HttpResponseMessage(HttpStatusCode.NotFound) { Content = TextContent("Not Found") },
+                "missing-stall" => new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StreamContent(new StalledStream()) },
                 _ => new HttpResponseMessage(HttpStatusCode.NotFound) { Content = TextContent("Page not found") }
             };
         }));
@@ -979,4 +1066,24 @@ sealed class CallbackHandler(Func<HttpRequestMessage, HttpResponseMessage> callb
 {
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
         Task.FromResult(callback(request));
+}
+
+sealed class StalledStream(Action? onRead = null) : Stream
+{
+    public override bool CanRead => true;
+    public override bool CanSeek => false;
+    public override bool CanWrite => false;
+    public override long Length => throw new NotSupportedException();
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override void Flush() => throw new NotSupportedException();
+    public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        onRead?.Invoke();
+        await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        return 0;
+    }
 }

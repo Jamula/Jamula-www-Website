@@ -9,6 +9,7 @@ public static class PreviewSiteVerifier
 {
     private const int ReadinessAttempts = 18;
     private const int MaxBodyBytes = 5 * 1024 * 1024;
+    private static readonly TimeSpan MaxBodyReadTime = TimeSpan.FromSeconds(20);
     private static readonly Regex AllowedHost = new(
         @"^ashy-beach-033c7d01e-[1-9][0-9]*\.7\.azurestaticapps\.net$",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -40,14 +41,15 @@ public static class PreviewSiteVerifier
             {
                 homeResponse = await client.GetAsync(baseUrl + "/", HttpCompletionOption.ResponseHeadersRead, cancellationToken);
                 homeResponse.EnsureSuccessStatusCode();
-                home = await ReadBodyAsync(homeResponse.Content, cancellationToken);
+                home = await ReadBodyAsync(homeResponse.Content, client.Timeout, cancellationToken);
                 break;
             }
-            catch (Exception error) when (error is HttpRequestException or TaskCanceledException)
+            catch (Exception error) when (error is HttpRequestException or OperationCanceledException)
             {
-                errorWriter.WriteLine($"Preview readiness attempt {attempt + 1} failed: {error.Message}");
                 homeResponse?.Dispose();
                 homeResponse = null;
+                cancellationToken.ThrowIfCancellationRequested();
+                errorWriter.WriteLine($"Preview readiness attempt {attempt + 1} failed: {error.Message}");
                 if (attempt == ReadinessAttempts - 1)
                 {
                     throw;
@@ -101,7 +103,7 @@ public static class PreviewSiteVerifier
         }
 
         using var missingResponse = await client.GetAsync(baseUrl + "/__jamula_missing_route__", HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        var missingBody = await ReadBodyAsync(missingResponse.Content, cancellationToken);
+        var missingBody = await ReadBodyAsync(missingResponse.Content, client.Timeout, cancellationToken);
         if (missingResponse.StatusCode != HttpStatusCode.NotFound ||
             !missingBody.Contains("Page not found", StringComparison.Ordinal))
         {
@@ -138,14 +140,18 @@ public static class PreviewSiteVerifier
         return uri;
     }
 
-    private static async Task<string> ReadBodyAsync(HttpContent content, CancellationToken cancellationToken)
+    private static async Task<string> ReadBodyAsync(HttpContent content, TimeSpan clientTimeout, CancellationToken cancellationToken)
     {
-        await using var stream = await content.ReadAsStreamAsync(cancellationToken);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(clientTimeout == Timeout.InfiniteTimeSpan || clientTimeout > MaxBodyReadTime
+            ? MaxBodyReadTime
+            : clientTimeout);
+        await using var stream = await content.ReadAsStreamAsync(deadline.Token);
         var buffer = new byte[MaxBodyBytes];
         var count = 0;
         while (count < buffer.Length)
         {
-            var read = await stream.ReadAsync(buffer.AsMemory(count, buffer.Length - count), cancellationToken);
+            var read = await stream.ReadAsync(buffer.AsMemory(count, buffer.Length - count), deadline.Token);
             if (read == 0)
             {
                 break;

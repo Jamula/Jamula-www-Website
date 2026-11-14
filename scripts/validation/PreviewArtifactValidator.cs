@@ -90,16 +90,6 @@ public static class PreviewArtifactValidator
             throw new InvalidDataException("The preview artifact is missing required static files.");
         }
 
-        var configEntry = files.Single(file => file.RelativePath == "staticwebapp.config.json").Entry;
-        using (var configStream = configEntry.Open())
-        {
-            var document = JsonNode.Parse(configStream);
-            if (!JsonNode.DeepEquals(document, expectedConfig))
-            {
-                throw new InvalidDataException("Preview configuration differs from the trusted default branch.");
-            }
-        }
-
         // Opening and consuming every entry detects unsupported encryption and corrupt data before any writes.
         long validatedExpandedSize = 0;
         for (var entryIndex = 0; entryIndex < entries.Count; entryIndex++)
@@ -124,6 +114,16 @@ public static class PreviewArtifactValidator
             if (entrySize != entry.Length || ~entryCrc != encryptedEntries[entryIndex].Crc32)
             {
                 throw new InvalidDataException("The preview artifact contains an entry with invalid size or checksum.");
+            }
+        }
+
+        var configEntry = files.Single(file => file.RelativePath == "staticwebapp.config.json").Entry;
+        using (var configStream = configEntry.Open())
+        {
+            var document = JsonNode.Parse(configStream);
+            if (!JsonNode.DeepEquals(document, expectedConfig))
+            {
+                throw new InvalidDataException("Preview configuration differs from the trusted default branch.");
             }
         }
 
@@ -188,7 +188,7 @@ public static class PreviewArtifactValidator
 
     private static void ValidateTree(IReadOnlyDictionary<string, bool> kinds)
     {
-        foreach (var (path, isDirectory) in kinds)
+        foreach (var path in kinds.Keys)
         {
             var segments = path.Split('/');
             for (var index = 1; index < segments.Length; index++)
@@ -198,13 +198,6 @@ public static class PreviewArtifactValidator
                 {
                     throw new InvalidDataException($"Unsafe or duplicated artifact path: '{path}'");
                 }
-            }
-
-            if (!isDirectory && kinds.Keys.Any(candidate =>
-                    candidate.Length > path.Length &&
-                    candidate.StartsWith(path + "/", StringComparison.Ordinal)))
-            {
-                throw new InvalidDataException($"Unsafe or duplicated artifact path: '{path}'");
             }
         }
     }
