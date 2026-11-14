@@ -660,6 +660,74 @@ test("CoverageGate_InventoryClassifiesTrackedExecutableSources", async () => {
   );
 });
 
+test("CoverageGate_SidequestArtifactRuntimeStaysBlockingAndChecksStayTestSupport", async () => {
+  const manifest = JSON.parse(
+    await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
+  );
+  const component = manifest.components.find(
+    (item) => item.id === "sidequest-artifacts-local-runtime",
+  );
+  const runtimePaths = [
+    "scripts/spikes/sidequest-artifacts/Publish-Local.ps1",
+    "scripts/spikes/sidequest-artifacts/SectionHost.cs",
+    "scripts/spikes/sidequest-artifacts/Gateway/Program.cs",
+  ];
+  const supportPaths = [
+    "scripts/spikes/sidequest-artifacts/Checks/Program.cs",
+    "scripts/spikes/sidequest-artifacts/Checks/Child.cs",
+  ];
+
+  assert.ok(
+    component,
+    "local runnable spike sources need their own classification",
+  );
+  assert.deepEqual(component.sources, []);
+  assert.deepEqual(component.reports, []);
+  assert.deepEqual(
+    component.unmeasured.map((source) => source.path).sort(),
+    [...runtimePaths].sort(),
+  );
+  for (const source of component.unmeasured) {
+    assert.match(
+      source.reason,
+      /no compatible line\/branch coverage report exists/i,
+    );
+    assert.match(source.reason, /blocker/i);
+    assert.match(source.reason, /not classified as test-only/i);
+  }
+  for (const path of supportPaths) {
+    const exclusion = manifest.excludedSources.find(
+      (source) => source.path === path,
+    );
+    assert.ok(exclusion, `${path} must remain explicitly classified`);
+    assert.match(exclusion.reason, /offline spike-check/i);
+    assert.match(exclusion.reason, /test support/i);
+    assert.ok(
+      !component.unmeasured.some((source) => source.path === path),
+      `${path} is support code, not a runtime coverage blocker`,
+    );
+  }
+  assert.equal(manifest.thresholdPercent, 90);
+
+  const result = evaluateCoverage(
+    { ...manifest, components: [component] },
+    new Map(),
+  );
+  assert.equal(result.passed, false);
+  assert.deepEqual(
+    result.components[0].unmeasured.map((source) => source.path).sort(),
+    [...runtimePaths].sort(),
+  );
+  for (const path of runtimePaths) {
+    assert.ok(
+      result.errors.some((error) =>
+        error.includes(`unmeasured source: ${path}`),
+      ),
+      `${path} must block the gate until measured`,
+    );
+  }
+});
+
 test("CoverageGate_RepositoryMonitorMetadataUsesGuardedClassification", async () => {
   const manifest = JSON.parse(
     await readFile(new URL("./inventory.json", import.meta.url), "utf8"),

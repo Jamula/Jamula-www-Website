@@ -125,6 +125,25 @@
       "sources": ["scripts/coverage/gate.mjs"]
     },
     {
+      "id": "sidequest-artifacts-local-runtime",
+      "reports": [],
+      "sources": [],
+      "unmeasured": [
+        {
+          "path": "scripts/spikes/sidequest-artifacts/Publish-Local.ps1",
+          "reason": "Runnable local publisher; no compatible line/branch coverage report exists. Kept as a blocker, not classified as test-only."
+        },
+        {
+          "path": "scripts/spikes/sidequest-artifacts/SectionHost.cs",
+          "reason": "Runnable section host linked into the published artifacts; no compatible line/branch coverage report exists. Kept as a blocker, not classified as test-only."
+        },
+        {
+          "path": "scripts/spikes/sidequest-artifacts/Gateway/Program.cs",
+          "reason": "Runnable local gateway; no compatible line/branch coverage report exists. Kept as a blocker, not classified as test-only."
+        }
+      ]
+    },
+    {
       "id": "squad-maintenance-templates",
       "reports": ["ralph-triage/cobertura-coverage.xml"],
       "sources": [".squad/templates/ralph-triage.js"],
@@ -232,6 +251,14 @@
     {
       "path": "scripts/monitor/tests/SelfTests.cs",
       "reason": "Test-only source; its assertions are not monitor behavior."
+    },
+    {
+      "path": "scripts/spikes/sidequest-artifacts/Checks/Program.cs",
+      "reason": "Offline spike-check runner and assertions; test support, not a publisher, host, or gateway."
+    },
+    {
+      "path": "scripts/spikes/sidequest-artifacts/Checks/Child.cs",
+      "reason": "Offline spike-check child-process lifecycle fixture; test support, not a publisher, host, or gateway."
     },
     {
       "path": "scripts/mbr/tests/ui.test.mjs",

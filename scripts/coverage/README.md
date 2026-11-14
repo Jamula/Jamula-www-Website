@@ -10,6 +10,13 @@ sources is below 90% in either metric. The printed aggregate is measured
 sources only; known unmeasured sources are reported as blockers, not silently
 omitted from an otherwise green result.
 
+Tracked runnable sources in the local side-quest artifact spike are inventoried
+as `sidequest-artifacts-local-runtime`. The publisher, section host, and gateway
+are executable authored code, not test-only files; there are no compatible
+line/branch reports for them, so they remain explicit unmeasured blockers.
+Only the offline checks runner and its child-process fixture are excluded as
+test support. No spike coverage or passing result is implied.
+
 Source attribution is anchored to this gate's actual repository root, not the
 report directory or a matching filename suffix. Without `<sources>`, relative
 class filenames are repository-relative. With `<sources>`, relative filenames
