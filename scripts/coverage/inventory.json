@@ -45,8 +45,10 @@
       "id": "github-automation",
       "reports": ["automation/cobertura-coverage.xml"],
       "sources": [
+        ".github/scripts/production-deployment.cjs",
         ".github/scripts/release.cjs",
         ".github/scripts/swa-preview.cjs",
+        ".github/scripts/verify-preview.cjs",
         ".github/scripts/verify-swa-csp.cjs"
       ],
       "unmeasured": [
@@ -204,6 +206,10 @@
     },
     {
       "path": ".github/scripts/swa-preview.test.cjs",
+      "reason": "Test-only source; its assertions are not product behavior."
+    },
+    {
+      "path": ".github/scripts/verify-preview.test.cjs",
       "reason": "Test-only source; its assertions are not product behavior."
     },
     {

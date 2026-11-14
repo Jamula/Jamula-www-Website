@@ -1,4 +1,5 @@
 const fs = require("node:fs");
+const crypto = require("node:crypto");
 
 const BASELINE = "0.1.0";
 const SHA = /^[0-9a-f]{40}$/;
@@ -19,9 +20,9 @@ function compare(a, b) {
   return 0;
 }
 
-function nextVersion(tags, releases, bump, revision) {
-  if (!["patch", "minor", "major"].includes(bump))
-    throw new Error("Invalid bump");
+function selectRelease(tags, releases, classification, revision) {
+  if (!["material", "fix"].includes(classification))
+    throw new Error("Invalid change classification");
   if (!SHA.test(revision)) throw new Error("Invalid revision");
   const versionTags = tags.filter((tag) => tag.name.startsWith("v"));
   const seen = new Set();
@@ -51,16 +52,34 @@ function nextVersion(tags, releases, bump, revision) {
   }
   if (published.size !== seen.size)
     throw new Error("Release tag without a published release");
-  if (!versionTags.length) return BASELINE;
+  const history = {
+    tags: versionTags.map(({ name, commit }) => [name, commit.sha]).sort(),
+    releases: releases
+      .filter((release) => published.has(release.tag_name))
+      .map((release) => [release.tag_name, release.id ?? null])
+      .sort((a, b) => a[0].localeCompare(b[0])),
+  };
+  const fingerprint = crypto
+    .createHash("sha256")
+    .update(JSON.stringify(history))
+    .digest("hex");
+  if (!versionTags.length) {
+    if (classification === "fix")
+      throw new Error(
+        "No release exists; select material to establish the baseline",
+      );
+    return { version: BASELINE, releaseSha: "", fingerprint };
+  }
   versionTags.sort((a, b) => compare(b.name.slice(1), a.name.slice(1)));
-  if (versionTags[0].commit.sha === revision)
+  const releaseSha = versionTags[0].commit.sha;
+  if (classification === "fix")
+    return { version: versionTags[0].name.slice(1), releaseSha, fingerprint };
+  if (releaseSha === revision)
     throw new Error("Current revision is already the latest release");
   const parts = parseVersion(versionTags[0].name.slice(1));
-  const index = { major: 0, minor: 1, patch: 2 }[bump];
-  parts[index]++;
-  if (!Number.isSafeInteger(parts[index])) throw new Error("Version overflow");
-  for (let i = index + 1; i < parts.length; i++) parts[i] = 0;
-  return parts.join(".");
+  parts[2]++;
+  if (!Number.isSafeInteger(parts[2])) throw new Error("Version overflow");
+  return { version: parts.join("."), releaseSha, fingerprint };
 }
 
 function metadata(version, revision, run, attempt) {
@@ -85,12 +104,19 @@ function verifyMetadata(actual, expected) {
 
 if (require.main === module) {
   const [command, ...args] = process.argv.slice(2);
-  if (command === "next") {
-    const [tagsFile, releasesFile, bump, revision] = args;
+  if (command === "select") {
+    const [tagsFile, releasesFile, classification, revision] = args;
     const readPages = (file) =>
       JSON.parse(fs.readFileSync(file, "utf8")).flat();
     console.log(
-      nextVersion(readPages(tagsFile), readPages(releasesFile), bump, revision),
+      JSON.stringify(
+        selectRelease(
+          readPages(tagsFile),
+          readPages(releasesFile),
+          classification,
+          revision,
+        ),
+      ),
     );
   } else if (command === "write" || command === "verify") {
     const [file, version, revision, run, attempt] = args;
@@ -103,4 +129,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { nextVersion, metadata, verifyMetadata };
+module.exports = { selectRelease, metadata, verifyMetadata };

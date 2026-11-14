@@ -1,14 +1,23 @@
 ---
 import AnalyticsConsent from "./AnalyticsConsent.astro";
+
+interface Props {
+  releaseVersion?: string;
+}
+
+const { releaseVersion } = Astro.props;
 const year = new Date().getFullYear();
 ---
 
 <footer class="site-footer">
   <div class="site-footer__inner">
     <p class="site-footer__mark">Jamula</p>
-    <p class="site-footer__copy">&copy; {year} Jamula, Inc. All rights reserved.</p>
+    <p class="site-footer__copy">
+      &copy; {year} Jamula, Inc. All rights reserved.{" "}
+      {releaseVersion && <span class="site-footer__version">Release v{releaseVersion}</span>}
+    </p>
   </div>
-  <AnalyticsConsent />
+  <AnalyticsConsent releaseVersion={releaseVersion} />
 </footer>
 
 <style>
@@ -51,6 +60,12 @@ const year = new Date().getFullYear();
     max-width: none;
     color: var(--j-cloth);
     font-size: var(--j-text-sm);
+  }
+
+  .site-footer__version {
+    margin-inline-start: var(--j-space-2);
+    padding-inline-start: var(--j-space-2);
+    border-inline-start: 1px solid currentColor;
   }
 
   @media (max-width: 32rem) {

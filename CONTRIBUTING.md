@@ -78,6 +78,8 @@ Third-party and reserved-content paths in `LICENSE_SCOPE.md` require maintainer 
 - For documentation/governance changes, run `dotnet run --project scripts/validation/JamulaValidation.csproj --configuration Release -- validate-governance .`,
   `node --test .github/scripts/swa-preview.test.cjs`, and
   `dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release`.
+- For live preview verification changes, also run
+  `node --test .github/scripts/verify-preview.test.cjs`.
 - For changes under `www/`, run `npm ci`, `npm run check`, and `npm run build`
   from `www/`; CI also checks formatting on changed website files.
 - Pass the required review and workflow checks for the files changed.

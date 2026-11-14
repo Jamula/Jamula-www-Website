@@ -24,6 +24,9 @@ class Element extends EventTarget {
   focused = false;
   removed = false;
   contact = false;
+  getAttribute(name) {
+    return this.attributes.get(name) ?? null;
+  }
   setAttribute(name, value) {
     this.attributes.set(name, value);
   }
@@ -44,6 +47,7 @@ function harness({
   stored,
   gpc = false,
   storage: sharedStorage,
+  releaseVersion = "0.1.0",
 } = {}) {
   const elements = new Map(
     ["consent", "status", "accept", "reject", "preferences", "withdraw"].map((name) => [
@@ -55,6 +59,9 @@ function harness({
   const cookies = [];
   const warnings = [];
   const timers = new Map();
+  if (releaseVersion) {
+    elements.get("#analytics-consent").setAttribute("data-release-version", releaseVersion);
+  }
   const storage = sharedStorage ?? new Map(stored === undefined ? [] : [[KEY, stored]]);
   const win = new EventTarget();
   win.location = new URL(url);
@@ -224,9 +231,27 @@ test("valid saved consent resumes once and repeated init or accept does not dupl
   const events = h.commands().filter(([command]) => command === "event");
   assert.equal(h.scripts.length, 1);
   assert.deepEqual(events, [
-    ["event", "page_view", { send_to: "G-7JW27J2XSW" }],
-    ["event", "contact_click", { send_to: "G-7JW27J2XSW", contact_method: "email" }],
+    ["event", "page_view", { send_to: "G-7JW27J2XSW", release_version: "0.1.0" }],
+    [
+      "event",
+      "contact_click",
+      { send_to: "G-7JW27J2XSW", release_version: "0.1.0", contact_method: "email" },
+    ],
   ]);
+});
+
+test("release version is omitted from events on builds without release metadata", () => {
+  const h = harness({ releaseVersion: null });
+  h.init();
+  h.click("accept");
+  h.contactClick();
+  assert.deepEqual(
+    h.commands().filter(([command]) => command === "event"),
+    [
+      ["event", "page_view", { send_to: "G-7JW27J2XSW" }],
+      ["event", "contact_click", { send_to: "G-7JW27J2XSW", contact_method: "email" }],
+    ]
+  );
 });
 
 test("configuration excludes advertising linker and sensitive URLs from all requested events", () => {

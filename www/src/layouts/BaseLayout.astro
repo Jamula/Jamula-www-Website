@@ -23,6 +23,7 @@ interface Props {
 
 const SITE_NAME = "Jamula";
 const SITE_URL = "https://jamula.net";
+const releaseVersion = import.meta.env.PUBLIC_RELEASE_VERSION;
 
 const { title, description, canonicalUrl = Astro.url.href, ogImage, structuredData } = Astro.props;
 
@@ -83,6 +84,6 @@ const structuredDataJson = structuredData
       <slot />
     </main>
 
-    <SiteFooter />
+    <SiteFooter releaseVersion={releaseVersion} />
   </body>
 </html>

@@ -3,11 +3,10 @@ name: Azure Static Web Apps
 on:
   workflow_dispatch:
     inputs:
-      bump:
-        description: Version increment (first release is always 0.1.0)
+      change_type:
+        description: "Material change creates a release; fix reuses the latest release"
         type: choice
-        options: [patch, minor, major]
-        default: patch
+        options: [material, fix]
         required: true
   pull_request:
     branches: [main]
@@ -47,6 +46,7 @@ jobs:
     outputs:
       should_deploy: ${{ steps.gate.outputs.should_deploy }}
       version: ${{ steps.release.outputs.version }}
+      selection: ${{ steps.release.outputs.selection }}
     steps:
       - name: Check out exact revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -81,19 +81,21 @@ jobs:
             echo "should_deploy=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Select next version from published history
+      - name: Select release from published history
         if: github.event_name == 'workflow_dispatch'
         id: release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          BUMP: ${{ inputs.bump }}
+          CHANGE_TYPE: ${{ inputs.change_type }}
         run: |
           set -euo pipefail
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/tags?per_page=100" > release-tags.json
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > release-history.json
-          version="$(node .github/scripts/release.cjs next release-tags.json release-history.json "$BUMP" "$DEPLOYMENT_SHA")"
+          selection="$(node .github/scripts/release.cjs select release-tags.json release-history.json "$CHANGE_TYPE" "$DEPLOYMENT_SHA")"
+          version="$(node -e 'console.log(JSON.parse(process.argv[1]).version)' "$selection")"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "selection=$selection" >> "$GITHUB_OUTPUT"
           echo "Selected v$version for $DEPLOYMENT_SHA."
 
   build:
@@ -151,6 +153,8 @@ jobs:
         run: npm run check
 
       - name: Build static website
+        env:
+          PUBLIC_RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && needs.prepare.outputs.version || '' }}
         run: npm run build
 
       - name: Stamp release metadata
@@ -192,7 +196,16 @@ jobs:
       && github.event_name == 'workflow_dispatch'
       && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
     environment: swa-deployment
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_ATTEMPT: ${{ needs.build.outputs.release_attempt }}
+      CHANGE_TYPE: ${{ inputs.change_type }}
+      DEPLOYMENT_APP: net
+      GH_TOKEN: ${{ github.token }}
     outputs:
       url: ${{ steps.deploy.outputs.static_web_app_url }}
     steps:
@@ -204,6 +217,7 @@ jobs:
           sparse-checkout: |
             .github/scripts/verify-swa-csp.cjs
             .github/scripts/release.cjs
+            .github/scripts/production-deployment.cjs
           sparse-checkout-cone-mode: false
 
       - name: Require production deployment token
@@ -235,6 +249,10 @@ jobs:
           latest_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
           [[ "$latest_main" == "$DEPLOYMENT_SHA" ]] || { echo "::error::main advanced; release aborted."; exit 1; }
 
+      - name: Record production deployment
+        id: record
+        run: node .github/scripts/production-deployment.cjs start
+
       - name: Deploy prebuilt site
         id: deploy
         uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
@@ -246,6 +264,7 @@ jobs:
           skip_app_build: true
 
       - name: Verify live site
+        id: verify
         shell: bash
         env:
           DEPLOYED_URL: ${{ steps.deploy.outputs.static_web_app_url }}
@@ -365,6 +384,17 @@ jobs:
             echo "- Azure platform: TLS/HSTS$( [[ "$GITHUB_EVENT_NAME" == "pull_request" ]] && printf ', X-Robots-Tag: none' )"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Record deployment result
+        if: always() && steps.record.outputs.id != ''
+        env:
+          DEPLOYMENT_ID: ${{ steps.record.outputs.id }}
+          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+          DEPLOYED_URL: ${{ steps.deploy.outputs.static_web_app_url }}
+        run: |
+          state=failure
+          if [[ "$VERIFY_OUTCOME" == "success" ]]; then state=success; fi
+          node .github/scripts/production-deployment.cjs status "$DEPLOYMENT_ID" "$state" "$DEPLOYED_URL"
+
   deploy-com:
     name: Deploy and verify .com app
     needs: [prepare, build]
@@ -373,7 +403,16 @@ jobs:
       && github.event_name == 'workflow_dispatch'
       && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
     environment: swa-deployment
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_ATTEMPT: ${{ needs.build.outputs.release_attempt }}
+      CHANGE_TYPE: ${{ inputs.change_type }}
+      DEPLOYMENT_APP: com
+      GH_TOKEN: ${{ github.token }}
     outputs:
       url: ${{ steps.deploy.outputs.static_web_app_url }}
     steps:
@@ -385,6 +424,7 @@ jobs:
           sparse-checkout: |
             .github/scripts/verify-swa-csp.cjs
             .github/scripts/release.cjs
+            .github/scripts/production-deployment.cjs
           sparse-checkout-cone-mode: false
 
       - name: Require companion deployment token
@@ -416,6 +456,10 @@ jobs:
           latest_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
           [[ "$latest_main" == "$DEPLOYMENT_SHA" ]] || { echo "::error::main advanced; release aborted."; exit 1; }
 
+      - name: Record production deployment
+        id: record
+        run: node .github/scripts/production-deployment.cjs start
+
       - name: Deploy prebuilt site
         id: deploy
         uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
@@ -427,6 +471,7 @@ jobs:
           skip_app_build: true
 
       - name: Verify live site
+        id: verify
         shell: bash
         env:
           DEPLOYED_URL: ${{ steps.deploy.outputs.static_web_app_url }}
@@ -547,6 +592,17 @@ jobs:
             echo "- Azure platform: TLS/HSTS$( [[ "$GITHUB_EVENT_NAME" == "pull_request" ]] && printf ', X-Robots-Tag: none' )"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Record deployment result
+        if: always() && steps.record.outputs.id != ''
+        env:
+          DEPLOYMENT_ID: ${{ steps.record.outputs.id }}
+          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+          DEPLOYED_URL: ${{ steps.deploy.outputs.static_web_app_url }}
+        run: |
+          state=failure
+          if [[ "$VERIFY_OUTCOME" == "success" ]]; then state=success; fi
+          node .github/scripts/production-deployment.cjs status "$DEPLOYMENT_ID" "$state" "$DEPLOYED_URL"
+
   publish:
     name: Publish verified release
     needs: [prepare, build, deploy, deploy-com]
@@ -564,7 +620,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          BUMP: ${{ inputs.bump }}
+          CHANGE_TYPE: ${{ inputs.change_type }}
+          RELEASE_SELECTION: ${{ needs.prepare.outputs.selection }}
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
           RELEASE_ATTEMPT: ${{ needs.build.outputs.release_attempt }}
           NET_URL: ${{ needs.deploy.outputs.url }}
@@ -580,12 +637,14 @@ jobs:
           [[ "$latest_main" == "$DEPLOYMENT_SHA" ]] || { echo "::error::main advanced; release not published."; exit 1; }
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/tags?per_page=100" > release-tags.json
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > release-history.json
-          version="$(node .github/scripts/release.cjs next release-tags.json release-history.json "$BUMP" "$DEPLOYMENT_SHA")"
-          [[ "$version" == "$RELEASE_VERSION" ]] || { echo "::error::Release history changed; release not published."; exit 1; }
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" -f "ref=refs/tags/v$version" -f "sha=$DEPLOYMENT_SHA"
-          latest_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
-          [[ "$latest_main" == "$DEPLOYMENT_SHA" ]] || { echo "::error::main advanced after tag creation; release not published."; exit 1; }
-          gh release create "v$version" --repo "$GITHUB_REPOSITORY" --verify-tag --title "v$version" --notes "Verified Azure deployment of revision $DEPLOYMENT_SHA."
+          selection="$(node .github/scripts/release.cjs select release-tags.json release-history.json "$CHANGE_TYPE" "$DEPLOYMENT_SHA")"
+          [[ "$selection" == "$RELEASE_SELECTION" ]] || { echo "::error::Release history changed; publication aborted."; exit 1; }
+          if [[ "$CHANGE_TYPE" == "material" ]]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" -f "ref=refs/tags/v$RELEASE_VERSION" -f "sha=$DEPLOYMENT_SHA"
+            latest_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+            [[ "$latest_main" == "$DEPLOYMENT_SHA" ]] || { echo "::error::main advanced after tag creation; release not published."; exit 1; }
+            gh release create "v$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" --verify-tag --title "v$RELEASE_VERSION" --notes "Verified Azure deployment of revision $DEPLOYMENT_SHA."
+          fi
           latest_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
           [[ "$latest_main" == "$DEPLOYMENT_SHA" ]] || { echo "::error::main advanced during publication; inspect the published release."; exit 1; }
-          echo "Published v$version for $DEPLOYMENT_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo "Verified $CHANGE_TYPE deployment $DEPLOYMENT_SHA associated with v$RELEASE_VERSION." >> "$GITHUB_STEP_SUMMARY"
