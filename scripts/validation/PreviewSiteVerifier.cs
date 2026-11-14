@@ -10,6 +10,9 @@ public static class PreviewSiteVerifier
     private const int ReadinessAttempts = 18;
     private const int MaxBodyBytes = 5 * 1024 * 1024;
     private static readonly TimeSpan MaxBodyReadTime = TimeSpan.FromSeconds(20);
+    private static readonly UTF8Encoding StrictUtf8 = new(
+        encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: true);
     private static readonly Regex AllowedHost = new(
         @"^ashy-beach-033c7d01e-[1-9][0-9]*\.7\.azurestaticapps\.net$",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -56,6 +59,11 @@ public static class PreviewSiteVerifier
                 }
 
                 await (delayAsync ?? Task.Delay)(TimeSpan.FromSeconds(10), cancellationToken);
+            }
+            catch
+            {
+                homeResponse?.Dispose();
+                throw;
             }
         }
 
@@ -160,6 +168,6 @@ public static class PreviewSiteVerifier
             count += read;
         }
 
-        return Encoding.UTF8.GetString(buffer, 0, count);
+        return StrictUtf8.GetString(buffer, 0, count);
     }
 }

@@ -66,6 +66,7 @@ runner.Run("Artifact_JsonObjectPropertyOrder_IsNotMaterial", ArtifactConfigPrope
 runner.Run("Artifact_NonRegularEntry_IsRejected", ArtifactNonRegularEntryRejected);
 runner.Run("Artifact_FileDirectoryCollision_IsRejected", ArtifactTreeConflictRejected);
 runner.Run("Artifact_DeeplySegmentedDirectory_IsValidatedWithBoundedAllocations", ArtifactDeeplySegmentedDirectoryValidated);
+runner.Run("Artifact_AggregatePathSegmentLimit_IsEnforcedBeforeTreeAllocation", ArtifactAggregatePathSegmentLimitEnforced);
 runner.Run("Artifact_NonEmptyDestination_IsPreserved", ArtifactNonEmptyDestinationPreserved);
 runner.Run("Artifact_FileDestination_IsRejected", ArtifactFileDestinationRejected);
 runner.Run("Artifact_SymlinkDestination_IsRejected", ArtifactSymlinkDestinationRejected);
@@ -74,6 +75,7 @@ runner.Run("Preview_AllowedIsolatedHostnameAndRoot_AreAccepted", PreviewAllowedU
 runner.Run("Preview_ProductionExternalPortQueryAndFragmentUrls_AreRejected", PreviewInvalidUrlsRejected);
 runner.Run("Preview_HttpClientUsesTimeoutAndDisablesRedirects", PreviewClientPolicyIsConfigured);
 runner.Run("Preview_ValidResponseContract_IsVerified", PreviewValidResponseVerified);
+runner.Run("Preview_MalformedHomeUtf8_IsRejected", PreviewMalformedHomeUtf8Rejected);
 runner.Run("Preview_TitleMismatch_IsRejected", () => PreviewResponseFailure("title", "unexpected title"));
 runner.Run("Preview_ConfiguredHeaderMismatch_IsRejected", () => PreviewResponseFailure("header", "X-Frame-Options"));
 runner.Run("Preview_MissingHsts_IsRejected", () => PreviewResponseFailure("hsts", "Strict-Transport-Security"));
@@ -454,6 +456,24 @@ void ArtifactDeeplySegmentedDirectoryValidated()
     Check(File.Exists(Path.Combine(destination, "index.html")), "deep-directory-does-not-block-archive-extraction");
 }
 
+void ArtifactAggregatePathSegmentLimitEnforced()
+{
+    using var fixture = new ArtifactFixture();
+    var deepDirectories = Enumerable.Range(0, 9)
+        .Select(index => Entry(
+            $"root{index}/" + string.Join('/', Enumerable.Repeat("d", 12_000)) + "/",
+            "",
+            0x4000))
+        .ToArray();
+    var archive = fixture.CreateArchive(deepDirectories);
+    var destination = Path.Combine(fixture.Root, "dist");
+
+    Throws<InvalidDataException>(
+        () => PreviewArtifactValidator.ExtractPreview(archive, destination, fixture.ConfigPath),
+        "path segment limit");
+    Check(!Directory.Exists(destination), "aggregate-path-limit-rejects-before-output");
+}
+
 void ArtifactNonEmptyDestinationPreserved()
 {
     using var fixture = new ArtifactFixture();
@@ -566,6 +586,17 @@ void PreviewValidResponseVerified()
     Equal(PreviewFixture.Url + "/", fixture.Requests[0]);
     Equal(PreviewFixture.Url + "/robots.txt", fixture.Requests[1]);
     Equal(PreviewFixture.Url + "/__jamula_missing_route__", fixture.Requests[2]);
+}
+
+void PreviewMalformedHomeUtf8Rejected()
+{
+    using var fixture = new PreviewFixture();
+    using var client = fixture.ClientFor("malformed-utf8-title");
+    Throws<DecoderFallbackException>(() => PreviewSiteVerifier.VerifyAsync(
+        PreviewFixture.Url, fixture.ConfigPath, client, TextWriter.Null, (_, _) => Task.CompletedTask)
+        .GetAwaiter().GetResult());
+    Equal(1, fixture.Requests.Count);
+    Check(fixture.HomeContentDisposed, "malformed-home-utf8-disposes-response-content");
 }
 
 void PreviewResponseFailure(string mutation, string expectedMessage)
@@ -994,6 +1025,7 @@ sealed class PreviewFixture : IDisposable
     private readonly TemporaryDirectory _directory = new();
     public List<string> Requests { get; } = [];
     public string ConfigPath { get; }
+    public bool HomeContentDisposed { get; private set; }
     private readonly Dictionary<string, string> _headers;
 
     public PreviewFixture()
@@ -1009,6 +1041,7 @@ sealed class PreviewFixture : IDisposable
     public HttpClient ClientFor(string mode, Action? onStalledRead = null)
     {
         Requests.Clear();
+        HomeContentDisposed = false;
         return new HttpClient(new CallbackHandler(request =>
         {
             var path = request.RequestUri!.AbsolutePath;
@@ -1029,7 +1062,10 @@ sealed class PreviewFixture : IDisposable
                 {
                     Content = mode == "home-stall-once" && Requests.Count == 1
                         ? new StreamContent(new StalledStream(onStalledRead))
-                        : TextContent(mode == "title" ? "<title>Unexpected</title>" : "<title>Jamula</title>")
+                        : mode == "malformed-utf8-title"
+                            ? new DisposalTrackingContent(Encoding.UTF8.GetBytes("<title>Jamula</title>")
+                                .Concat(new byte[] { 0xC3, 0x28 }).ToArray(), () => HomeContentDisposed = true)
+                            : TextContent(mode == "title" ? "<title>Unexpected</title>" : "<title>Jamula</title>")
                 };
                 foreach (var (name, value) in _headers)
                 {
@@ -1062,6 +1098,15 @@ sealed class PreviewFixture : IDisposable
     }
 
     private static StringContent TextContent(string text) => new(text, Encoding.UTF8, "text/html");
+
+    private sealed class DisposalTrackingContent(byte[] bytes, Action onDispose) : ByteArrayContent(bytes)
+    {
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) onDispose();
+            base.Dispose(disposing);
+        }
+    }
 
     private static string FindRepositoryRoot()
     {

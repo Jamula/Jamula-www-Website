@@ -9,6 +9,7 @@ public static class PreviewArtifactValidator
 {
     public const long MaxBytes = 100L * 1024 * 1024;
     public const int MaxFiles = 20_000;
+    private const int MaxPathSegments = 100_000;
     private static readonly uint[] Crc32Table = BuildCrc32Table();
 
     public static void ExtractPreview(string archivePath, string destinationPath, string trustedConfigPath)
@@ -51,11 +52,12 @@ public static class PreviewArtifactValidator
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var files = new List<(ZipArchiveEntry Entry, string RelativePath)>();
         var kinds = new Dictionary<string, bool>(StringComparer.Ordinal);
+        var totalPathSegments = 0;
         foreach (var entry in entries)
         {
             var name = entry.FullName;
             var isDirectory = name.EndsWith("/", StringComparison.Ordinal);
-            ValidateEntryPath(name, isDirectory);
+            ValidateEntryPath(name, isDirectory, ref totalPathSegments);
             var relativePath = isDirectory ? name[..^1] : name;
             var collisionKey = CaseFold(relativePath);
             if (!seen.Add(collisionKey))
@@ -170,7 +172,7 @@ public static class PreviewArtifactValidator
         }
     }
 
-    private static void ValidateEntryPath(string name, bool isDirectory)
+    private static void ValidateEntryPath(string name, bool isDirectory, ref int totalPathSegments)
     {
         if (string.IsNullOrEmpty(name) || name.Contains('\\') || name.Contains(':') ||
             name.Any(character => character < 32) || name.StartsWith("/", StringComparison.Ordinal) ||
@@ -180,9 +182,32 @@ public static class PreviewArtifactValidator
         }
 
         var path = isDirectory ? name[..^1] : name;
-        if (path.Length == 0 || path.Split('/').Any(part => part is "." or ".."))
+        if (path.Length == 0)
         {
             throw new InvalidDataException($"Unsafe or duplicated artifact path: '{name}'");
+        }
+
+        var segmentStart = 0;
+        for (var index = 0; index <= path.Length; index++)
+        {
+            if (index < path.Length && path[index] != '/')
+            {
+                continue;
+            }
+
+            if (++totalPathSegments > MaxPathSegments)
+            {
+                throw new InvalidDataException("The preview artifact exceeds the path segment limit.");
+            }
+
+            var segmentLength = index - segmentStart;
+            if ((segmentLength == 1 && path[segmentStart] == '.') ||
+                (segmentLength == 2 && path[segmentStart] == '.' && path[segmentStart + 1] == '.'))
+            {
+                throw new InvalidDataException($"Unsafe or duplicated artifact path: '{name}'");
+            }
+
+            segmentStart = index + 1;
         }
     }
 
