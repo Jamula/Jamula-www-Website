@@ -54,6 +54,26 @@ local spike are not substituted for that evidence.
 | Local .NET reverse proxy with three section hosts | The loopback spike routes `/admin`, `/finance`, and `/tech`; a section host can be restarted with a new version while the other two remain unchanged. The command passed seven deterministic checks. | Demonstrates only local ASP.NET Core routing and host-replacement mechanics. It does not demonstrate separate OS processes, independently built/deployed artifacts, or public hosting. A public TLS-capable proxy host, approved identity, and inference boundary are unavailable or unverified. | Mechanism evidence only. No public host is assumed, provisioned, priced, or selected; production feasibility remains blocked. |
 | Separate section hosts or alternate public hostnames | Could be researched as a different hosting shape | The approved scope requires the four existing hostnames and paths; alternate hosts or host-level routing changes are not authorized. Cost, domain, identity, and operational evidence are also absent. | Not evaluated as an approved option; requires a product/hosting constraint change before consideration. |
 | Local or hosted model inference | Local inference is a possible research category; hosted inference may have free quotas or paid usage | No production compute allocation, provider entitlement, commercial-use determination, quality/latency evidence, retention terms, hard quota enforcement, or no-bill-overflow proof is recorded. | No live provider selected. Do not use developer Copilot access or test fakes as a production inference entitlement. |
+| Cloudflare (tentative research candidate only) | Cloudflare publishes Workers AI pricing and Cloudflare One Zero Trust plan and seat-management documentation | Published free-tier quotas and seat limits do not establish suitable always-on compute, commercial/model rights, Jamula account entitlement, or end-to-end tenant, guest, routing, normalization, and evidence-retention controls. | Research note only; does not resolve or weaken any Azure Free Static Web Apps blocker above. No architecture or deployment choice is approved. |
+
+#### Cloudflare research note (tentative; not an architecture decision)
+
+Cloudflare’s Workers AI documentation currently lists 10,000 Neurons per day
+for the Free Workers allocation, resetting at 00:00 UTC; operations fail after
+limits are exceeded, and some models require paid billing. This quota does not
+prove suitability, commercial-use entitlement, or that Jamula’s account can use
+the service. Cloudflare’s Zero Trust Free plan lists up to 50 users and up to
+24 hours of standard log retention, so evidence-retention needs assessment.
+The seat limit is not a revocation control: at the limit additional logins are
+blocked, but removing a user does not itself prevent access; revoking sessions
+ends active sessions, while policies or the IdP must prevent future logins.
+
+Existing always-on compute availability, commercial/model terms,
+tenant/guest policy enforcement, path normalization end-to-end, log retention
+adequacy, approved DNS/route changes, and applicable account entitlement remain
+unverified. These are research leads, not verified Jamula capabilities. The
+existing Azure Free-tier blockers and no-new-paid-services constraint remain
+unchanged. No deployment or architecture choice is authorized.
 
 The Azure Standard/App Service alternative is the required comparison against
 the current Free mechanism. Its documented technical limits and cost-plan
@@ -130,6 +150,9 @@ that a Jamula resource is configured or that the mechanism passed a test.
 | [Authenticate and authorize Static Web Apps](https://learn.microsoft.com/azure/static-web-apps/authentication-authorization) | Microsoft Learn | Built-in and custom authentication | The preconfigured Entra provider allows any Microsoft account; restricting to one Entra tenant requires a custom provider. **Verified documentation.** |
 | [.NET releases and support](https://learn.microsoft.com/dotnet/core/releases-and-support) | Microsoft Learn | Runtime selection for new .NET tooling | .NET 10 is LTS and supported until November 2028. **Verified documentation; use the current serviced SDK/runtime when implementing.** |
 | [C# SDK authorization filters](https://github.com/modelcontextprotocol/csharp-sdk/blob/main/docs/concepts/filters.md) and [identity propagation](https://github.com/modelcontextprotocol/csharp-sdk/blob/main/docs/concepts/identity/identity.md) | Model Context Protocol C# SDK repository | Future authenticated Streamable HTTP MCP implementation | ASP.NET authentication identity propagates through the MCP request pipeline; authorization attributes require explicit `AddAuthorizationFilters()` configuration. **Verified SDK guidance; not Jamula implementation evidence.** |
+| [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) | Cloudflare Developers | Workers AI free allocation and model billing; page last updated 2026-11-12, checked 2026-11-13 | Free allocation is 10,000 Neurons/day; limits reset at 00:00 UTC and further operations fail after limits; some models require paid billing. **Verified documentation only; commercial-use rights and Jamula entitlement are not inferred.** |
+| [Cloudflare SASE / Zero Trust pricing](https://www.cloudflare.com/plans/sase-zero-trust.md) | Cloudflare | Cloudflare One Free plan; checked 2026-11-13 | Free plan lists up to 50 users and up to 24 hours standard log retention. **Verified published plan details; evidence-retention adequacy and Jamula account applicability remain unverified.** |
+| [Seat management](https://developers.cloudflare.com/cloudflare-one/team-and-resources/users/seat-management/) | Cloudflare Developers | Cloudflare One seats and access revocation; page last updated 2026-05-01, checked 2026-11-13 | At the seat limit, additional users attempting to log in are blocked. Removing a user does not itself prevent access; revocation terminates active sessions, but policies or the IdP must prevent future logins. **Verified documentation; not evidence of Jamula tenant/guest policy enforcement.** |
 
 ## Evidence required to unblock
 
