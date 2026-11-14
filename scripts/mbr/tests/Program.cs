@@ -536,5 +536,46 @@ finally
     File.Delete(Path.Combine(directory, "costs.json"));
     Directory.Delete(directory);
 }
+
+var reopenedCompleted = Metrics.Summarize(new([
+    Item(71, "open", "completed", month.Start.AddHours(1)),
+    Item(72, "closed", "completed", month.Start.AddHours(2)),
+    Item(73, "closed", "completed", month.Start.AddHours(3))
+], "ok", ""), month, now, false);
+Check(reopenedCompleted.Active!.Select(x => x.Number).SequenceEqual([71]) &&
+    reopenedCompleted.Completed!.Select(x => x.Number).SequenceEqual([73, 72]) &&
+    reopenedCompleted.OtherClosed!.Count == 0,
+    "Metrics_ReopenedCompletedIssue_IsActiveButNotDelivered");
+
+var wrongRowProduct = System.Text.Json.Nodes.JsonNode.Parse(Billing())!;
+wrongRowProduct["usageItems"]![1]!["product"] = "Copilot";
+var unverifiedRow = await Costs.CollectAsync(emptyCosts, month, now,
+    read: _ => Task.FromResult(wrongRowProduct.ToJsonString()));
+Check(unverifiedRow.ActionsStatus == "unavailable" && unverifiedRow.Status == "unknown" &&
+    unverifiedRow.Measurements.Count == 0,
+    "Actions_WrongRowProduct_RejectsEntireBillingSummary");
+
+var wrongQuantityType = System.Text.Json.Nodes.JsonNode.Parse(Billing())!;
+wrongQuantityType["usageItems"]![1]!["netQuantity"] = "private fixture detail";
+var invalidQuantity = await Costs.CollectAsync(emptyCosts, month, now,
+    read: _ => Task.FromResult(wrongQuantityType.ToJsonString()));
+Check(invalidQuantity.ActionsStatus == "unavailable" && invalidQuantity.Measurements.Count == 0 &&
+    !invalidQuantity.ActionsDetail!.Contains("private fixture detail", StringComparison.Ordinal),
+    "Actions_WrongQuantityType_IsUnavailableAndSanitized");
+
+var lockedImportPath = Path.Combine(Path.GetTempPath(), "jamula-mbr-locked-" + Guid.NewGuid().ToString("N") + ".json");
+try
+{
+    await File.WriteAllTextAsync(lockedImportPath, "{}");
+    using var lockedImport = new FileStream(lockedImportPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+    var unreadable = await Costs.ReadAsync(lockedImportPath, month, now);
+    Check(unreadable.Status == "invalid" && unreadable.Measurements.Count == 0 &&
+        !unreadable.Detail.Contains(lockedImportPath, StringComparison.Ordinal),
+        "CostImport_UnreadableFile_IsInvalidAndSanitized");
+}
+finally
+{
+    File.Delete(lockedImportPath);
+}
 await MbrIntegrationTests.RunAsync(Check);
 Console.WriteLine($"{tests} offline fixture checks passed.");
