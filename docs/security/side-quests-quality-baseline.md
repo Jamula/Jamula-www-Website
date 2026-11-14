@@ -149,6 +149,72 @@ conditions before and after each future change; label low-volume field samples
 provisional. Coordinate public Search Console evidence with #94 and optional
 consent-gated analytics with #95 rather than duplicating either work.
 
+### Local public-site lab observation — 2026-11-13
+
+This is diagnostic evidence for the existing static site at source revision
+`e0a777b`, not the unimplemented side quests and not a production or field
+result. On Windows 11 Enterprise Insider Preview 10.0.28020, Snapdragon X
+X1E80100 (12 logical processors), 33,888,956,416 bytes RAM, Node 26.12.1 and
+Microsoft Edge **158.0.4370.16 beta** (DevTools protocol 1.3), the following
+commands were run from `www/`:
+
+```powershell
+$env:ASTRO_TELEMETRY_DISABLED='1'
+npm run build                         # passed: 16 files checked; 3 static pages
+node scripts\measure-local-performance.mjs  # passed: 30 samples
+```
+
+The dependency-free harness serves `dist/` on IPv4 loopback, uses a headless
+Edge process and a fresh isolated browser context per sample with cache
+disabled and service workers bypassed. It intercepts page requests and blocks
+non-loopback URLs; the browser is also configured with a loopback-only failing
+proxy for non-local destinations and blocked DNS. No external page requests
+were observed. No analytics choice was made: fresh consent state is off.
+Each sample observes through three seconds after `load`, with no interaction,
+CPU or network throttling. Viewports are 1365×768 CSS px at DPR 1 (desktop)
+and 390×844 at DPR 2.6 with mobile emulation. These are viewport classes on
+the **same desktop CPU**, not measurements on representative mobile hardware
+or networks. The harness observes browser LCP/FCP, navigation TTFB, and
+layout-shift entries (maximum session-window CLS); it emits individual JSON
+samples. `/404.html` is served directly with HTTP 200, so it does not exercise
+hosting's actual missing-URL/404 response.
+
+Five sequential cold-context samples per cell; table shows median [minimum,
+maximum], milliseconds except CLS. The range is observed run-to-run variation,
+not a confidence interval; five correlated local runs cannot characterize a
+population or a percentile reliably. The local server has no compression or
+real network latency; CDP request interception adds overhead.
+
+| Route | Viewport | LCP ms | FCP ms | TTFB ms | CLS |
+|---|---|---:|---:|---:|---:|
+| `/` | desktop | 120 [112, 132] | 120 [112, 132] | 9.6 [6.2, 11.8] | 0 [0, 0] |
+| `/privacy/` | desktop | 104 [84, 112] | 104 [84, 112] | 9.3 [6.1, 10.2] | 0 [0, 0] |
+| `/404.html` | desktop | 88 [88, 96] | 80 [64, 88] | 8.2 [5.1, 11.0] | 0.194 [0, 0.194] |
+| `/` | mobile viewport | 112 [108, 144] | 112 [108, 144] | 8.8 [6.7, 13.8] | 0 [0, 0] |
+| `/privacy/` | mobile viewport | 92 [72, 124] | 92 [72, 124] | 10.1 [8.8, 11.5] | 0 [0, 0] |
+| `/404.html` | mobile viewport | 84 [76, 92] | 84 [60, 92] | 9.6 [7.6, 16.0] | 0 [0, 0] |
+
+The desktop 404 shift was 0.1937304482 in three of five samples; affected
+nodes reported by the browser included the header, error content, footer and
+analytics controls. An earlier independent five-sample run of the same
+configuration observed it once. The cause is **not established**; the
+observation warrants a trace and controlled before/after investigation, not a
+speculative CSS or consent change. The harness's transfer-size sums were
+43,964, 29,490 and 25,910 bytes for home, privacy and 404 respectively in
+every sample. Those browser Resource Timing estimates include per-resource
+header estimates and the favicon, and are not an encoded production transfer
+budget assessment.
+
+INP was not measured: an idle synthetic visit without representative
+interactions cannot produce field INP. Total Blocking Time and long tasks were
+not measured. LCP can change after the three-second observation and CLS here
+does not cover the full visit. No accessibility, production-speed, budget-gate
+or p75 claim follows. Field p75 LCP/INP/CLS remains provisional without
+sufficient consented real-user evidence. Independent review should examine the
+harness, the 404 shift and its fix before any performance conclusion or merge;
+repeat on representative throttled hardware/network conditions and actual
+hosting when separately authorized.
+
 ## Telemetry feasibility and privacy boundary
 
 The existing public-site analytics implementation (`www/public/analytics-consent.js`)
