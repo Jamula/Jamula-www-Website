@@ -188,17 +188,43 @@ public static class PreviewArtifactValidator
 
     private static void ValidateTree(IReadOnlyDictionary<string, bool> kinds)
     {
-        foreach (var path in kinds.Keys)
+        var root = new PathNode();
+        foreach (var (path, isDirectory) in kinds)
         {
-            var segments = path.Split('/');
-            for (var index = 1; index < segments.Length; index++)
+            var current = root;
+            var segmentStart = 0;
+            while (true)
             {
-                var parent = string.Join('/', segments.Take(index));
-                if (kinds.TryGetValue(parent, out var parentIsDirectory) && !parentIsDirectory)
+                if (current.IsDirectory == false)
                 {
                     throw new InvalidDataException($"Unsafe or duplicated artifact path: '{path}'");
                 }
+
+                var separator = path.IndexOf('/', segmentStart);
+                var segmentEnd = separator < 0 ? path.Length : separator;
+                var segment = path[segmentStart..segmentEnd];
+                current.Children ??= new Dictionary<string, PathNode>(StringComparer.Ordinal);
+                if (!current.Children.TryGetValue(segment, out var child))
+                {
+                    child = new PathNode();
+                    current.Children.Add(segment, child);
+                }
+
+                current = child;
+                if (separator < 0)
+                {
+                    break;
+                }
+
+                segmentStart = separator + 1;
             }
+
+            if (!isDirectory && current.Children is { Count: > 0 })
+            {
+                throw new InvalidDataException($"Unsafe or duplicated artifact path: '{path}'");
+            }
+
+            current.IsDirectory = isDirectory;
         }
     }
 
@@ -293,6 +319,12 @@ public static class PreviewArtifactValidator
             crc = Crc32Table[(int)((crc ^ buffer[index]) & 0xFF)] ^ (crc >> 8);
         }
         return crc;
+    }
+
+    private sealed class PathNode
+    {
+        public Dictionary<string, PathNode>? Children { get; set; }
+        public bool? IsDirectory { get; set; }
     }
 
     private readonly record struct ZipEntryMetadata(bool IsEncrypted, uint Crc32);
