@@ -11,6 +11,7 @@ on:
       - "docs/**"
       - "scripts/validation/**"
       - "scripts/validation.tests/**"
+      - "scripts/validation.cli.tests/**"
       - "LICENSE*"
       - "TRADEMARKS.md"
       - "CONTRIBUTING.md"
@@ -25,6 +26,7 @@ on:
       - "docs/**"
       - "scripts/validation/**"
       - "scripts/validation.tests/**"
+      - "scripts/validation.cli.tests/**"
       - "LICENSE*"
       - "TRADEMARKS.md"
       - "CONTRIBUTING.md"
@@ -55,3 +57,6 @@ jobs:
       - name: Test preview artifact boundary
         working-directory: scripts/validation
         run: dotnet run --project ../validation.tests/JamulaValidation.Tests.csproj --configuration Release
+      - name: Test validation CLI happy and error paths
+        working-directory: scripts/validation
+        run: dotnet run --project ../validation.cli.tests/JamulaValidation.Cli.Tests.csproj --configuration Release

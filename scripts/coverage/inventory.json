@@ -241,6 +241,10 @@
       "reason": "Offline fixture runner, not the migrated validation utility."
     },
     {
+      "path": "scripts/validation.cli.tests/Program.cs",
+      "reason": "Offline CLI fixture runner and assertions, not the migrated validation utility."
+    },
+    {
       "path": "www/scripts/collect-astro-config-coverage.mjs",
       "reason": "Coverage collection support runner, not shipped website behavior."
     },
