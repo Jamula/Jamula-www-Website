@@ -270,7 +270,8 @@ allow at most 15 seconds to confirm the owned provider's exit after a tree kill.
 An unconfirmed exit or cleanup error is explicit; if collection also failed,
 both errors are retained in an aggregate (including caller cancellation).
 Successful cleanup preserves caller cancellation unchanged. Deterministic
-in-process tests cover non-exit and termination/wait failures without networking.
+in-process tests confirm a kill exception is ignored only after exit is confirmed;
+non-exit and termination/wait failures remain explicit without networking.
 Assertion failures release and settle pending refreshes. A cleanup failure
 reports both the original failure and the cleanup error. These checks can run
 alongside the offline Node suites without shared fixture directories.

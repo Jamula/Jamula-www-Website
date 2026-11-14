@@ -152,6 +152,70 @@ internal static class MbrIntegrationTests
             observedCancellation.CancellationToken == caller.Token && killed && waited && exited,
             "GitHubCleanup_CallerCancellationPreservedAfterConfirmedExit");
 
+        foreach (var callerCancelled in new[] { true, false })
+        {
+            using var raceCaller = new CancellationTokenSource();
+            var killRace = new InvalidOperationException("The process exited before it could be killed.");
+            exited = false;
+            killed = false;
+            waited = false;
+            Exception? observedRaceFailure = null;
+            try
+            {
+                await GitHub.RunWithCleanupAsync(_ =>
+                {
+                    if (callerCancelled)
+                    {
+                        raceCaller.Cancel();
+                        return Task.FromException<string>(new OperationCanceledException(raceCaller.Token));
+                    }
+                    return Task.FromException<string>(new OperationCanceledException());
+                }, () => exited, () =>
+                {
+                    killed = true;
+                    exited = true;
+                    throw killRace;
+                }, _ =>
+                {
+                    waited = true;
+                    return Task.CompletedTask;
+                }, raceCaller.Token, callerCancelled ? executionTimeout : TimeSpan.Zero, cleanupTimeout);
+            }
+            catch (Exception ex) { observedRaceFailure = ex; }
+
+            var preservedCallerCancellation = observedRaceFailure is OperationCanceledException
+                { CancellationToken: var token } && token == raceCaller.Token;
+            var preservedExecutionTimeout = observedRaceFailure is IOException
+                { Message: "GitHub read timed out.", InnerException: OperationCanceledException };
+            check(killed && exited && !waited &&
+                (callerCancelled ? preservedCallerCancellation : preservedExecutionTimeout),
+                callerCancelled
+                    ? "GitHubCleanup_KillRacePreservesCallerCancellationAfterConfirmedExit"
+                    : "GitHubCleanup_KillRacePreservesExecutionTimeoutAfterConfirmedExit");
+        }
+
+        var readFailure = new IOException("GitHub read failed.");
+        exited = false;
+        killed = false;
+        waited = false;
+        Exception? observedReadFailure = null;
+        try
+        {
+            await GitHub.RunWithCleanupAsync(_ => Task.FromException<string>(readFailure), () => exited, () =>
+            {
+                killed = true;
+                exited = true;
+                throw new InvalidOperationException("The process exited before it could be killed.");
+            }, _ =>
+            {
+                waited = true;
+                return Task.CompletedTask;
+            }, CancellationToken.None, executionTimeout, cleanupTimeout);
+        }
+        catch (Exception ex) { observedReadFailure = ex; }
+        check(ReferenceEquals(observedReadFailure, readFailure) && killed && exited && !waited,
+            "GitHubCleanup_KillRacePreservesReadFailureAfterConfirmedExit");
+
         exited = false;
         killed = false;
         waited = false;
