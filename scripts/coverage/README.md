@@ -17,7 +17,7 @@ From the repository root in PowerShell, create isolated report directories:
 ```powershell
 $reports = Join-Path (Get-Location) "coverage-reports"
 New-Item -ItemType Directory -Force `
-  "$reports\website", "$reports\automation", "$reports\mbr-ui", "$reports\coverage-gate" | Out-Null
+  "$reports\website", "$reports\astro-config", "$reports\automation", "$reports\mbr-ui", "$reports\coverage-gate" | Out-Null
 ```
 
 Install website dependencies with `npm ci --prefix www` if needed. The gate
@@ -28,15 +28,29 @@ uses the pinned `saxes` XML parser from that installation. Install the pinned
 dotnet tool install --global dotnet-coverage --version 18.12.0
 ```
 
+Build the website first: several browser tests read files from `www/dist`.
 Collect the website browser report from the repository root so its source path
 matches the repository-relative inventory. Collect GitHub automation and MBR
 browser reports using the repository-pinned c8 dependency:
 
 ```powershell
+npm --prefix www run build
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 & .\www\node_modules\.bin\c8.cmd --reporter=cobertura --reports-dir="$reports\website" `
   --include="www/public/analytics-consent.js" --exclude="www/tests/*.test.mjs" `
   node --test www/tests/*.test.mjs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+$collectorOutput = npm --prefix www run coverage:astro-config 2>&1
+$collectorExit = $LASTEXITCODE
+$collectorOutput | ForEach-Object { Write-Host $_ }
+if ($collectorExit -ne 0) { exit $collectorExit }
+$reportLine = @($collectorOutput | Where-Object { "$_" -match '^Coverage reports: ' })
+if ($reportLine.Count -ne 1) { throw "Astro config collector did not identify exactly one report directory." }
+$configReports = "$($reportLine[0])" -replace '^Coverage reports: ', ''
+Copy-Item -LiteralPath (Join-Path $configReports "cobertura-coverage.xml") `
+  -Destination "$reports\astro-config\cobertura-coverage.xml" -ErrorAction Stop
 
 & .\www\node_modules\.bin\c8.cmd --reporter=cobertura --reports-dir="$reports\automation" `
   --include=".github/scripts/*.cjs" --exclude=".github/scripts/*.test.cjs" `
@@ -53,6 +67,13 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   node --test scripts/coverage/gate.test.mjs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 ```
+
+The Astro collector writes a fresh temporary directory on each run; the copy
+above uses the directory printed by that successful run. Its Cobertura
+`<sources>` root resolves the relative `astro.config.ts` filename to the
+inventoried source. This measures the configuration only, not rendered HTML or
+the seven Astro templates. The collector reports c8/V8 branch counts, which do
+not establish independent coverage of every boolean condition.
 
 Collect the .NET application reports from their offline test runners. Test-runner
 source is explicitly excluded in `inventory.json`; application source remains
@@ -94,10 +115,9 @@ console-only runner summary as a successful gate.
 - `scripts/monitor/InternalsVisibleTo.cs` is production assembly metadata with
   no executable lines for Cobertura to measure. It is inventoried as
   unmeasured and therefore blocks the gate, rather than being excluded.
-- The website has seven `.astro` templates with build-time logic and an
-  executable `www/astro.config.ts`. Existing runtime coverage reports only
-  `www/public/analytics-consent.js`; build and generated-site tests do not
-  provide line/branch coverage for the templates or build configuration.
+- The website has seven `.astro` templates with build-time logic that remain
+  unmeasured. The separate configuration and browser reports do not measure
+  those templates; build and generated-site tests are not source coverage.
 - Workflow YAML contains inline shell/JavaScript and workflow control logic not
   represented by the `.github/scripts/*.cjs` Cobertura report. All tracked
   workflows are named in the inventory.

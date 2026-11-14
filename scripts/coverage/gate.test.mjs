@@ -84,6 +84,46 @@ test("CoverageGate_UsesClassLinesWithoutDoubleCountingMethodLines", () => {
   assert.equal(result.components[0].branchesValid, 2);
 });
 
+test("CoverageGate_AttributesRelativeAstroConfigUsingCoberturaSourceRoot", async () => {
+  const manifest = JSON.parse(await readFile(new URL("./inventory.json", import.meta.url), "utf8"));
+  const website = manifest.components.find((item) => item.id === "website-browser");
+  assert.ok(website.sources.includes("www/astro.config.ts"));
+  assert.ok(!website.unmeasured.some((item) => item.path === "www/astro.config.ts"));
+  const configReport = classReport("astro.config.ts", [1, 0], [[1, 2]])
+    .replace("<packages>", "<sources><source>C:\\repo\\www</source></sources><packages>");
+  const reports = new Map([
+    ["website/cobertura-coverage.xml", classReport("www/public/analytics-consent.js", [1], [[1, 1]])],
+    ["astro-config/cobertura-coverage.xml", configReport],
+  ]);
+  const result = evaluateCoverage(inventory([website]), reports);
+  const config = result.components[0].sources.find((item) => item.path === "www/astro.config.ts");
+  assert.deepEqual(
+    [config.linesCovered, config.linesValid, config.branchesCovered, config.branchesValid],
+    [2, 3, 1, 2],
+  );
+  assert.equal(result.components[0].passed, false);
+  assert.equal(result.components[0].unmeasured.filter((item) => item.path.endsWith(".astro")).length, 7);
+  assert.ok(!result.errors.some((error) => error.includes("unclassified report source")));
+
+  reports.set("astro-config/cobertura-coverage.xml", configReport.replace("C:\\repo\\www", "C:\\repo\\other"));
+  const wrongRoot = evaluateCoverage(inventory([website]), reports);
+  assert.ok(wrongRoot.errors.some((error) => error.includes("missing source measurement: www/astro.config.ts")));
+  assert.ok(wrongRoot.errors.some((error) => error.includes("unclassified report source: astro.config.ts")));
+});
+
+test("CoverageGate_FailsClosedWhenAstroConfigReportIsMissing", async () => {
+  const manifest = JSON.parse(await readFile(new URL("./inventory.json", import.meta.url), "utf8"));
+  const website = manifest.components.find((item) => item.id === "website-browser");
+  const result = evaluateCoverage(
+    inventory([website]),
+    new Map([["website/cobertura-coverage.xml", classReport("www/public/analytics-consent.js", [1], [[1, 1]])]]),
+  );
+  assert.equal(result.passed, false);
+  assert.equal(result.components[0].passed, false);
+  assert.ok(result.errors.some((error) => error.includes("missing report: astro-config/cobertura-coverage.xml")));
+  assert.ok(result.errors.some((error) => error.includes("missing source measurement: www/astro.config.ts")));
+});
+
 test("CoverageGate_FailsWhenEitherComponentMetricIsBelowThreshold", () => {
   const result = evaluateCoverage(
     inventory([component("app", ["src/app.cs"], ["app.xml"])]),

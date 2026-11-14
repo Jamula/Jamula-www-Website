@@ -18,15 +18,19 @@ const COUNT_KEYS = [
 
 function parseCobertura(xml, reportPath) {
   const classes = [];
+  const sources = [];
   const stack = [];
   let currentClass;
+  let currentSource;
   const parser = new SaxesParser();
   parser.on("opentag", (tag) => {
     const parent = stack.at(-1);
     if (stack.length === 0 && tag.name !== "coverage") {
       throw new Error("missing Cobertura coverage root.");
     }
-    if (tag.name === "class") {
+    if (tag.name === "source" && parent === "sources") {
+      currentSource = "";
+    } else if (tag.name === "class") {
       if (currentClass) throw new Error("nested Cobertura classes.");
       if (!tag.attributes.filename) throw new Error("class has no filename.");
       currentClass = { filename: tag.attributes.filename, lines: [] };
@@ -67,8 +71,14 @@ function parseCobertura(xml, reportPath) {
     }
     stack.push(tag.name);
   });
+  parser.on("text", (text) => {
+    if (currentSource !== undefined) currentSource += text;
+  });
   parser.on("closetag", (tag) => {
-    if (tag.name === "class") {
+    if (tag.name === "source" && currentSource !== undefined) {
+      if (currentSource.trim()) sources.push(currentSource.trim());
+      currentSource = undefined;
+    } else if (tag.name === "class") {
       if (currentClass.lines.length === 0) {
         throw new Error("class has no executable line entries.");
       }
@@ -85,7 +95,15 @@ function parseCobertura(xml, reportPath) {
   if (classes.length === 0) {
     throw new Error(`${reportPath}: no Cobertura class measurements.`);
   }
-  return classes;
+  return classes.map((item) => ({
+    ...item,
+    paths: [
+      item.filename,
+      ...(/^(?:[A-Za-z]:[\\/]|[\\/]|file:)/i.test(item.filename)
+        ? []
+        : sources.map((source) => `${source}/${item.filename}`)),
+    ],
+  }));
 }
 
 function normalizeSource(value) {
@@ -203,7 +221,7 @@ export function evaluateCoverage(inventory, reports) {
       const matches = [];
       for (const report of loadedReports) {
         const classes = report.classes.filter((item) =>
-          matchesPath(item.filename, source),
+          item.paths.some((filename) => matchesPath(filename, source)),
         );
         if (classes.length > 0) matches.push({ report, classes });
       }
@@ -240,11 +258,11 @@ export function evaluateCoverage(inventory, reports) {
     for (const report of loadedReports) {
       for (const measuredClass of report.classes) {
         const source = component.sources.find((item) =>
-          matchesPath(measuredClass.filename, item),
+          measuredClass.paths.some((filename) => matchesPath(filename, item)),
         );
         if (source) continue;
         const excluded = exclusions.find((item) =>
-          matchesPath(measuredClass.filename, item.path),
+          measuredClass.paths.some((filename) => matchesPath(filename, item.path)),
         );
         if (!excluded) {
           componentErrors.push(
