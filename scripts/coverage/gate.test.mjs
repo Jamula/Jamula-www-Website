@@ -364,6 +364,41 @@ test("CoverageGate_RejectsAmbiguousEscapingAndUnsupportedPaths", () => {
   );
 });
 
+test("CoverageGate_UsesCdataCoberturaSourceRoots", () => {
+  const localReport = sourceReport(
+    "astro.config.ts",
+    ["/checkout/repo/www"],
+  ).replace(
+    "<source>/checkout/repo/www</source>",
+    "<source><![CDATA[/checkout/repo/www]]></source>",
+  );
+  const localResult = evaluateCoverage(
+    inventory([component("config", ["www/astro.config.ts"], ["config.xml"])]),
+    new Map([["config.xml", localReport]]),
+    "/checkout/repo",
+  );
+  assert.equal(localResult.components[0].sources[0].path, "www/astro.config.ts");
+
+  const outsideReport = sourceReport(
+    "www/astro.config.ts",
+    ["/other/checkout"],
+  ).replace(
+    "<source>/other/checkout</source>",
+    "<source><![CDATA[/other/checkout]]></source>",
+  );
+  const outsideResult = evaluateCoverage(
+    inventory([component("config", ["www/astro.config.ts"], ["config.xml"])]),
+    new Map([["config.xml", outsideReport]]),
+    "/checkout/repo",
+  );
+  assert.equal(outsideResult.passed, false);
+  assert.ok(
+    outsideResult.errors.some((error) =>
+      error.includes("source path is outside repository root"),
+    ),
+  );
+});
+
 test("CoverageGate_DoesNotUseOutsidePathsAsExplicitExclusions", () => {
   const report = classReport("src/app.cs", [1], [[1, 1]]).replace(
     "</classes>",

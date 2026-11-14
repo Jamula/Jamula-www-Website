@@ -83,9 +83,11 @@ function parseCobertura(xml) {
     }
     stack.push(tag.name);
   });
-  parser.on("text", (text) => {
+  const appendSourceText = (text) => {
     if (currentSource !== undefined) currentSource += text;
-  });
+  };
+  parser.on("text", appendSourceText);
+  parser.on("cdata", appendSourceText);
   parser.on("closetag", (tag) => {
     if (tag.name === "source" && currentSource !== undefined) {
       if (currentSource.trim()) sources.push(currentSource.trim());
