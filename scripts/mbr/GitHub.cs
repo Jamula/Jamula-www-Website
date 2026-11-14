@@ -74,12 +74,12 @@ public static class GitHub
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            if (!process.HasExited) process.Kill(entireProcessTree: true);
             throw new IOException("GitHub read timed out.");
         }
         finally
         {
             if (!process.HasExited) process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync();
         }
     }
 }

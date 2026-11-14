@@ -261,6 +261,14 @@ heading, refresh and stale/error states without installing packages. It also
 prevents engineering tracker controls/links from returning to the main page.
 No fixtures write to GitHub or load live billing.
 
+The Windows integration fixtures use a private copied `gh.exe`, per-provider
+gate markers, and loopback-only web hosts. Each web host owns a Windows job
+attached before requests begin; teardown waits for the job's entire process tree
+to exit before deleting fixture files. Cancellation waits for the owned provider,
+and assertion failures release and settle pending refreshes. A cleanup failure
+reports both the original failure and the cleanup error. These checks can run
+alongside the offline Node suites without shared fixture directories.
+
 API definitions: [repository issues](https://docs.github.com/en/rest/issues/issues#list-repository-issues)
 and [pull requests](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests).
 The collector pins REST `2022-11-28` and GitHub.com. A server-side error deliberately
