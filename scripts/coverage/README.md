@@ -118,6 +118,25 @@ measured subtotal was 1,899/2,134 lines (88.99%) and 1,136/1,249 branches
 (90.95%). The gate failed, including for unmeasured sources. These counts are
 diagnostic for that run, not a full-coverage claim; rerun for each revision.
 
+For the 2026-11-13 local run at `56a25e2`, all collectors succeeded but the
+gate exited **1**. Counts below are covered/valid for inventoried production
+sources; component results include unmeasured-source blockers.
+
+| Component | Lines | Branches | Gate result |
+| --- | ---: | ---: | --- |
+| Website browser and config | 301/301 | 102/106 | Fail: seven unmeasured templates |
+| GitHub automation | 575/604 | 211/226 | Fail: nine unmeasured workflows |
+| Monitor | 186/205 | 80/86 | Fail: unmeasured assembly metadata |
+| Monthly business review | 460/463 | 395/401 | Pass |
+| Validation tool | 358/391 | 279/302 | Pass |
+| Coverage gate | 427/429 | 175/180 | Pass |
+| Squad maintenance templates | Unmeasured | Unmeasured | Fail |
+
+The measured-only aggregate was 2,307/2,393 lines (96.41%) and
+1,242/1,301 branches (95.47%); its measured threshold passed, but the overall
+gate failed because sources remain unmeasured. These results apply to this run
+and are not full first-party coverage.
+
 On CI, use the same commands with the pinned Node/npm/.NET versions from the
 existing workflows, and retain every report plus `summary.json` as artifacts for
 the exact source revision. Do not treat a failed collector, empty report, or
@@ -134,9 +153,9 @@ console-only runner summary as a successful gate.
 - Workflow YAML contains inline shell/JavaScript and workflow control logic not
   represented by the `.github/scripts/*.cjs` Cobertura report. All tracked
   workflows are named in the inventory.
-- `scripts/monitor/Program.cs`, the MBR application, and the migrated
-  validation utility have measured line/branch values below the approved
-  threshold; external DNS/GitHub/server paths remain in their denominators.
+- In the 2026-11-13 run, the measured monitor, MBR, and validation component
+  totals met the 90% line and branch thresholds. Some individual sources remain
+  below 90%; external DNS/GitHub/server paths remain in their denominators.
 - `.squad/templates/` contains first-party Node, PowerShell, shell, and 11
   runnable workflow templates. They are named as an unmeasured component
   instead of being treated as third-party or silently omitted.
