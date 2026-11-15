@@ -32,7 +32,21 @@ function requestLocal(url) {
   });
 }
 
-function fakeMeasurementBrowser({ missingMeasurement = false } = {}) {
+function fakeMeasurementBrowser({
+  runtimeEvaluation = {
+    result: {
+      value: {
+        lcp: 12,
+        fcp: 10,
+        cls: 0,
+        ttfb: 8,
+        shifts: [],
+        resources: [{ name: "http://127.0.0.1/app.js", transferSize: 24 }],
+        documentTransfer: 128,
+      },
+    },
+  },
+} = {}) {
   const child = childProcessStub();
   const output = new PassThrough();
   const calls = [];
@@ -49,9 +63,7 @@ function fakeMeasurementBrowser({ missingMeasurement = false } = {}) {
         "Target.createBrowserContext": { browserContextId: `context-${context}` },
         "Target.createTarget": { targetId: "target" },
         "Target.attachToTarget": { sessionId: `session-${context}` },
-        "Runtime.evaluate": {
-          result: { value: missingMeasurement ? {} : { lcp: 12, fcp: 10, cls: 0 } },
-        },
+        "Runtime.evaluate": runtimeEvaluation,
       };
       if (message.method === "Page.navigate" && !requestCheck) {
         const base = new URL(message.params.url).origin;
@@ -108,17 +120,46 @@ function fakeMeasurementBrowser({ missingMeasurement = false } = {}) {
   };
 }
 
-for (const missingMeasurement of [false, true]) {
+for (const scenario of [
+  {
+    name: "MeasurementRun_CollectsAllSamplesAndBlocksExternalRequests",
+  },
+  {
+    name: "MeasurementRun_MissingMetricsFailsAndCleansUp",
+    error: true,
+    runtimeEvaluation: { result: { value: {} } },
+  },
+  {
+    name: "MeasurementRun_MissingFcpWithOtherMetricsFailsAndCleansUp",
+    error: true,
+    expectedDetail: /"fcp":null/,
+    runtimeEvaluation: {
+      result: { value: { lcp: 12, fcp: null, cls: 0 } },
+    },
+  },
+  {
+    name: "MeasurementRun_ExceptionDetailsWithValidMetricsFailsAndCleansUp",
+    error: true,
+    expectedDetail: /exceptionDetails/,
+    runtimeEvaluation: {
+      result: { value: { lcp: 12, fcp: 10, cls: 0 } },
+      exceptionDetails: {
+        text: "Uncaught",
+        exception: { description: "fixture evaluation error" },
+      },
+    },
+  },
+]) {
   test(
-    missingMeasurement
-      ? "MeasurementRun_MissingMetricsFailsAndCleansUp"
-      : "MeasurementRun_CollectsAllSamplesAndBlocksExternalRequests",
+    scenario.name,
     { timeout: 5000 },
     async () => {
       const directory = await mkdtemp(join(tmpdir(), "jamula-performance-test-"));
       const root = join(directory, "dist");
       const profile = join(directory, "profile");
-      const fake = fakeMeasurementBrowser({ missingMeasurement });
+      const fake = fakeMeasurementBrowser({
+        runtimeEvaluation: scenario.runtimeEvaluation,
+      });
       const logs = [];
       let pauses = 0;
       try {
@@ -151,8 +192,14 @@ for (const missingMeasurement of [false, true]) {
           },
           log: (line) => logs.push(JSON.parse(line)),
         });
-        if (missingMeasurement) await assert.rejects(run, /Missing measurements/);
-        else await run;
+        if (scenario.error) {
+          await assert.rejects(run, (error) => {
+            assert.match(error.message, /Missing measurements/);
+            if (scenario.expectedDetail)
+              assert.match(error.message, scenario.expectedDetail);
+            return true;
+          });
+        } else await run;
         const responses = await fake.requests();
         assert.deepEqual(
           responses.map(({ status, type, body }) => [status, type, body]),
@@ -179,10 +226,30 @@ for (const missingMeasurement of [false, true]) {
             ["Fetch.failRequest", "external"],
           ]
         );
-        if (!missingMeasurement) {
+        if (!scenario.error) {
           assert.equal(pauses, 30);
           assert.equal(logs.length, 31);
           assert.equal(logs[1].externalRequests, 1);
+          assert.deepEqual(
+            {
+              lcp: logs[1].lcp,
+              fcp: logs[1].fcp,
+              cls: logs[1].cls,
+              ttfb: logs[1].ttfb,
+              shifts: logs[1].shifts,
+              resources: logs[1].resources,
+              documentTransfer: logs[1].documentTransfer,
+            },
+            {
+              lcp: 12,
+              fcp: 10,
+              cls: 0,
+              ttfb: 8,
+              shifts: [],
+              resources: [{ name: "http://127.0.0.1/app.js", transferSize: 24 }],
+              documentTransfer: 128,
+            },
+          );
           assert.deepEqual(
             logs.slice(1).map(({ device, route, run }) => [device, route, run]),
             ["desktop", "mobile"].flatMap((device) =>
