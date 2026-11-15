@@ -158,6 +158,28 @@ inventoried source. This measures the configuration only, not rendered HTML or
 the seven Astro templates. The collector reports c8/V8 branch counts, which do
 not establish independent coverage of every boolean condition.
 
+The author reported an offline Astro 7.4.4 / c8 9.1.0 investigation in which
+the compiler emitted inline source maps identifying the original `.astro`
+files. That map alone was not sufficient for coverage attribution. With the
+normal `vite.build.sourcemap: false` setting, c8 reported no covered lines or
+branches for the seven templates. Enabling build sourcemaps in a temporary
+config and using c8's `--exclude-after-remap` option reportedly produced
+**1,110/1,110 lines (100%) and 3/3 branches (100%)** across the templates, but
+Cobertura marked static HTML and CSS source lines as covered. Its only branch
+entries reportedly mapped to `<BaseLayout>` invocations in `404.astro:9`,
+`index.astro:24`, and `privacy.astro:9`, not to template conditional
+expressions. These counts are author-reported and were not independently
+verified during this integration; they are not executable-source coverage and
+must not enter the inventory or 90% gate. Production source maps remain
+disabled.
+
+`CoverageGate_KeepsAllAstroTemplatesAsUnmeasuredBlockers` protects the exact
+seven paths and confirms that complete browser and Astro-config reports cannot
+make the website component pass while those templates lack validated
+executable-source measurements. Keep the entries unmeasured until a
+compiler-aware collector can distinguish executable template expressions and
+their branches from emitted markup and styles.
+
 Collect the .NET application reports from their offline test runners. Test-runner
 source is explicitly excluded in `inventory.json`; application source remains
 in the Cobertura report and is matched by its repository-relative path.
@@ -318,16 +340,17 @@ console-only runner summary as a successful gate.
 ## Current blockers
 
 - The website has seven `.astro` templates with build-time logic that remain
-  unmeasured. The separate configuration and browser reports do not measure
-  those templates; build and generated-site tests are not source coverage.
+  unmeasured. Astro source-map V8 coverage can remap static markup and styles to
+  covered lines while leaving the executable branch denominator incomplete;
+  separate configuration and browser reports do not measure those templates.
+  Build and generated-site tests are not source coverage.
 - `scripts/monitor/InternalsVisibleTo.cs` has no executable lines for Cobertura
   to measure. The exact-content guard validates only the allowlisted friend
   assembly declaration; it contributes no invented coverage counts. Any other
   content or classification fails closed.
-- The website has seven `.astro` templates with build-time logic and an
-  executable `www/astro.config.ts`. The runtime coverage report measures only
-  `www/public/analytics-consent.js`; separate configuration coverage does not
-  measure the templates.
+- The website also has an executable `www/astro.config.ts`. The runtime
+  coverage report measures only `www/public/analytics-consent.js`; separate
+  configuration coverage does not measure the templates.
 - Workflow YAML contains inline shell/JavaScript and workflow control logic not
   represented by the `.github/scripts/*.cjs` Cobertura report. All tracked
   workflows are named in the inventory.

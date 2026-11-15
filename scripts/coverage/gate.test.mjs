@@ -527,6 +527,57 @@ test("CoverageGate_AttributesRelativeAstroConfigUsingCoberturaSourceRoot", async
   assert.ok(wrongRoot.errors.some((error) => error.includes("unclassified report source: astro.config.ts")));
 });
 
+test("CoverageGate_KeepsAllAstroTemplatesAsUnmeasuredBlockers", async () => {
+  const manifest = JSON.parse(
+    await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
+  );
+  const website = manifest.components.find(
+    (item) => item.id === "website-browser",
+  );
+  const expectedTemplates = [
+    "www/src/components/AnalyticsConsent.astro",
+    "www/src/components/SiteFooter.astro",
+    "www/src/components/SiteHeader.astro",
+    "www/src/layouts/BaseLayout.astro",
+    "www/src/pages/404.astro",
+    "www/src/pages/index.astro",
+    "www/src/pages/privacy.astro",
+  ];
+  assert.deepEqual(
+    website.unmeasured
+      .filter((source) => source.path.endsWith(".astro"))
+      .map((source) => source.path)
+      .sort(),
+    [...expectedTemplates].sort(),
+  );
+  assert.ok(
+    expectedTemplates.every((source) => !website.sources.includes(source)),
+  );
+
+  const result = evaluateCoverage(
+    inventory([website]),
+    new Map([
+      [
+        "website/cobertura-coverage.xml",
+        classReport("www/public/analytics-consent.js", [1], [[1, 1]]),
+      ],
+      [
+        "astro-config/cobertura-coverage.xml",
+        classReport("www/astro.config.ts", [1], [[1, 1]]),
+      ],
+    ]),
+  );
+  assert.equal(result.passed, false);
+  for (const source of expectedTemplates) {
+    assert.ok(
+      result.errors.some((error) =>
+        error.includes(`unmeasured source: ${source}`),
+      ),
+      source,
+    );
+  }
+});
+
 test("CoverageGate_FailsClosedWhenAstroConfigReportIsMissing", async () => {
   const manifest = JSON.parse(await readFile(new URL("./inventory.json", import.meta.url), "utf8"));
   const website = manifest.components.find((item) => item.id === "website-browser");

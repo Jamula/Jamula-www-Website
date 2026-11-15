@@ -16,31 +16,31 @@
         },
         {
           "path": "www/src/components/AnalyticsConsent.astro",
-          "reason": "Astro build-time template code has no line/branch source-map report."
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
         },
         {
           "path": "www/src/components/SiteFooter.astro",
-          "reason": "Astro build-time template code has no line/branch source-map report."
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
         },
         {
           "path": "www/src/components/SiteHeader.astro",
-          "reason": "Astro build-time template code has no line/branch source-map report."
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
         },
         {
           "path": "www/src/layouts/BaseLayout.astro",
-          "reason": "Astro build-time template code has no line/branch source-map report."
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
         },
         {
           "path": "www/src/pages/404.astro",
-          "reason": "Astro build-time template code has no line/branch source-map report."
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
         },
         {
           "path": "www/src/pages/index.astro",
-          "reason": "Astro build-time template code has no line/branch source-map report."
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
         },
         {
           "path": "www/src/pages/privacy.astro",
-          "reason": "Astro build-time template code has no line/branch source-map report."
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
         }
       ]
     },
