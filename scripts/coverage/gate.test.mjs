@@ -945,6 +945,8 @@ test("CoverageGate_MeasuresLinkedHostsAndKeepsPublisherBlocking", async () => {
       source.reason,
       /no compatible line\/branch coverage report exists/i,
     );
+    assert.match(source.reason, /Pester 3\.4.*no branch counts/i);
+    assert.match(source.reason, /behavior checks are not source coverage/i);
     assert.match(source.reason, /blocker/i);
     assert.match(source.reason, /not classified as test-only/i);
   }

@@ -152,7 +152,7 @@
       "unmeasured": [
         {
           "path": "scripts/spikes/sidequest-artifacts/Publish-Local.ps1",
-          "reason": "Runnable local publisher; no compatible line/branch coverage report exists. Kept as a blocker, not classified as test-only."
+          "reason": "Runnable local publisher; offline --publisher behavior checks are not source coverage. Available Pester 3.4 command coverage has no branch counts or repository-pinned Cobertura export, and dotnet-coverage measures CLR code rather than PowerShell source. No compatible line/branch coverage report exists; kept as a blocker, not classified as test-only."
         }
       ]
     },

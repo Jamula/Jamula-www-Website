@@ -43,6 +43,29 @@ For only the five focused cleanup regressions (no publishing or hosting), run:
 dotnet run --project scripts\spikes\sidequest-artifacts\Checks\Checks.csproj --configuration Release -- --cleanup
 ```
 
+For only the local publisher behavior checks, run:
+
+```powershell
+dotnet run --project scripts\spikes\sidequest-artifacts\Checks\Checks.csproj --configuration Release -- --publisher
+```
+
+This mode substitutes an in-process `dotnet` function that records the exact
+publish arguments and returns controlled exit codes. It does not invoke a real
+build, access a package feed, or create release artifacts. A successful run
+reports **9 publisher checks passed, 0 skipped, 0 failed**:
+
+| Requirement | Check |
+| --- | --- |
+| Independent publish selects only the requested project and preserves offline arguments | `Publisher_IndependentSectionBuildsOnlyTheSelectedProject` |
+| Default version and unique release roots | `Publisher_DefaultsToUniqueReleaseRootsAndVersion` |
+| `-All` publishes the four projects in order | `Publisher_AllBuildsTheFourProjectsInOrder` |
+| Reused destinations fail before invoking `dotnet` | `Publisher_RejectsReusedDestinationBeforeAnyBuild` |
+| A single offline publish failure is surfaced without a success result | `Publisher_StopsAfterOfflinePublishFailure` |
+| Collective publish stops at its first failed project | `Publisher_AllStopsAfterFirstFailedProject` |
+| Invalid section is rejected before invoking `dotnet` | `Publisher_RejectsInvalidSectionBeforeAnyBuild` |
+| Invalid version is rejected before invoking `dotnet` | `Publisher_RejectsInvalidVersionBeforeAnyBuild` |
+| A section or `-All` selection is required | `Publisher_RequiresSectionOrAll` |
+
 These checks inject ordered cleanup failures deterministically and use one
 owned sleeping .NET child (the checks assembly's internal `--cleanup-child`
 mode, bounded to 60 seconds) to verify that successful startup cleanup rethrows
@@ -113,11 +136,12 @@ earlier failures rather than replacing them.
 
 The default command must exit 0 with **24 passed, 0 skipped, 0 failed**. The
 collective command must exit 0 with **7 passed, 0 skipped, 0 failed**. The focused
-`--cleanup` command must exit 0 with **5 passed, 0 skipped, 0 failed**. Names are
-static, unique report metadata, never interpolated request data. This console
-fixture follows the existing spike convention; it does not emit a TRX/JUnit
-result report or enforce an in-run coverage threshold. The coverage gate
-consumes the separate `dotnet-coverage` report described in
+`--cleanup` command must exit 0 with **5 passed, 0 skipped, 0 failed**; the
+focused `--publisher` command must exit 0 with **9 passed, 0 skipped, 0 failed**.
+Names are static, unique report metadata, never interpolated request data. This
+console fixture follows the existing spike convention; it does not emit a
+TRX/JUnit result report or enforce an in-run coverage threshold. The coverage
+gate consumes the separate `dotnet-coverage` report described in
 `scripts\coverage\README.md`.
 
 | Requirement | Evidence |

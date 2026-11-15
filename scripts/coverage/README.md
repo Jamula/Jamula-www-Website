@@ -235,6 +235,23 @@ instead of collapsing branch counts. Gateway is expected only in its single
 that module without report merging. This identity rule is specific to these
 declared builds, not a general-purpose Cobertura merge.
 
+Run the publisher's offline behavior checks separately from source coverage:
+
+```powershell
+dotnet run --project scripts\spikes\sidequest-artifacts\Checks\Checks.csproj --configuration Release -- --publisher
+```
+
+The fixture shadows `dotnet` with an in-process PowerShell function that records
+arguments and returns controlled exit codes; it performs no builds or feed
+access. It reports **9 publisher checks passed, 0 skipped, 0 failed** with
+stable names documented in `scripts\spikes\sidequest-artifacts\README.md`.
+These checks do not produce line or branch coverage. The available Pester 3.4
+CodeCoverage feature counts executed PowerShell commands but has no branch
+counts and no repository-pinned Cobertura exporter; `dotnet-coverage` measures
+CLR code, not PowerShell source. The gate therefore retains `Publish-Local.ps1`
+as an explicit unmeasured blocker and does not infer a coverage pass from the
+behavior checks.
+
 The fresh 2026-11-13 local collection ran
 `dotnet-coverage collect --output artifacts\sidequest-coverage\sidequest-artifacts\cobertura-coverage.xml --output-format cobertura dotnet run --project scripts\spikes\sidequest-artifacts\Checks\Checks.csproj --configuration Release -- --coverage`
 and passed **19 checks, 0 skipped, 0 failed**. The report resolved both source
@@ -253,6 +270,15 @@ as 100%. The PowerShell publisher remains unmeasured. Running the gate with
 only this report produced the above spike subtotal and exited **1**, retaining
 the publisher blocker and missing reports for every other component; no
 overall coverage pass is established.
+
+The author reported that a 2026-11-15 local collection used the same collector
+with an isolated report directory and passed **24 checks, 0 skipped, 0 failed**.
+That report was said to resolve both compiled source paths to this checkout and
+measure 93/94 lines (98.94%) and 38/40 branches (95.00%); a gate run with only
+that report was reported to exit **1**, with the publisher and other components
+still blocking. These historical results were not independently reproduced
+during this integration. The reported runtime-source counts exclude
+`Publish-Local.ps1`; they are not publisher coverage or an overall 90% result.
 
 The final command currently exits **1**: missing measurements and
 below-threshold components remain blockers. The printed aggregate is only the
