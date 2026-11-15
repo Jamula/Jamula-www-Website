@@ -596,7 +596,10 @@ test("MeasurementPipe_ProtocolErrorRejectsRequestAndClearsDeadline", async () =>
   const { send } = createMeasurementConnection(child, timers);
   try {
     const response = send("Page.enable");
-    assert.equal(input.read().toString(), '{"id":1,"method":"Page.enable","params":{}}\0');
+    assert.equal(
+      input.read().toString(),
+      '{"id":1,"method":"Page.enable","params":{}}\0'
+    );
     assert.equal(timers.active.size, 1);
     output.write('{"id":1,"error":{"code":-32000,"message":"Cannot enable"}}\0');
 
