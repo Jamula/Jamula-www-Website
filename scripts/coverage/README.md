@@ -161,6 +161,12 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 ```
 
+Run the focused offline behavior tests for the notes-fetch PowerShell template
+with `node --test scripts/coverage/notes-fetch.test.cjs`. The test harness
+shadows Git with a fixture-only function and uses a disposable repo-shaped
+directory; it does not collect source coverage. The template remains unmeasured
+until compatible line-and-branch attribution is available.
+
 The Ralph collector explicitly includes the hidden source and clears c8's
 default exclusions. Run from the repository root: Cobertura records that
 absolute root, which the gate checks against its own checkout. Its offline CLI
