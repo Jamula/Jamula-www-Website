@@ -309,6 +309,57 @@ test("MeasurementPipe_ResponseResolvesRequestAndClearsDeadline", async () => {
   }
 });
 
+test("MeasurementPipe_EventDispatchesSplitFramedEventToSessionHandler", () => {
+  const child = childProcessStub();
+  const input = new PassThrough();
+  const output = new PassThrough();
+  child.stderr = { resume() {} };
+  child.stdio = [null, null, child.stderr, input, output];
+  const { eventHandlers } = createMeasurementConnection(child);
+  const received = [];
+  eventHandlers.set("session-7:Page.loadEventFired", (params) => received.push(params));
+
+  try {
+    const event =
+      '{"sessionId":"session-7","method":"Page.loadEventFired","params":{"frameId":"frame-7"}}\0';
+    output.write(event.slice(0, 37));
+    assert.deepEqual(received, []);
+    output.write(event.slice(37));
+
+    assert.deepEqual(received, [{ frameId: "frame-7" }]);
+  } finally {
+    input.destroy();
+    output.destroy();
+  }
+});
+
+test("MeasurementPipe_ProtocolErrorRejectsRequestAndClearsDeadline", async () => {
+  const child = childProcessStub();
+  const input = new PassThrough();
+  const output = new PassThrough();
+  child.stderr = { resume() {} };
+  child.stdio = [null, null, child.stderr, input, output];
+  const timers = controlledMeasurementDeadline();
+  const { send } = createMeasurementConnection(child, timers);
+  try {
+    const response = send("Page.enable");
+    assert.equal(
+      input.read().toString(),
+      '{"id":1,"method":"Page.enable","params":{}}\0'
+    );
+    assert.equal(timers.active.size, 1);
+    output.write('{"id":1,"error":{"code":-32000,"message":"Cannot enable"}}\0');
+
+    await assert.rejects(response, {
+      message: '{"code":-32000,"message":"Cannot enable"}',
+    });
+    assert.equal(timers.active.size, 0);
+  } finally {
+    input.destroy();
+    output.destroy();
+  }
+});
+
 for (const { name, navigationFailure } of [
   {
     name: "MeasurementLoad_NavigationRejectionCancelsDeadlineAndListener",
