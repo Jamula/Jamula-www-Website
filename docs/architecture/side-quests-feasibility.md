@@ -98,6 +98,11 @@ does not establish an available, secure production compute allocation. Privacy,
 audit retention, commercial rights, hard cost controls, and production quality,
 latency and availability remain blockers.
 
+Payload-suppression settings do not establish that Logpush or other exports are
+disabled, free, or non-persistent. Their separate charges, destinations,
+persistence, retention, and deletion behavior—and those of every other logging,
+storage, cache, or stateful feature—must be reviewed independently.
+
 The Azure Standard/App Service alternative is the required comparison against
 the current Free mechanism. Its documented technical limits and cost-plan
 requirement are sufficient to reject it under the current constraint; they do
@@ -111,7 +116,7 @@ not justify upgrading or procuring it.
 | Hosts, TLS, and previews | Repository documents the approved four-host Static Web Apps configuration and isolated preview policy; Microsoft documents automatically renewing SSL certificates on Free and Standard plans. | No live check of all four HTTPS hosts, same-host HTTP upgrades, preview isolation, or public backend behavior was performed for this issue. |
 | Tenant identity, private data, and caching | Microsoft documents that the preconfigured Entra provider permits any Microsoft account and tenant restriction requires a custom provider; custom provider registrations are listed on Standard. | No Jamula tenant/guest membership, explicit roles, revocation, protected assets/search, private storage, or cache isolation was demonstrated. |
 | AI inference | Cloudflare publishes a Free Workers AI allocation of 10,000 Neurons/day; excess operations fail on Free, while Workers Paid bills above the allocation. | No Jamula account eligibility, model/commercial terms, secure data handling, quality, latency, availability, hard request/token caps, no-bill-overflow control, kill switch, or portable inference adapter was verified. |
-| Monitoring and storage | Cloudflare publishes up to 24 hours of standard Cloudflare One log retention on Free and a 50-user limit. | This does not establish suitable inference monitoring/audit retention or a zero-cost private-content store; no Jamula account configuration, retention adequacy, recovery, or cost was verified. |
+| Monitoring and storage | Cloudflare publishes up to 24 hours of standard Cloudflare One log retention on Free and a 50-user limit. | This does not establish suitable inference monitoring/audit retention or a zero-cost private-content store; no Jamula account configuration, retention adequacy, recovery, or cost was verified. Logpush and other exports, logging, storage, caches, and stateful features require separate review of charges and persistence/deletion behavior; payload suppression does not establish either. |
 | Cost and quota | Published Free/Standard plan distinctions and Cloudflare AI quota/pricing are recorded above. | A Free label is not proof of Jamula commercial eligibility or zero-spend operation. No live entitlement/overage inventory or region-specific Standard price was captured; no monthly, annual, or three-year cost forecast is decision-grade without an exact candidate and workload. |
 
 These are evidence gaps, not proof that no alternative could meet the
@@ -226,26 +231,46 @@ retrieval dates.
 
 Before any topology-dependent implementation can be represented as complete:
 
-1. A Cyrus-approved candidate must demonstrate the four approved hosts, HTTPS,
+1. The product owner must define and approve the representative workload and
+   numeric, measurable acceptance targets before suitability can be evaluated:
+   request volume and peak concurrency; an agreed quality benchmark and
+   pass/fail threshold; latency limits with percentile and measurement
+   conditions; an availability percentage and measurement window; and
+   retention durations for each required data category.
+   Until those targets are recorded, workload fit and production quality,
+   latency, availability, and retention remain unverified.
+2. An authorized account owner must verify the actual candidate account and
+   applicable region, exact plan and entitlement, paid-overflow paths and
+   excluded charges, model eligibility and license/commercial-use terms, and
+   applicable privacy, data-handling, and retention terms. This review must
+   cover the complete request, inference, logging, export, storage, and
+   deployment path—not just published Free-tier descriptions. No Jamula
+   account, plan, entitlement, or configuration is asserted here; no silent
+   plan upgrade or paid overage is acceptable.
+3. A Cyrus-approved candidate must demonstrate the four approved hosts, HTTPS,
    same-host HTTP upgrade, approved paths, independent section artifacts,
    protected private routes/APIs/assets/search/caches, preview isolation, and a
    compatible ad-hoc collective-release model.
-2. The candidate must meet the hard no-new-paid-services constraint with
-   verified commercial terms and quotas. No silent plan upgrade or paid
-   overage is acceptable.
-3. Entra tenant/guest membership, explicit application roles, revocation,
-   private-content isolation, and audit behavior must be tested end to end.
-4. A production-intended inference provider or local compute boundary must have
-   verified terms/entitlements, quality and latency evidence, data handling,
-   hard request/token ceilings, billing-overflow prevention, monitoring, and
-   an exercised kill switch.
+4. Authorized end-to-end and isolated tests must verify Entra tenant/guest
+   membership, explicit application roles, revocation, private-content
+   isolation, and audit behavior. They must also exercise quota limits and
+   prove fail-closed behavior for abuse and exhausted limits, and explicitly
+   test logging behavior and alerts without exposing disallowed payloads.
+   A production-intended inference provider or local compute boundary must
+   additionally demonstrate the approved workload's quality and latency
+   targets, hard request/token ceilings, prevention of paid overflow, and an
+   exercised kill switch. These tests have not been performed.
 5. A separately authorized isolated deployment experiment must verify
-   independent backend artifacts against a selected public routing mechanism.
-   Record source and artifact revisions, exact plan/runtime, sanitized
-   requests/results, cost, teardown, and limitations. The local artifact
-   experiment demonstrates only local routing and artifact replacement; it
-   does not establish a public route or production readiness. Such an
-   experiment remains outside the current no-provisioning/no-public-deployment
-   authorization.
+   independent backend artifacts against the selected public routing mechanism
+   and its routing behavior. Record source and artifact revisions, exact
+   plan/runtime, sanitized requests/results, cost, teardown, and limitations.
+   The local artifact experiment demonstrates only local routing and artifact
+   replacement; it does not establish a public route or production readiness.
+   Such an experiment remains outside the current no-provisioning/no-public-
+   deployment authorization.
+6. Separately review Logpush and every other export, logging, storage, cache,
+   and stateful feature for charges, destination, persistence, retention, and
+   deletion behavior. Do not infer zero cost or non-persistence from payload
+   suppression, disabled collection, or another feature's controls.
 
 No user/product constraint has been relaxed to clear these gates.
