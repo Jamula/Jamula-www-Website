@@ -283,20 +283,20 @@ inventoried source. This measures the configuration only, not rendered HTML or
 the seven Astro templates. The collector reports c8/V8 branch counts, which do
 not establish independent coverage of every boolean condition.
 
-An offline Astro 7.4.4 / c8 9.1.0 investigation confirmed that the compiler
-emits inline source maps whose `sources` identify the original `.astro` files.
-That map alone is not sufficient for coverage attribution. With the normal
-`vite.build.sourcemap: false` setting, c8's build report gave the seven
-templates no covered lines or branches. Enabling build sourcemaps in a
-temporary config and using c8's `--exclude-after-remap` option did remap the
-generated V8 data, but reported **1,110/1,110 lines (100%) and 3/3 branches
-(100%)** across the seven templates. Its Cobertura entries mark static HTML and
-CSS source lines as covered. Its only branch entries mapped to the `<BaseLayout>`
-invocations in `404.astro:9`, `index.astro:24`, and `privacy.astro:9`, not to
-the template's conditional expressions. Those mapped numbers therefore are not
-executable-source line/branch coverage and must not enter the inventory or the
-90% gate. The source-map configuration used for the experiment was temporary;
-production source maps remain disabled.
+The author reported an offline Astro 7.4.4 / c8 9.1.0 investigation in which
+the compiler emitted inline source maps identifying the original `.astro`
+files. That map alone was not sufficient for coverage attribution. With the
+normal `vite.build.sourcemap: false` setting, c8 reported no covered lines or
+branches for the seven templates. Enabling build sourcemaps in a temporary
+config and using c8's `--exclude-after-remap` option reportedly produced
+**1,110/1,110 lines (100%) and 3/3 branches (100%)** across the templates, but
+Cobertura marked static HTML and CSS source lines as covered. Its only branch
+entries reportedly mapped to `<BaseLayout>` invocations in `404.astro:9`,
+`index.astro:24`, and `privacy.astro:9`, not to template conditional
+expressions. These counts are author-reported and were not independently
+verified during this integration; they are not executable-source coverage and
+must not enter the inventory or 90% gate. Production source maps remain
+disabled.
 
 `CoverageGate_KeepsAllAstroTemplatesAsUnmeasuredBlockers` protects the exact
 seven paths and confirms that complete browser and Astro-config reports cannot
