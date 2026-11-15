@@ -135,6 +135,22 @@ tests stub Git, HTTPS and output writes; no GitHub request or result file is
 created. c8 reports V8 line and branch counts, not independent boolean
 condition coverage. Other Squad templates remain unmeasured.
 
+The live `.github/workflows/squad-triage.yml` JavaScript block has deterministic
+offline behavioral tests: `node --test scripts/coverage/squad-triage.test.cjs`.
+The tests extract the block directly from the workflow and supply local
+filesystem, GitHub API, and core fakes; they do not call GitHub. The VM filename
+and line offset support diagnostics, not a coverage source map: V8 ranges refer
+to the extracted and wrapped JavaScript, not the original YAML bytes. The
+repository-pinned c8 excludes `.yml` by default; forcing `--extension .yml`
+produces a misleading report attributing execution to YAML metadata and
+misplacing JavaScript branches. Do not use that report as coverage evidence.
+Node's experimental test-coverage report also cannot reliably map this VM
+script back to the original YAML. Neither report measures the Actions event,
+job condition, step execution, or external actions. The gate classifies whole
+source paths, so treating the YAML as measured from the script alone would hide
+those behaviors. It remains an unmeasured blocker; no counts are added to the
+gate. V8 branch ranges are not independent boolean-condition coverage.
+
 The Astro collector writes a fresh temporary directory on each run; the copy
 above uses the directory printed by that successful run. Its Cobertura
 `<sources>` root resolves the relative `astro.config.ts` filename to the
@@ -146,11 +162,18 @@ Collect the .NET application reports from their offline test runners. Test-runne
 source is explicitly excluded in `inventory.json`; application source remains
 in the Cobertura report and is matched by its repository-relative path.
 
-```powershell
-dotnet-coverage collect --output "$reports\monitor.cobertura.xml" --output-format cobertura `
-  dotnet run --project scripts\monitor\JamulaMonitor.csproj --configuration Release -- --self-test
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+> **MONITOR COLLECTION PAUSED:** Do not run the monitor collector or probe live
+> Jamula hosts pending an offline root-cause determination. Earlier DNS and
+> HTTP(S) success messages do not establish that external requests were sent:
+> `Monitor_HttpClientDisposesHandlerExactlyOnce` in
+> `scripts/monitor/tests/SelfTests.cs` uses injected DNS/HTTP fakes and does not
+> capture console output. No original network trace is available, so actual
+> network activity remains unknown. The missing `monitor.cobertura.xml` is an
+> explicit coverage-gate blocker. The remaining collectors below do not produce
+> complete per-deployable or aggregate coverage and must not be presented as a
+> complete passing report.
 
+```powershell
 dotnet-coverage collect --output "$reports\mbr-dotnet.cobertura.xml" --output-format cobertura `
   dotnet run --project scripts\mbr\tests\JamulaMbr.Tests.csproj --configuration Release
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
