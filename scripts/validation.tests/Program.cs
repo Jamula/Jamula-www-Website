@@ -67,6 +67,7 @@ runner.Run("Artifact_NonRegularEntry_IsRejected", ArtifactNonRegularEntryRejecte
 runner.Run("Artifact_FileDirectoryCollision_IsRejected", ArtifactTreeConflictRejected);
 runner.Run("Artifact_DeeplySegmentedDirectory_IsValidatedWithBoundedAllocations", ArtifactDeeplySegmentedDirectoryValidated);
 runner.Run("Artifact_AggregatePathSegmentLimit_IsEnforcedBeforeTreeAllocation", ArtifactAggregatePathSegmentLimitEnforced);
+runner.Run("Artifact_CompatibilitySeparators_RespectAggregatePathSegmentLimit", ArtifactCompatibilitySeparatorsRespectAggregateLimit);
 runner.Run("Artifact_NonEmptyDestination_IsPreserved", ArtifactNonEmptyDestinationPreserved);
 runner.Run("Artifact_FileDestination_IsRejected", ArtifactFileDestinationRejected);
 runner.Run("Artifact_SymlinkDestination_IsRejected", ArtifactSymlinkDestinationRejected);
@@ -476,6 +477,35 @@ void ArtifactAggregatePathSegmentLimitEnforced()
         () => PreviewArtifactValidator.ExtractPreview(archive, destination, fixture.ConfigPath),
         "path segment limit");
     Check(!Directory.Exists(destination), "aggregate-path-limit-rejects-before-output");
+}
+
+void ArtifactCompatibilitySeparatorsRespectAggregateLimit()
+{
+    foreach (var overLimit in new[] { false, true })
+    {
+        using var fixture = new ArtifactFixture();
+        var directories = Enumerable.Range(0, 7)
+            .Select(index => Entry(
+                $"root{index}" + string.Concat(Enumerable.Repeat("\uFF0Fd", index < 6 ? 14_999 : overLimit ? 9_996 : 9_995)) + "/",
+                "",
+                0x4000))
+            .ToArray();
+        var archive = fixture.CreateArchive(directories);
+        var destination = Path.Combine(fixture.Root, "dist");
+
+        if (overLimit)
+        {
+            Throws<InvalidDataException>(
+                () => PreviewArtifactValidator.ExtractPreview(archive, destination, fixture.ConfigPath),
+                "path segment limit");
+            Check(!Directory.Exists(destination), "compatibility-separators-rejected-before-output");
+        }
+        else
+        {
+            PreviewArtifactValidator.ExtractPreview(archive, destination, fixture.ConfigPath);
+            Check(File.Exists(Path.Combine(destination, "index.html")), "normalized-segments-at-limit-are-accepted");
+        }
+    }
 }
 
 void ArtifactNonEmptyDestinationPreserved()
