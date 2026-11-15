@@ -135,6 +135,11 @@ tests stub Git, HTTPS and output writes; no GitHub request or result file is
 created. c8 reports V8 line and branch counts, not independent boolean
 condition coverage. Other Squad templates remain unmeasured.
 
+Run `node --test scripts\coverage\write-note.test.cjs` for offline PowerShell
+note-writer behavior checks. A disposable fixture intercepts Git and sleeps;
+these checks do not produce source-level line or branch coverage, so
+`write-note.ps1` remains unmeasured and the gate remains blocked.
+
 The Astro collector writes a fresh temporary directory on each run; the copy
 above uses the directory printed by that successful run. Its Cobertura
 `<sources>` root resolves the relative `astro.config.ts` filename to the
