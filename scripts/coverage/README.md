@@ -192,20 +192,20 @@ inventoried source. This measures the configuration only, not rendered HTML or
 the seven Astro templates. The collector reports c8/V8 branch counts, which do
 not establish independent coverage of every boolean condition.
 
-The author reported an offline Astro 7.4.4 / c8 9.1.0 investigation in which
-the compiler emitted inline source maps identifying the original `.astro`
-files. That map alone was not sufficient for coverage attribution. With the
-normal `vite.build.sourcemap: false` setting, c8 reported no covered lines or
-branches for the seven templates. Enabling build sourcemaps in a temporary
-config and using c8's `--exclude-after-remap` option reportedly produced
-**1,110/1,110 lines (100%) and 3/3 branches (100%)** across the templates, but
-Cobertura marked static HTML and CSS source lines as covered. Its only branch
-entries reportedly mapped to `<BaseLayout>` invocations in `404.astro:9`,
-`index.astro:24`, and `privacy.astro:9`, not to template conditional
-expressions. These counts are author-reported and were not independently
-verified during this integration; they are not executable-source coverage and
-must not enter the inventory or 90% gate. Production source maps remain
-disabled.
+An offline Astro 7.4.4 / c8 9.1.0 investigation confirmed that the compiler
+emits inline source maps whose `sources` identify the original `.astro` files.
+That map alone is not sufficient for coverage attribution. With the normal
+`vite.build.sourcemap: false` setting, c8's build report gave the seven
+templates no covered lines or branches. Enabling build sourcemaps in a
+temporary config and using c8's `--exclude-after-remap` option did remap the
+generated V8 data, but reported **1,110/1,110 lines (100%) and 3/3 branches
+(100%)** across the seven templates. Its Cobertura entries mark static HTML and
+CSS source lines as covered. Its only branch entries mapped to the `<BaseLayout>`
+invocations in `404.astro:9`, `index.astro:24`, and `privacy.astro:9`, not to
+the template's conditional expressions. Those mapped numbers therefore are not
+executable-source line/branch coverage and must not enter the inventory or the
+90% gate. The source-map configuration used for the experiment was temporary;
+production source maps remain disabled.
 
 `CoverageGate_KeepsAllAstroTemplatesAsUnmeasuredBlockers` protects the exact
 seven paths and confirms that complete browser and Astro-config reports cannot
@@ -213,6 +213,14 @@ make the website component pass while those templates lack validated
 executable-source measurements. Keep the entries unmeasured until a
 compiler-aware collector can distinguish executable template expressions and
 their branches from emitted markup and styles.
+
+A test-only compiler-AST probe maps one `SiteFooter.astro` `releaseVersion &&
+<span>` expression back to its source location and confirms that an
+instrumented expression preserves its result and render side effects while
+recording both observed short-circuit outcomes. This proves only that one
+expression can be mapped and probed; V8 precise coverage returned the same
+range for the taken and untaken runs. The probe does not measure template source
+lines or establish a complete branch denominator.
 
 The performance diagnostic tests above are correctness checks only, not a
 coverage report. Their fake CDP server returns canned values; it does not
@@ -389,10 +397,11 @@ console-only runner summary as a successful gate.
 ## Current blockers
 
 - The website has seven `.astro` templates with build-time logic that remain
-  unmeasured. Astro source-map V8 coverage can remap static markup and styles to
-  covered lines while leaving the executable branch denominator incomplete;
-  separate configuration and browser reports do not measure those templates.
-  Build and generated-site tests are not source coverage.
+  unmeasured. Astro source maps remap static markup and styles to covered lines,
+  and the resulting V8 branch denominator is incomplete; the separate
+  configuration and browser reports do not measure those templates. The
+  one-expression test probe does not provide template source coverage or a
+  complete denominator. Build and generated-site tests are not source coverage.
 - `scripts/monitor/InternalsVisibleTo.cs` has no executable lines for Cobertura
   to measure. The exact-content guard validates only the allowlisted friend
   assembly declaration; it contributes no invented coverage counts. Any other
