@@ -81,7 +81,7 @@
         },
         {
           "path": ".github/workflows/squad-triage.yml",
-          "reason": "GitHub Actions workflow control logic lacks source-level coverage collection."
+          "reason": "Offline tests exercise the embedded JavaScript, but no report measures both that block and GitHub Actions workflow control logic."
         },
         {
           "path": ".github/workflows/sync-squad-labels.yml",
@@ -244,6 +244,10 @@
     {
       "path": "scripts/coverage/ralph-triage.test.cjs",
       "reason": "Offline test source; its assertions are not product behavior."
+    },
+    {
+      "path": "scripts/coverage/squad-triage.test.cjs",
+      "reason": "Offline workflow test source; its assertions are not product behavior."
     },
     {
       "path": "scripts/coverage/ralph-triage-fixture.cjs",
