@@ -132,19 +132,58 @@ test("WriteNote_WriteFailure_ReportsErrorWithoutPush", () => {
   assert.deepEqual(events.map((event) => event.kind), ["fetch", "notes-show", "notes-add"]);
 });
 
-test("WriteNote_NonConflictPushFailure_RetriesFiveTimesAndWarns", () => {
+test("WriteNote_NonConflictPushFailure_FailsAfterFiveAttempts", () => {
   const { result, events, directory } = runNote({
     steps: [initialFetch, missingNote, step("notes-add"),
       ...Array.from({ length: 5 }, () => step("push", 1, "permission denied"))],
   });
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Failed after 5 retries/);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Failed to push notes to test-remote after 5 attempts/);
+  assert.match(result.stderr, /refs\/notes\/squad\/data/);
+  assert.match(result.stderr, /permission denied/);
   assert.deepEqual(events.map((event) => event.kind), [
     "fetch", "notes-show", "notes-add", "push", "push", "push", "push", "push",
   ]);
   for (const event of events.slice(3)) {
     assert.deepEqual(event.args, ["-C", directory, "push", "test-remote", "refs/notes/squad/data:refs/notes/squad/data"]);
   }
+});
+
+test("WriteNote_ConflictPushFailure_FailsAfterFiveAttempts", () => {
+  const { result, events, directory } = runNote({
+    steps: [initialFetch, missingNote, step("notes-add"),
+      ...Array.from({ length: 5 }, () => [
+        step("push", 1, "rejected"), step("fetch"), step("notes-append"),
+      ]).flat()],
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Failed to push notes to test-remote after 5 attempts/);
+  assert.match(result.stderr, /refs\/notes\/squad\/data/);
+  assert.match(result.stderr, /rejected/);
+  assert.deepEqual(events.map((event) => event.kind), [
+    "fetch", "notes-show", "notes-add",
+    ...Array.from({ length: 5 }, () => ["push", "fetch", "notes-append", "sleep"]).flat(),
+  ]);
+  const originalNote = events[2].args[6];
+  for (let i = 0; i < 5; i++) {
+    const [push, fetch, append, sleep] = events.slice(3 + 4 * i, 7 + 4 * i);
+    assert.deepEqual(push.args, ["-C", directory, "push", "test-remote", "refs/notes/squad/data:refs/notes/squad/data"]);
+    assert.deepEqual(fetch.args, ["-C", directory, "fetch", "test-remote", "refs/notes/squad/data:refs/notes/squad/data"]);
+    verifyNote(append, "append", directory);
+    assert.equal(append.args[6], originalNote);
+    assert.equal(sleep.seconds, 2 ** i);
+  }
+});
+
+test("WriteNote_FinalPushAttemptSucceeds_ExitsSuccessfully", () => {
+  const { result, events } = runNote({
+    steps: [initialFetch, missingNote, step("notes-add"),
+      ...Array.from({ length: 4 }, () => step("push", 1, "permission denied")), step("push")],
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(events.map((event) => event.kind), [
+    "fetch", "notes-show", "notes-add", "push", "push", "push", "push", "push",
+  ]);
 });
 
 test("WriteNote_UnexpectedGitCommand_FailsClosed", () => {
