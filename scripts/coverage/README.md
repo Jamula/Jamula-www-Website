@@ -165,13 +165,15 @@ in the Cobertura report and is matched by its repository-relative path.
 > **MONITOR COLLECTION PAUSED:** Do not run the monitor collector or probe live
 > Jamula hosts pending an offline root-cause determination. Earlier DNS and
 > HTTP(S) success messages do not establish that external requests were sent:
-> `Monitor_HttpClientDisposesHandlerExactlyOnce` in
-> `scripts/monitor/tests/SelfTests.cs` uses injected DNS/HTTP fakes and does not
-> capture console output. No original network trace is available, so actual
-> network activity remains unknown. The missing `monitor.cobertura.xml` is an
-> explicit coverage-gate blocker. The remaining collectors below do not produce
-> complete per-deployable or aggregate coverage and must not be presented as a
-> complete passing report.
+> `Monitor_HttpClientDisposesHandlerExactlyOnce` exercises injected DNS/HTTP
+> fakes. The self-tests now capture fake-run output, and
+> `Monitor_FakeSuccessOutputIsCapturedAndNotPrintedUnlabelled` guards against
+> those success messages reaching the console. This does not establish whether
+> the original collector sent requests. No original network trace is available,
+> so actual network activity remains unknown. The missing
+> `monitor.cobertura.xml` is an explicit coverage-gate blocker. The remaining
+> collectors below do not produce complete per-deployable or aggregate coverage
+> and must not be presented as a complete passing report.
 
 ```powershell
 dotnet-coverage collect --output "$reports\mbr-dotnet.cobertura.xml" --output-format cobertura `
