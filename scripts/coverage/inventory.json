@@ -6,14 +6,11 @@
       "id": "website-browser",
       "reports": [
         "website/cobertura-coverage.xml",
-        "astro-config/cobertura-coverage.xml"
+        "astro-config/cobertura-coverage.xml",
+        "local-performance/cobertura-coverage.xml"
       ],
-      "sources": ["www/public/analytics-consent.js", "www/astro.config.ts"],
+      "sources": ["www/public/analytics-consent.js", "www/astro.config.ts", "www/scripts/measure-local-performance.mjs"],
       "unmeasured": [
-        {
-          "path": "www/scripts/measure-local-performance.mjs",
-          "reason": "Runnable local diagnostic for built-site performance; no line/branch coverage report exists."
-        },
         {
           "path": "www/src/components/AnalyticsConsent.astro",
           "reason": "Astro build-time template code has no line/branch source-map report."

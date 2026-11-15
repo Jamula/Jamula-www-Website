@@ -60,9 +60,9 @@ internal access, while `Monitor` remains non-public. Run both this command and
 
 The local Edge-based performance diagnostic at
 `www/scripts/measure-local-performance.mjs` is a runnable first-party source,
-not test support. It is explicitly listed as unmeasured under `website-browser`
-until a line/branch report exists; the inventory completeness test prevents
-reclassifying it as a test-only exclusion.
+not test support. Its separate offline c8 report is required by
+`website-browser`; a missing or incorrectly attributed report fails closed.
+Its fake browser and loopback server tests do not measure real Edge behavior.
 
 ## Collecting reports
 
@@ -71,7 +71,7 @@ From the repository root in PowerShell, create isolated report directories:
 ```powershell
 $reports = Join-Path (Get-Location) "coverage-reports"
 New-Item -ItemType Directory -Force `
-  "$reports\website", "$reports\astro-config", "$reports\automation", "$reports\mbr-ui", "$reports\coverage-gate", "$reports\ralph-triage", "$reports\sidequest-artifacts" | Out-Null
+  "$reports\website", "$reports\astro-config", "$reports\local-performance", "$reports\automation", "$reports\mbr-ui", "$reports\coverage-gate", "$reports\ralph-triage", "$reports\sidequest-artifacts" | Out-Null
 ```
 
 Install website dependencies with `npm ci --prefix www` if needed. The gate
@@ -105,6 +105,15 @@ if ($reportLine.Count -ne 1) { throw "Astro config collector did not identify ex
 $configReports = "$($reportLine[0])" -replace '^Coverage reports: ', ''
 Copy-Item -LiteralPath (Join-Path $configReports "cobertura-coverage.xml") `
   -Destination "$reports\astro-config\cobertura-coverage.xml" -ErrorAction Stop
+
+if (Test-Path -LiteralPath "$reports\local-performance\cobertura-coverage.xml") {
+  Remove-Item -LiteralPath "$reports\local-performance\cobertura-coverage.xml" -Force -ErrorAction Stop
+}
+& .\www\node_modules\.bin\c8.cmd --all --include="www/scripts/measure-local-performance.mjs" `
+  --reporter=text --reporter=cobertura --reporter=json `
+  --reports-dir="$reports\local-performance" --check-coverage --lines=90 --branches=90 --per-file `
+  node --test www/tests/measure-local-performance.test.mjs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 & .\www\node_modules\.bin\c8.cmd --reporter=cobertura --reports-dir="$reports\automation" `
   --include=".github/scripts/*.cjs" --exclude=".github/scripts/*.test.cjs" `
@@ -142,9 +151,29 @@ inventoried source. This measures the configuration only, not rendered HTML or
 the seven Astro templates. The collector reports c8/V8 branch counts, which do
 not establish independent coverage of every boolean condition.
 
+On 2026-11-15 the local-performance collector above passed 29 offline tests
+and measured **457/465 lines (98.28%)** and **122/129 branches (94.57%)**
+for `www/scripts/measure-local-performance.mjs`. c8's text report truncates
+the line percentage to 98.27%; the counts are authoritative. The gate resolved
+the report to this checkout and counted the same source; with only this report
+present it still failed for missing reports and unmeasured sources.
+
+The seven unhit V8 branch ranges are: duplicate listen completion (line 14),
+undefined `signalCode` (36), already-exited child at entry (45), exit between
+listener setup and the second check (61), duplicate server-close completion
+(74), path-containment rejection (303–306), and the CLI entry-point path
+(460–465). Uncovered lines are 304–306 and 461–465. These counts include V8's
+line/branch mapping, not independent boolean-condition coverage; the fake CDP
+browser and loopback HTTP tests are not evidence of live Edge or field results.
+
 Collect the .NET application reports from their offline test runners. Test-runner
 source is explicitly excluded in `inventory.json`; application source remains
 in the Cobertura report and is matched by its repository-relative path.
+
+**Paused: do not run the monitor collector command below pending an offline
+root-cause determination.** It unexpectedly made public-site requests; its
+cause has not been established. This pause does not remove its report or
+coverage requirements from the gate.
 
 ```powershell
 dotnet-coverage collect --output "$reports\monitor.cobertura.xml" --output-format cobertura `

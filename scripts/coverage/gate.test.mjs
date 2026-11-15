@@ -716,7 +716,7 @@ test("CoverageGate_InventoryClassifiesTrackedExecutableSources", async () => {
   );
 });
 
-test("CoverageGate_ClassifiesPerformanceDiagnosticAsUnmeasuredNotTestOnly", async () => {
+test("CoverageGate_RequiresCorrectlyAttributedPerformanceDiagnosticReport", async () => {
   const manifest = JSON.parse(
     await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
   );
@@ -724,13 +724,43 @@ test("CoverageGate_ClassifiesPerformanceDiagnosticAsUnmeasuredNotTestOnly", asyn
   const website = manifest.components.find(
     (item) => item.id === "website-browser",
   );
-  const blocker = website.unmeasured.find((item) => item.path === sourcePath);
-
-  assert.ok(blocker, `${sourcePath} must remain a coverage blocker`);
-  assert.match(blocker.reason, /runnable local diagnostic/i);
-  assert.match(blocker.reason, /no line\/branch coverage report/i);
-  assert.ok(!website.sources.includes(sourcePath));
+  const reportPath = "local-performance/cobertura-coverage.xml";
+  assert.ok(website.sources.includes(sourcePath));
+  assert.ok(website.reports.includes(reportPath));
+  assert.ok(!website.unmeasured.some((item) => item.path === sourcePath));
   assert.ok(!manifest.excludedSources.some((item) => item.path === sourcePath));
+  const report = sourceReport(sourcePath, [repositoryRoot]);
+  const reports = new Map([
+    ["website/cobertura-coverage.xml", classReport("www/public/analytics-consent.js", [1], [[1, 1]])],
+    ["astro-config/cobertura-coverage.xml", sourceReport("astro.config.ts", [`${repositoryRoot}www`])],
+    [reportPath, report],
+  ]);
+  const result = evaluateCoverage(inventory([website]), reports);
+  const source = result.components[0].sources.find((item) => item.path === sourcePath);
+  assert.deepEqual(
+    [source.linesCovered, source.linesValid, source.branchesCovered, source.branchesValid],
+    [2, 2, 1, 1],
+  );
+  assert.equal(result.passed, false);
+  assert.equal(result.components[0].unmeasured.length, 7);
+  assert.ok(!result.errors.some((error) => error.includes(sourcePath)));
+
+  reports.delete(reportPath);
+  const missing = evaluateCoverage(inventory([website]), reports);
+  assert.ok(missing.errors.some((error) => error.includes(`missing report: ${reportPath}`)));
+  assert.ok(missing.errors.some((error) => error.includes(`missing source measurement: ${sourcePath}`)));
+  reports.set(reportPath, report.replace(repositoryRoot, `${repositoryRoot}other\\`));
+  const wrongRoot = evaluateCoverage(inventory([website]), reports);
+  assert.ok(wrongRoot.errors.some((error) => error.includes(`missing source measurement: ${sourcePath}`)));
+  assert.ok(wrongRoot.errors.some((error) => error.includes(`unclassified report source: ${sourcePath}`)));
+
+  const diagnosticOnly = inventory([component("diagnostic", [sourcePath], [reportPath])]);
+  const belowThreshold = evaluateCoverage(
+    diagnosticOnly,
+    new Map([[reportPath, classReport(sourcePath, [1, 0], [[1, 2]])]]),
+  );
+  assert.equal(belowThreshold.passed, false);
+  assert.ok(belowThreshold.errors.some((error) => error.includes("component requires >=90% line and branch coverage")));
 });
 
 test("CoverageGate_DeduplicatesIdenticalLinkedSourceAcrossExpectedAssemblies", () => {

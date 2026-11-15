@@ -235,9 +235,9 @@ destroys only that measurement server's connections if its close is not
 confirmed. Cleanup failures are surfaced, the operational error remains first
 in any combined failure, and a profile is retained unless browser exit is
 confirmed. This recheck validates the harness execution, not field performance
-or a coverage percentage. The harness remains explicitly **unmeasured** in
-`scripts/coverage/inventory.json`, so the website and overall coverage gates
-remain blocked.
+or a coverage percentage. The diagnostic now has a separate offline source
+coverage report; see the [coverage inventory](../../scripts/coverage/README.md).
+The website and overall coverage gates remain blocked by other unmeasured sources.
 
 INP was not measured: an idle synthetic visit without representative
 interactions cannot produce field INP. Total Blocking Time and long tasks were
