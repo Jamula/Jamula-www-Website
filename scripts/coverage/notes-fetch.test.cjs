@@ -299,7 +299,7 @@ test("setup does not duplicate an existing notes refspec", () => {
 
 test("a pipeline-output condition probe changes the missing-refspec behavior", () => {
   const fixtureRoot = fs.mkdtempSync(
-    path.join(__dirname, ".notes-fetch-probe-"),
+    path.join(os.tmpdir(), "jamula-notes-fetch-probe-"),
   );
   let baseline;
   let probed;
