@@ -239,7 +239,6 @@ or a coverage percentage. The diagnostic remains unmeasured; its offline
 lifecycle tests do not provide a source coverage report. See the
 [coverage inventory](../../scripts/coverage/README.md).
 The website and overall coverage gates remain blocked by other unmeasured sources.
-
 ### Desktop 404 scrollbar regression — 2026-11-15
 
 The root `scrollbar-gutter: stable` rule is exercised by an opt-in browser test
