@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { createServer, get } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { PassThrough, Writable } from "node:stream";
 import test from "node:test";
 import {
@@ -14,6 +16,39 @@ import {
   runMeasurement,
   runMeasurementLifecycle,
 } from "../scripts/measure-local-performance.mjs";
+import {
+  browserEgressIsolationAcknowledgement,
+  requireBrowserEgressIsolationAcknowledgement,
+} from "./browser-egress-isolation.mjs";
+
+test("BrowserEgressIsolation_RequiresExplicitAcknowledgement", () => {
+  assert.throws(
+    () => requireBrowserEgressIsolationAcknowledgement({}),
+    /independently enforced external egress isolation is required.*acknowledgment does not verify or create isolation/
+  );
+  assert.doesNotThrow(() =>
+    requireBrowserEgressIsolationAcknowledgement({
+      [browserEgressIsolationAcknowledgement]: "1",
+    })
+  );
+});
+
+test("BrowserEgressIsolation_StopsBeforeCheckingOrLaunchingEdge", () => {
+  const edgePath = join(tmpdir(), "jamula-edge-must-not-be-checked.exe");
+  const env = { ...process.env, EDGE_PATH: edgePath };
+  delete env[browserEgressIsolationAcknowledgement];
+  delete env.NODE_TEST_CONTEXT;
+  const result = spawnSync(
+    process.execPath,
+    ["--test", fileURLToPath(new URL("./measure-local-performance.browser.mjs", import.meta.url))],
+    { encoding: "utf8", env, timeout: 10000 }
+  );
+  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+
+  assert.equal(result.status, 1, output);
+  assert.match(output, /independently enforced external egress isolation is required/);
+  assert.ok(!output.includes(edgePath), "the Edge executable must not be checked before the gate");
+});
 
 function requestLocal(url) {
   return new Promise((resolveResponse, reject) => {
