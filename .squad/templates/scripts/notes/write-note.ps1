@@ -86,14 +86,16 @@ Log "Note written to refs/notes/$namespace on $($Commit.Substring(0,[Math]::Min(
 
 # ── Push with retry ──────────────────────────────────────────────────────────
 if (-not $NoPush) {
-    $maxRetries = 5
+    $maxAttempts = 5
     $nsRef = "refs/notes/$namespace"
+    $pushed = $false
 
-    for ($i = 0; $i -lt $maxRetries; $i++) {
+    for ($i = 0; $i -lt $maxAttempts; $i++) {
         Log "Pushing notes (attempt $($i+1))..."
         $pushOut = git -C $repo push $Remote "${nsRef}:${nsRef}" 2>&1
         if ($LASTEXITCODE -eq 0) {
             Log "Notes pushed successfully." Green
+            $pushed = $true
             break
         }
 
@@ -112,10 +114,11 @@ if (-not $NoPush) {
 
         } else {
             Log "Push error: $pushOut" Red
-            if ($i -eq $maxRetries - 1) {
-                Write-Warning "Failed after $maxRetries retries. Push manually: git push origin '${nsRef}:${nsRef}'"
-            }
         }
+    }
+    if (-not $pushed) {
+        Write-Error "Failed to push notes to $Remote after $maxAttempts attempts. Ref: $nsRef. Last error: $pushOut"
+        exit 1
     }
 }
 
