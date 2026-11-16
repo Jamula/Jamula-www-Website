@@ -62,10 +62,22 @@ internal access, while `Monitor` remains non-public. Run both this command and
 The local Edge-based performance diagnostic at
 `www/scripts/measure-local-performance.mjs` is a runnable first-party source,
 not test support. It remains explicitly unmeasured in `website-browser`:
-the fake CDP replies with canned values and does not execute the embedded
-browser-side JavaScript or its instrumentation branches. c8 host-line counts
-from those tests would not represent coverage of the diagnostic source. Its
-offline lifecycle tests do not measure real Edge behavior.
+the fake CDP replies with canned values and do not execute the embedded
+browser-side JavaScript. Run
+`node --test www/tests/measure-local-performance.browser.mjs` to execute those
+exact strings in local Edge through CDP, collect V8 ranges, and validate an
+exact-offset source map. The prototype uses an isolated profile, `about:blank`,
+disabled background networking, a dead local proxy, and failing external host
+resolution; it does not navigate to or request an external URL.
+
+The prototype is evidence of browser execution, not a gate report:
+`v8-to-istanbul` initializes source lines outside the mapped string range as
+covered. Mapping a browser string to its containing `.mjs` file therefore
+creates false host-line hits, and the host and browser results cannot yet be
+combined into a truthful denominator. Keep this source unmeasured until a
+collector masks host string lines and merges both execution contexts without
+inventing line or branch counts. The existing offline lifecycle tests remain
+separate and do not measure real Edge behavior.
 
 ## Collecting reports
 
