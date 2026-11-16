@@ -359,6 +359,10 @@
       "reason": "Compiler-aware Astro probe test; its assertions are not product behavior."
     },
     {
+      "path": "www/tests/404-layout.browser.mjs",
+      "reason": "Opt-in offline browser regression test; its assertions are not shipped browser code."
+    },
+    {
       "path": "www/tests/homepage-contact.test.mjs",
       "reason": "Test-only source; its assertions are not product behavior."
     },
