@@ -258,6 +258,14 @@
       "reason": "Offline CLI test doubles, not production automation."
     },
     {
+      "path": "scripts/coverage/write-note.test.cjs",
+      "reason": "Offline behavior tests and assertions, not a maintenance script."
+    },
+    {
+      "path": "scripts/coverage/write-note-fixture.ps1",
+      "reason": "Offline PowerShell test doubles, not a maintenance script."
+    },
+    {
       "path": "scripts/mbr/tests/Program.cs",
       "reason": "Offline fixture runner, not the MBR application."
     },
