@@ -156,7 +156,6 @@ hits are not source coverage or a line-and-branch report. The focused test also
 rejects an inventory mutation that reclassifies this template as measured.
 Keep it explicitly unmeasured until a semantics-preserving collector proves
 complete attribution against the original source.
-
 The same offline test demonstrates one concrete instrumentation hazard: adding
 `Write-Output` to the `$existing` condition in a temporary copy makes a missing
 refspec truthy, so the script skips the fake Git `config --add` call. The
