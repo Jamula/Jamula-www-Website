@@ -150,125 +150,120 @@ for (const scenario of [
     },
   },
 ]) {
-  test(
-    scenario.name,
-    { timeout: 5000 },
-    async () => {
-      const directory = await mkdtemp(join(tmpdir(), "jamula-performance-test-"));
-      const root = join(directory, "dist");
-      const profile = join(directory, "profile");
-      const fake = fakeMeasurementBrowser({
-        runtimeEvaluation: scenario.runtimeEvaluation,
+  test(scenario.name, { timeout: 5000 }, async () => {
+    const directory = await mkdtemp(join(tmpdir(), "jamula-performance-test-"));
+    const root = join(directory, "dist");
+    const profile = join(directory, "profile");
+    const fake = fakeMeasurementBrowser({
+      runtimeEvaluation: scenario.runtimeEvaluation,
+    });
+    const logs = [];
+    let pauses = 0;
+    try {
+      await mkdir(join(root, "privacy"), { recursive: true });
+      await mkdir(profile);
+      for (const [file, body] of [
+        ["index.html", "home"],
+        ["privacy/index.html", "privacy"],
+        ["404.html", "not found page"],
+        ["app.js", "script"],
+        ["style.css", "style"],
+        ["image.png", "png"],
+        ["data.bin", "data"],
+      ])
+        await writeFile(join(root, file), body);
+      const run = runMeasurement({
+        root,
+        createProfile: async () => profile,
+        spawnBrowser: (executable, args, options) => {
+          assert.ok(executable);
+          assert.ok(args.includes("--remote-debugging-pipe"));
+          assert.ok(args.includes("--proxy-server=127.0.0.1:9"));
+          assert.deepEqual(options.stdio, ["ignore", "ignore", "pipe", "pipe", "pipe"]);
+          return fake.child;
+        },
+        delay: async (milliseconds) => {
+          assert.equal(milliseconds, 3000);
+          pauses++;
+          await fake.requests();
+        },
+        log: (line) => logs.push(JSON.parse(line)),
       });
-      const logs = [];
-      let pauses = 0;
-      try {
-        await mkdir(join(root, "privacy"), { recursive: true });
-        await mkdir(profile);
-        for (const [file, body] of [
-          ["index.html", "home"],
-          ["privacy/index.html", "privacy"],
-          ["404.html", "not found page"],
-          ["app.js", "script"],
-          ["style.css", "style"],
-          ["image.png", "png"],
-          ["data.bin", "data"],
-        ])
-          await writeFile(join(root, file), body);
-        const run = runMeasurement({
-          root,
-          createProfile: async () => profile,
-          spawnBrowser: (executable, args, options) => {
-            assert.ok(executable);
-            assert.ok(args.includes("--remote-debugging-pipe"));
-            assert.ok(args.includes("--proxy-server=127.0.0.1:9"));
-            assert.deepEqual(options.stdio, ["ignore", "ignore", "pipe", "pipe", "pipe"]);
-            return fake.child;
-          },
-          delay: async (milliseconds) => {
-            assert.equal(milliseconds, 3000);
-            pauses++;
-            await fake.requests();
-          },
-          log: (line) => logs.push(JSON.parse(line)),
+      if (scenario.error) {
+        await assert.rejects(run, (error) => {
+          assert.match(error.message, /Missing measurements/);
+          if (scenario.expectedDetail) assert.match(error.message, scenario.expectedDetail);
+          return true;
         });
-        if (scenario.error) {
-          await assert.rejects(run, (error) => {
-            assert.match(error.message, /Missing measurements/);
-            if (scenario.expectedDetail)
-              assert.match(error.message, scenario.expectedDetail);
-            return true;
-          });
-        } else await run;
-        const responses = await fake.requests();
+      } else await run;
+      const responses = await fake.requests();
+      assert.deepEqual(
+        responses.map(({ status, type, body }) => [status, type, body]),
+        [
+          [200, "text/html; charset=utf-8", "home"],
+          [200, "text/html; charset=utf-8", "privacy"],
+          [200, "text/html; charset=utf-8", "not found page"],
+          [200, "text/javascript", "script"],
+          [200, "text/css", "style"],
+          [200, "image/png", "png"],
+          [200, "application/octet-stream", "data"],
+          [404, undefined, ""],
+        ]
+      );
+      assert.equal(logs[0].browser, "FakeBrowser");
+      assert.equal(fake.child.killCalls, 1);
+      await assert.rejects(stat(profile), { code: "ENOENT" });
+      assert.deepEqual(
+        fake.calls
+          .filter((call) => call.method.startsWith("Fetch.") && call.method !== "Fetch.enable")
+          .map((call) => [call.method, call.params.requestId]),
+        [
+          ["Fetch.continueRequest", "local"],
+          ["Fetch.failRequest", "external"],
+        ]
+      );
+      if (!scenario.error) {
+        assert.equal(pauses, 30);
+        assert.equal(logs.length, 31);
+        assert.equal(logs[1].externalRequests, 1);
         assert.deepEqual(
-          responses.map(({ status, type, body }) => [status, type, body]),
-          [
-            [200, "text/html; charset=utf-8", "home"],
-            [200, "text/html; charset=utf-8", "privacy"],
-            [200, "text/html; charset=utf-8", "not found page"],
-            [200, "text/javascript", "script"],
-            [200, "text/css", "style"],
-            [200, "image/png", "png"],
-            [200, "application/octet-stream", "data"],
-            [404, undefined, ""],
-          ]
+          {
+            lcp: logs[1].lcp,
+            fcp: logs[1].fcp,
+            cls: logs[1].cls,
+            ttfb: logs[1].ttfb,
+            shifts: logs[1].shifts,
+            resources: logs[1].resources,
+            documentTransfer: logs[1].documentTransfer,
+          },
+          {
+            lcp: 12,
+            fcp: 10,
+            cls: 0,
+            ttfb: 8,
+            shifts: [],
+            resources: [{ name: "http://127.0.0.1/app.js", transferSize: 24 }],
+            documentTransfer: 128,
+          }
         );
-        assert.equal(logs[0].browser, "FakeBrowser");
-        assert.equal(fake.child.killCalls, 1);
-        await assert.rejects(stat(profile), { code: "ENOENT" });
         assert.deepEqual(
-          fake.calls
-            .filter((call) => call.method.startsWith("Fetch.") && call.method !== "Fetch.enable")
-            .map((call) => [call.method, call.params.requestId]),
-          [
-            ["Fetch.continueRequest", "local"],
-            ["Fetch.failRequest", "external"],
-          ]
-        );
-        if (!scenario.error) {
-          assert.equal(pauses, 30);
-          assert.equal(logs.length, 31);
-          assert.equal(logs[1].externalRequests, 1);
-          assert.deepEqual(
-            {
-              lcp: logs[1].lcp,
-              fcp: logs[1].fcp,
-              cls: logs[1].cls,
-              ttfb: logs[1].ttfb,
-              shifts: logs[1].shifts,
-              resources: logs[1].resources,
-              documentTransfer: logs[1].documentTransfer,
-            },
-            {
-              lcp: 12,
-              fcp: 10,
-              cls: 0,
-              ttfb: 8,
-              shifts: [],
-              resources: [{ name: "http://127.0.0.1/app.js", transferSize: 24 }],
-              documentTransfer: 128,
-            },
-          );
-          assert.deepEqual(
-            logs.slice(1).map(({ device, route, run }) => [device, route, run]),
-            ["desktop", "mobile"].flatMap((device) =>
-              ["/", "/privacy/", "/404.html"].flatMap((route) =>
-                [1, 2, 3, 4, 5].map((run) => [device, route, run])
-              )
+          logs.slice(1).map(({ device, route, run }) => [device, route, run]),
+          ["desktop", "mobile"].flatMap((device) =>
+            ["/", "/privacy/", "/404.html"].flatMap((route) =>
+              [1, 2, 3, 4, 5].map((run) => [device, route, run])
             )
-          );
-          assert.equal(
-            fake.calls.filter((call) => call.method === "Target.disposeBrowserContext").length,
-            30
-          );
-        }
-      } finally {
-        fake.dispose();
-        await rm(directory, { recursive: true, force: true });
+          )
+        );
+        assert.equal(
+          fake.calls.filter((call) => call.method === "Target.disposeBrowserContext").length,
+          30
+        );
       }
+    } finally {
+      fake.dispose();
+      await rm(directory, { recursive: true, force: true });
     }
-  );
+  });
 }
 
 for (const { name, cleanupFails } of [
