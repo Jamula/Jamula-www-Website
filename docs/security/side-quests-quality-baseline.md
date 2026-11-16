@@ -327,6 +327,50 @@ Pop-Location
 # passed: 30 samples across 6 route/device cells; 0 non-loopback requests
 ```
 
+### Desktop 404 scrollbar regression — 2026-11-15
+
+The root `scrollbar-gutter: stable` rule is exercised by an opt-in browser test
+that runs `npm run build` itself before reading `dist/`; it cannot silently use
+stale built output. On Node 26.12.1 and Edge 158.0.4370.21, the desktop scenario
+verified that the 404 starts without vertical overflow and consent
+initialization introduces it. The no-gutter negative control observed the
+classic scrollbar transition (0 to 15 CSS px), header movement from x=90.5px
+to x=83px, and CLS 0.1937304482. With the stable gutter, the same transition
+left the header, error content, footer, and analytics container at x=83px;
+observed CLS was 0.0017893855. The mobile-emulated scenario also kept all
+checked landmarks fixed, with no layout-shift entries.
+
+The same browser run checked the exposed banner, navigation, main and footer
+landmarks, the 404 heading and home link, the named consent region, first-Tab
+skip-link behavior, and empty consent storage with no external scripts. It is
+a semantic smoke check, not a WCAG audit. Before navigation, the test verifies
+the browser's failing loopback proxy and blocked-DNS arguments; it then proves
+CDP interception by failing a synthetic `.invalid` request. The broader
+30-sample local harness recorded zero non-loopback page requests in all six
+route/device cells. No Jamula host or monitor collector was contacted.
+
+The global root rule was also measured against the current home, privacy, and
+404 layouts in five cold contexts per desktop and mobile-emulated cell. Maximum
+observed CLS was zero in every cell except desktop `/404.html`, whose maximum
+was 0.0017893855. This is a local Edge result, not production or field evidence.
+The CSS is progressive enhancement; browsers that ignore the declaration keep
+their prior behavior. Other browser engines and scrollbar modes were not
+tested. This browser test does not add line/branch coverage: the local
+performance harness and Astro template sources remain marked unmeasured in
+`scripts/coverage/inventory.json`, and the coverage gates remain blocked.
+
+Reproduce from the repository root with:
+
+```powershell
+node --test www\tests\404-layout.browser.mjs
+# passed: 1 test; includes a fresh site build, loopback-only browser checks,
+# and a no-gutter negative control
+Push-Location www
+node scripts\measure-local-performance.mjs
+Pop-Location
+# passed: 30 samples across 6 route/device cells; 0 non-loopback requests
+```
+
 INP was not measured: an idle synthetic visit without representative
 interactions cannot produce field INP. Total Blocking Time and long tasks were
 not measured. LCP can change after the three-second observation and CLS here
