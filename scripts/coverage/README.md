@@ -157,6 +157,13 @@ rejects an inventory mutation that reclassifies this template as measured.
 Keep it explicitly unmeasured until a semantics-preserving collector proves
 complete attribution against the original source.
 
+The same offline test demonstrates one concrete instrumentation hazard: adding
+`Write-Output` to the `$existing` condition in a temporary copy makes a missing
+refspec truthy, so the script skips the fake Git `config --add` call. The
+uninstrumented source adds it. This rejects that particular probe, not every
+possible instrumentation method; it does not measure source coverage or
+establish a complete denominator. The test only runs with the fake Git fixture.
+
 The live `.github/workflows/squad-triage.yml` JavaScript block has deterministic
 offline behavioral tests: `node --test scripts/coverage/squad-triage.test.cjs`.
 The tests extract the block directly from the workflow and supply local

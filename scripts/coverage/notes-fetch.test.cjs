@@ -58,6 +58,7 @@ function runFetch({
   setup = false,
   merge = false,
   staleMerge = false,
+  sourcePath = templatePath,
 } = {}) {
   const fixtureRoot = fs.mkdtempSync(
     path.join(__dirname, ".notes-fetch-"),
@@ -157,7 +158,7 @@ if ($Merge) { $scriptParameters.Merge = $true }
     "-File",
     harnessPath,
     "-TemplatePath",
-    templatePath,
+    sourcePath,
     "-RepoPath",
     repoPath,
     "-FixturePath",
@@ -257,6 +258,40 @@ test("setup does not duplicate an existing notes refspec", () => {
     assert.match(run.result.stdout, /Notes refspec already configured\./);
   } finally {
     run.cleanup();
+  }
+});
+
+test("a pipeline-output condition probe changes the missing-refspec behavior", () => {
+  const fixtureRoot = fs.mkdtempSync(
+    path.join(__dirname, ".notes-fetch-probe-"),
+  );
+  let baseline;
+  let probed;
+  try {
+    const probePath = path.join(fixtureRoot, "fetch.ps1");
+    const original = fs.readFileSync(templatePath, "utf8");
+    const condition = "if ($existing) {";
+    assert.equal(original.split(condition).length, 2);
+    fs.writeFileSync(
+      probePath,
+      original.replace(
+        condition,
+        'if ($(Write-Output "__coverage_hit__"; $existing)) {',
+      ),
+    );
+    baseline = runFetch({ setup: true });
+    probed = runFetch({ setup: true, sourcePath: probePath });
+    assertSuccessfulRun(baseline);
+    assertSuccessfulRun(probed);
+    const addsRefspec = (run) =>
+      run.calls.some((call) => call[2] === "config" && call[3] === "--add");
+    assert.equal(addsRefspec(baseline), true);
+    assert.equal(addsRefspec(probed), false);
+    assert.match(probed.result.stdout, /Notes refspec already configured\./);
+  } finally {
+    if (baseline) baseline.cleanup();
+    if (probed) probed.cleanup();
+    fs.rmSync(fixtureRoot, { recursive: true, force: true });
   }
 });
 
