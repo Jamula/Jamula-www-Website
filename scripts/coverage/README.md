@@ -135,6 +135,13 @@ tests stub Git, HTTPS and output writes; no GitHub request or result file is
 created. c8 reports V8 line and branch counts, not independent boolean
 condition coverage. Other Squad templates remain unmeasured.
 
+The notes-fetch PowerShell template has offline behavior tests:
+`node --test scripts/coverage/notes-fetch.test.cjs`. The harness uses a fake Git
+function and a disposable repository-shaped directory; it does not touch real
+refs/remotes or make network requests. These tests are not source coverage: the
+template remains explicitly unmeasured until compatible line-and-branch
+attribution is available, and they do not complete the #109 coverage gate.
+
 The live `.github/workflows/squad-triage.yml` JavaScript block has deterministic
 offline behavioral tests: `node --test scripts/coverage/squad-triage.test.cjs`.
 The tests extract the block directly from the workflow and supply local

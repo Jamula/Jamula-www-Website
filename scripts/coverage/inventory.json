@@ -242,6 +242,10 @@
       "reason": "Test-only source; its assertions are not product behavior."
     },
     {
+      "path": "scripts/coverage/notes-fetch.test.cjs",
+      "reason": "Offline PowerShell template behavior tests; assertions are not product behavior."
+    },
+    {
       "path": "scripts/coverage/ralph-triage.test.cjs",
       "reason": "Offline test source; its assertions are not product behavior."
     },
