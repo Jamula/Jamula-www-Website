@@ -3,6 +3,7 @@
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { test } = require("node:test");
 
@@ -59,6 +60,9 @@ function runFetch({
   merge = false,
   staleMerge = false,
   sourcePath = templatePath,
+  breakpoints = [],
+  traceSource = false,
+  redirectDebug = false,
 } = {}) {
   const fixtureRoot = fs.mkdtempSync(
     path.join(__dirname, ".notes-fetch-"),
@@ -75,6 +79,7 @@ function runFetch({
 
   const fixturePath = path.join(fixtureRoot, "scenario.json");
   const callLogPath = path.join(fixtureRoot, "git-calls.jsonl");
+  const breakpointPath = path.join(fixtureRoot, "breakpoints.json");
   const harnessPath = path.join(fixtureRoot, "harness.ps1");
   fs.writeFileSync(fixturePath, JSON.stringify(scenario));
   fs.writeFileSync(
@@ -84,9 +89,13 @@ function runFetch({
   [string]$RepoPath,
   [string]$FixturePath,
   [string]$CallLogPath,
+  [string]$BreakpointPath,
+  [string]$BreakpointSpecs,
   [string]$Remote,
   [switch]$Setup,
-  [switch]$Merge
+  [switch]$Merge,
+  [switch]$TraceSource,
+  [switch]$RedirectDebug
 )
 
 $ErrorActionPreference = "Stop"
@@ -147,7 +156,25 @@ function git {
 $scriptParameters = @{ RepoPath = $RepoPath; Remote = $Remote }
 if ($Setup) { $scriptParameters.Setup = $true }
 if ($Merge) { $scriptParameters.Merge = $true }
-. $TemplatePath @scriptParameters
+$installedBreakpoints = @(
+  foreach ($spec in @(ConvertFrom-Json -InputObject $BreakpointSpecs)) {
+    Set-PSBreakpoint -Script $TemplatePath -Line $spec.line -Column $spec.column -Action {}
+  }
+)
+if ($TraceSource) { Set-PSDebug -Trace 1 }
+try {
+  if ($RedirectDebug) {
+    . $TemplatePath @scriptParameters 5>$null
+  } else {
+    . $TemplatePath @scriptParameters
+  }
+} finally {
+  if ($TraceSource) { Set-PSDebug -Trace 0 }
+}
+$hits = @($installedBreakpoints | ForEach-Object {
+  @{ line = $_.Line; column = $_.Column; hitCount = $_.HitCount }
+})
+[System.IO.File]::WriteAllText($BreakpointPath, (ConvertTo-Json -InputObject $hits -Compress))
 `,
   );
 
@@ -165,11 +192,17 @@ if ($Merge) { $scriptParameters.Merge = $true }
     fixturePath,
     "-CallLogPath",
     callLogPath,
+    "-BreakpointPath",
+    breakpointPath,
+    "-BreakpointSpecs",
+    JSON.stringify(breakpoints),
     "-Remote",
     remote,
   ];
   if (setup) args.push("-Setup");
   if (merge) args.push("-Merge");
+  if (traceSource) args.push("-TraceSource");
+  if (redirectDebug) args.push("-RedirectDebug");
 
   const result = spawnSync("pwsh", args, { encoding: "utf8", windowsHide: true });
   const calls = fs.existsSync(callLogPath)
@@ -185,6 +218,9 @@ if ($Merge) { $scriptParameters.Merge = $true }
     calls,
     repoPath,
     result,
+    breakpointHits: fs.existsSync(breakpointPath)
+      ? JSON.parse(fs.readFileSync(breakpointPath, "utf8"))
+      : null,
     cleanup: () => fs.rmSync(fixtureRoot, { recursive: true, force: true }),
   };
 }
@@ -291,6 +327,206 @@ test("a pipeline-output condition probe changes the missing-refspec behavior", (
   } finally {
     if (baseline) baseline.cleanup();
     if (probed) probed.cleanup();
+    fs.rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test("condition breakpoint hits alone do not identify the setup outcome", () => {
+  const runs = [];
+  try {
+    const lines = fs.readFileSync(templatePath, "utf8").split(/\r?\n/);
+    const conditionLines = lines
+      .map((text, index) => ({ text, index }))
+      .filter(({ text }) => /^\s*if \(\$existing\) \{$/.test(text));
+    assert.equal(conditionLines.length, 1);
+    const condition = conditionLines[0];
+    const cases = [{}, { fetchConfig: ["+refs/notes/*:refs/notes/*"] }];
+    for (const scenario of cases) {
+      const baseline = runFetch({ setup: true, scenario });
+      runs.push(baseline);
+      const observed = runFetch({
+        setup: true,
+        scenario,
+        breakpoints: [
+          {
+            line: condition.index + 1,
+            column: condition.text.indexOf("$existing") + 1,
+          },
+        ],
+      });
+      runs.push(observed);
+      assertSuccessfulRun(baseline);
+      assertSuccessfulRun(observed);
+      assert.equal(observed.result.stdout, baseline.result.stdout);
+      assert.equal(observed.result.stderr, baseline.result.stderr);
+      const withoutRepoPath = (run) =>
+        run.calls.map((call) =>
+          call.map((arg) => (arg === run.repoPath ? "<repo>" : arg)),
+        );
+      assert.deepEqual(withoutRepoPath(observed), withoutRepoPath(baseline));
+    }
+    assert.deepEqual(runs[1].breakpointHits, runs[3].breakpointHits);
+    assert.equal(runs[1].breakpointHits[0].hitCount, 1);
+    assert.match(runs[1].result.stdout, /Added notes refspec/);
+    assert.match(runs[3].result.stdout, /Notes refspec already configured/);
+  } finally {
+    for (const run of runs) run.cleanup();
+  }
+});
+
+test("a column breakpoint may fire on a short-circuited operand", () => {
+  const fixtureRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), "jamula-breakpoint-short-circuit-"),
+  );
+  try {
+    const sourcePath = path.join(fixtureRoot, "short-circuit.ps1");
+    const harnessPath = path.join(fixtureRoot, "harness.ps1");
+    fs.writeFileSync(
+      sourcePath,
+      'param([bool]$Left)\nif ($Left -and (Test-Path "fixture")) { "true" } else { "false" }\n',
+    );
+    fs.writeFileSync(
+      harnessPath,
+      String.raw`param([string]$SourcePath)
+$ErrorActionPreference = "Stop"
+function Test-Path {
+  $global:fakeCalls++
+  return $false
+}
+$results = @(
+  foreach ($left in @($false, $true)) {
+    foreach ($instrumented in @($false, $true)) {
+      $global:fakeCalls = 0
+      $breakpoint = $null
+      try {
+        if ($instrumented) {
+          $breakpoint = Set-PSBreakpoint -Script $SourcePath -Line 2 -Column 17 -Action {}
+        }
+        $output = & $SourcePath -Left $left
+        [pscustomobject]@{
+          left = $left
+          instrumented = $instrumented
+          output = $output
+          operandCalls = $global:fakeCalls
+          breakpointHits = if ($instrumented) { $breakpoint.HitCount } else { $null }
+        }
+      } finally {
+        if ($null -ne $breakpoint) { Remove-PSBreakpoint -Breakpoint $breakpoint }
+      }
+    }
+  }
+)
+ConvertTo-Json -InputObject $results -Compress
+`,
+    );
+    const result = spawnSync(
+      "pwsh",
+      [
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-File",
+        harnessPath,
+        "-SourcePath",
+        sourcePath,
+      ],
+      { encoding: "utf8", windowsHide: true },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), [
+      {
+        left: false, instrumented: false, output: "false",
+        operandCalls: 0, breakpointHits: null,
+      },
+      {
+        left: false, instrumented: true, output: "false",
+        operandCalls: 0, breakpointHits: 1,
+      },
+      {
+        left: true, instrumented: false, output: "false",
+        operandCalls: 1, breakpointHits: null,
+      },
+      {
+        left: true, instrumented: true, output: "false",
+        operandCalls: 1, breakpointHits: 1,
+      },
+    ]);
+  } finally {
+    fs.rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test("built-in source tracing changes output even with debug-stream redirection", () => {
+  const runs = [];
+  try {
+    for (const options of [
+      {},
+      { traceSource: true },
+      { traceSource: true, redirectDebug: true },
+    ]) {
+      const run = runFetch({ setup: true, ...options });
+      runs.push(run);
+      assertSuccessfulRun(run);
+    }
+
+    const callsWithoutRepoPath = (run) =>
+      run.calls.map((call) =>
+        call.map((arg) => (arg === run.repoPath ? "<repo>" : arg)),
+      );
+    for (const traced of runs.slice(1)) {
+      assert.deepEqual(callsWithoutRepoPath(traced), callsWithoutRepoPath(runs[0]));
+      assert.equal(traced.result.stderr, runs[0].result.stderr);
+      assert.notEqual(traced.result.stdout, runs[0].result.stdout);
+      assert.match(traced.result.stdout, /DEBUG:.*Resolve-Path/);
+      assert.match(traced.result.stdout, /Added notes refspec/);
+    }
+  } finally {
+    for (const run of runs) run.cleanup();
+  }
+});
+
+test("source trace does not identify a short-circuited variable operand", () => {
+  const fixtureRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), "jamula-trace-short-circuit-"),
+  );
+  try {
+    const sourcePath = path.join(fixtureRoot, "short-circuit.ps1");
+    const harnessPath = path.join(fixtureRoot, "harness.ps1");
+    fs.writeFileSync(
+      sourcePath,
+      'param([bool]$Left)\n$right = $false\nif ($Left -and $right) { "true" } else { "false" }\n',
+    );
+    fs.writeFileSync(
+      harnessPath,
+      String.raw`param([string]$SourcePath, [string]$LeftValue)
+Set-PSDebug -Trace 1
+try {
+  & $SourcePath -Left ([bool]::Parse($LeftValue)) 5>$null
+} finally {
+  Set-PSDebug -Trace 0
+}
+`,
+    );
+    const traces = [];
+    for (const left of ["false", "true"]) {
+      const result = spawnSync(
+        "pwsh",
+        [
+          "-NoLogo", "-NoProfile", "-NonInteractive", "-File", harnessPath,
+          "-SourcePath", sourcePath, "-LeftValue", left,
+        ],
+        { encoding: "utf8", windowsHide: true },
+      );
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /(?:^|\r?\n)false(?:\r?\n|$)/);
+      const conditionTrace = result.stdout
+        .split(/\r?\n/)
+        .filter((line) => /DEBUG:.*if \(\$Left -and \$right\)/.test(line));
+      assert.equal(conditionTrace.length, 1);
+      traces.push(conditionTrace[0]);
+    }
+    assert.deepEqual(traces[0], traces[1]);
+  } finally {
     fs.rmSync(fixtureRoot, { recursive: true, force: true });
   }
 });
