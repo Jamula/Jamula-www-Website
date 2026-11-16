@@ -363,6 +363,10 @@
       "reason": "Opt-in offline browser regression test; its assertions are not shipped browser code."
     },
     {
+      "path": "www/tests/browser-egress-isolation.mjs",
+      "reason": "Test-only guard shared by the opt-in browser coverage prototype and offline tests; it is not shipped website behavior."
+    },
+    {
       "path": "www/tests/homepage-contact.test.mjs",
       "reason": "Test-only source; its assertions are not product behavior."
     },
