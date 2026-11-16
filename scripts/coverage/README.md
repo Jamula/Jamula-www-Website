@@ -138,9 +138,18 @@ condition coverage. Other Squad templates remain unmeasured.
 The notes-fetch PowerShell template has offline behavior tests:
 `node --test scripts/coverage/notes-fetch.test.cjs`. The harness uses a fake Git
 function and a disposable repository-shaped directory; it does not touch real
-refs/remotes or make network requests. These tests are not source coverage: the
-template remains explicitly unmeasured until compatible line-and-branch
-attribution is available, and they do not complete the #109 coverage gate.
+refs/remotes or make network requests. These tests do not collect source
+coverage. Pester 3.4.0's standard `CodeCoverage` output supplies line hits, not
+branch outcomes. PowerShell AST inspection identifies control-flow structure
+but does not show which paths ran. Inserting hit markers or wrapping conditions
+would execute transformed code; no method has been verified here to preserve
+automatic variables, pipeline and scope behavior, exceptions, and the original
+source mapping while accounting for every executable statement and decision
+outcome. Boolean-term counts, AST-node counts, passing behavior tests, and line
+hits are not source coverage or a line-and-branch report. The focused test also
+rejects an inventory mutation that reclassifies this template as measured.
+Keep it explicitly unmeasured until a semantics-preserving collector proves
+complete attribution against the original source.
 
 The live `.github/workflows/squad-triage.yml` JavaScript block has deterministic
 offline behavioral tests: `node --test scripts/coverage/squad-triage.test.cjs`.

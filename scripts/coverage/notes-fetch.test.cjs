@@ -3,7 +3,6 @@
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
 const { test } = require("node:test");
 
@@ -11,6 +10,47 @@ const templatePath = path.resolve(
   __dirname,
   "../../.squad/templates/scripts/notes/fetch.ps1",
 );
+const inventoryPath = path.resolve(__dirname, "inventory.json");
+const fetchSourcePath = ".squad/templates/scripts/notes/fetch.ps1";
+
+function assertFetchRemainsUnmeasured(inventory) {
+  const component = inventory.components.find(
+    (candidate) => candidate.id === "squad-maintenance-templates",
+  );
+  assert.ok(component, "Squad maintenance coverage component must exist");
+  assert.ok(
+    !component.sources.includes(fetchSourcePath),
+    `${fetchSourcePath} must remain unmeasured`,
+  );
+  assert.equal(
+    component.unmeasured.filter((entry) => entry.path === fetchSourcePath)
+      .length,
+    1,
+    `${fetchSourcePath} must have exactly one unmeasured blocker`,
+  );
+}
+
+test("notes-fetch stays unmeasured until valid line and branch attribution exists", () => {
+  const inventory = JSON.parse(fs.readFileSync(inventoryPath, "utf8"));
+  assertFetchRemainsUnmeasured(inventory);
+});
+
+test("rejects a mutation that marks notes-fetch as measured", () => {
+  const inventory = JSON.parse(fs.readFileSync(inventoryPath, "utf8"));
+  const component = inventory.components.find(
+    (candidate) => candidate.id === "squad-maintenance-templates",
+  );
+  assert.ok(component, "Squad maintenance coverage component must exist");
+  component.sources.push(fetchSourcePath);
+  component.unmeasured = component.unmeasured.filter(
+    (entry) => entry.path !== fetchSourcePath,
+  );
+
+  assert.throws(
+    () => assertFetchRemainsUnmeasured(inventory),
+    /must remain unmeasured/,
+  );
+});
 
 function runFetch({
   scenario = {},
@@ -20,7 +60,7 @@ function runFetch({
   staleMerge = false,
 } = {}) {
   const fixtureRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), "jamula-notes-fetch-"),
+    path.join(__dirname, ".notes-fetch-"),
   );
   const repoPath = path.join(fixtureRoot, "repo");
   fs.mkdirSync(path.join(repoPath, ".git"), { recursive: true });
