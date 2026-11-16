@@ -56,7 +56,7 @@ reports **9 publisher checks passed, 0 skipped, 0 failed**:
 
 | Requirement | Check |
 | --- | --- |
-| Independent publish selects only the requested project and preserves offline arguments | `Publisher_IndependentSectionBuildsOnlyTheSelectedProject` |
+| Independent publish selects only the requested Admin, Finance, Tech, or Gateway project and preserves offline arguments | `Publisher_IndependentSectionBuildsOnlyTheSelectedProject` |
 | Default version and unique release roots | `Publisher_DefaultsToUniqueReleaseRootsAndVersion` |
 | `-All` publishes the four projects in order | `Publisher_AllBuildsTheFourProjectsInOrder` |
 | Reused destinations fail before invoking `dotnet` | `Publisher_RejectsReusedDestinationBeforeAnyBuild` |
