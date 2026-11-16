@@ -72,7 +72,7 @@ function collectCoverage(testName) {
   }
 }
 
-test("script line mapping excludes YAML metadata and rejects source mutations", () => {
+test("script line mapping excludes YAML metadata and rejects synthetic source mismatches", () => {
   const workflow = fs.readFileSync(workflowPath, "utf8").replace(/\r\n/g, "\n");
   const { firstLine, script, source } = extract(workflow);
   const yamlLines = workflow.split("\n");

@@ -153,7 +153,10 @@ gate. V8 branch ranges are not independent boolean-condition coverage.
 
 `node --test scripts/coverage/squad-triage-mapping.test.cjs` checks a more
 limited mapping experiment. The script's generated lines can be aligned to the
-YAML block without including metadata, and source mutations are rejected.
+YAML block without including metadata, and an in-memory exact-source guard
+rejects synthetic candidate strings that differ from the source extracted
+from the unchanged workflow. It does not mutate the workflow text or prove
+that a workflow/source mutation is caught by the mapping or coverage path.
 However, even when the pinned `v8-to-istanbul` converter receives the exact VM
 source, the missing-roster early-return control falsely marks the later
 dispatch condition as covered. Its line report includes blank and comment
