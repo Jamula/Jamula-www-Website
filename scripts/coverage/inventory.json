@@ -250,6 +250,10 @@
       "reason": "Offline workflow test source; its assertions are not product behavior."
     },
     {
+      "path": "scripts/coverage/squad-triage-mapping.test.cjs",
+      "reason": "Offline V8 source attribution control; its assertions are not product behavior."
+    },
+    {
       "path": "scripts/coverage/ralph-triage-fixture.cjs",
       "reason": "Offline CLI test doubles, not production automation."
     },

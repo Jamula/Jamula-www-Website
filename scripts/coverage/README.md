@@ -151,6 +151,17 @@ source paths, so treating the YAML as measured from the script alone would hide
 those behaviors. It remains an unmeasured blocker; no counts are added to the
 gate. V8 branch ranges are not independent boolean-condition coverage.
 
+`node --test scripts/coverage/squad-triage-mapping.test.cjs` checks a more
+limited mapping experiment. The script's generated lines can be aligned to the
+YAML block without including metadata, and source mutations are rejected.
+However, even when the pinned `v8-to-istanbul` converter receives the exact VM
+source, the missing-roster early-return control falsely marks the later
+dispatch condition as covered. Its line report includes blank and comment
+lines, too, so it is not an executable-line denominator. V8's dynamically
+reported ranges also do not independently establish a complete static branch
+denominator. This experiment is diagnostic only: it is not a source-mapped
+coverage report, an Actions integration run, or evidence for the 90% gate.
+
 The Astro collector writes a fresh temporary directory on each run; the copy
 above uses the directory printed by that successful run. Its Cobertura
 `<sources>` root resolves the relative `astro.config.ts` filename to the
