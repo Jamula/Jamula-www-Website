@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { mkdtemp, rm, stat } from "node:fs/promises";
-import { createServer } from "node:http";
-import { resolve } from "node:path";
+import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { createServer, get } from "node:http";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { PassThrough, Writable } from "node:stream";
 import test from "node:test";
 import {
@@ -10,8 +11,265 @@ import {
   createMeasurementConnection,
   listenMeasurementServer,
   navigateMeasurementPage,
+  runMeasurement,
   runMeasurementLifecycle,
 } from "../scripts/measure-local-performance.mjs";
+
+function requestLocal(url) {
+  return new Promise((resolveResponse, reject) => {
+    get(url, (response) => {
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () =>
+        resolveResponse({
+          status: response.statusCode,
+          type: response.headers["content-type"],
+          body: Buffer.concat(chunks).toString(),
+        })
+      );
+      response.on("error", reject);
+    }).on("error", reject);
+  });
+}
+
+function fakeMeasurementBrowser({
+  runtimeEvaluation = {
+    result: {
+      value: {
+        lcp: 12,
+        fcp: 10,
+        cls: 0,
+        ttfb: 8,
+        shifts: [],
+        resources: [{ name: "http://127.0.0.1/app.js", transferSize: 24 }],
+        documentTransfer: 128,
+      },
+    },
+  },
+} = {}) {
+  const child = childProcessStub();
+  const output = new PassThrough();
+  const calls = [];
+  let context = 0;
+  let requestCheck;
+  const respond = (message) => output.write(`${JSON.stringify(message)}\0`);
+  const input = new Writable({
+    write(chunk, encoding, callback) {
+      const message = JSON.parse(chunk.toString().slice(0, -1));
+      calls.push(message);
+      if (message.method === "Target.createBrowserContext") context++;
+      const results = {
+        "Browser.getVersion": { product: "FakeBrowser", protocolVersion: "1.3" },
+        "Target.createBrowserContext": { browserContextId: `context-${context}` },
+        "Target.createTarget": { targetId: "target" },
+        "Target.attachToTarget": { sessionId: `session-${context}` },
+        "Runtime.evaluate": runtimeEvaluation,
+      };
+      if (message.method === "Page.navigate" && !requestCheck) {
+        const base = new URL(message.params.url).origin;
+        requestCheck = Promise.all(
+          [
+            "/",
+            "/privacy/",
+            "/404.html",
+            "/app.js",
+            "/style.css",
+            "/image.png",
+            "/data.bin",
+            "/missing",
+          ].map((path) => requestLocal(`${base}${path}`))
+        );
+        respond({
+          sessionId: message.sessionId,
+          method: "Fetch.requestPaused",
+          params: { request: { url: `${base}/app.js` }, requestId: "local" },
+        });
+        respond({
+          sessionId: message.sessionId,
+          method: "Fetch.requestPaused",
+          params: { request: { url: "https://example.invalid/" }, requestId: "external" },
+        });
+      }
+      queueMicrotask(() => {
+        respond({ id: message.id, result: results[message.method] ?? {} });
+        if (message.method === "Page.navigate") {
+          respond({ sessionId: message.sessionId, method: "Page.loadEventFired", params: {} });
+        }
+      });
+      callback();
+    },
+  });
+  child.stderr = { resume() {} };
+  child.stdio = [null, null, child.stderr, input, output];
+  child.kill = () => {
+    child.killCalls++;
+    queueMicrotask(() => {
+      child.exitCode = 0;
+      child.emit("exit", 0);
+    });
+    return true;
+  };
+  return {
+    child,
+    calls,
+    requests: () => requestCheck,
+    dispose: () => {
+      input.destroy();
+      output.destroy();
+    },
+  };
+}
+
+for (const scenario of [
+  {
+    name: "MeasurementRun_CollectsAllSamplesAndBlocksExternalRequests",
+  },
+  {
+    name: "MeasurementRun_MissingMetricsFailsAndCleansUp",
+    error: true,
+    runtimeEvaluation: { result: { value: {} } },
+  },
+  {
+    name: "MeasurementRun_MissingFcpWithOtherMetricsFailsAndCleansUp",
+    error: true,
+    expectedDetail: /"fcp":null/,
+    runtimeEvaluation: {
+      result: { value: { lcp: 12, fcp: null, cls: 0 } },
+    },
+  },
+  {
+    name: "MeasurementRun_ExceptionDetailsWithValidMetricsFailsAndCleansUp",
+    error: true,
+    expectedDetail: /exceptionDetails/,
+    runtimeEvaluation: {
+      result: { value: { lcp: 12, fcp: 10, cls: 0 } },
+      exceptionDetails: {
+        text: "Uncaught",
+        exception: { description: "fixture evaluation error" },
+      },
+    },
+  },
+]) {
+  test(
+    scenario.name,
+    { timeout: 5000 },
+    async () => {
+      const directory = await mkdtemp(join(tmpdir(), "jamula-performance-test-"));
+      const root = join(directory, "dist");
+      const profile = join(directory, "profile");
+      const fake = fakeMeasurementBrowser({
+        runtimeEvaluation: scenario.runtimeEvaluation,
+      });
+      const logs = [];
+      let pauses = 0;
+      try {
+        await mkdir(join(root, "privacy"), { recursive: true });
+        await mkdir(profile);
+        for (const [file, body] of [
+          ["index.html", "home"],
+          ["privacy/index.html", "privacy"],
+          ["404.html", "not found page"],
+          ["app.js", "script"],
+          ["style.css", "style"],
+          ["image.png", "png"],
+          ["data.bin", "data"],
+        ])
+          await writeFile(join(root, file), body);
+        const run = runMeasurement({
+          root,
+          createProfile: async () => profile,
+          spawnBrowser: (executable, args, options) => {
+            assert.ok(executable);
+            assert.ok(args.includes("--remote-debugging-pipe"));
+            assert.ok(args.includes("--proxy-server=127.0.0.1:9"));
+            assert.deepEqual(options.stdio, ["ignore", "ignore", "pipe", "pipe", "pipe"]);
+            return fake.child;
+          },
+          delay: async (milliseconds) => {
+            assert.equal(milliseconds, 3000);
+            pauses++;
+            await fake.requests();
+          },
+          log: (line) => logs.push(JSON.parse(line)),
+        });
+        if (scenario.error) {
+          await assert.rejects(run, (error) => {
+            assert.match(error.message, /Missing measurements/);
+            if (scenario.expectedDetail)
+              assert.match(error.message, scenario.expectedDetail);
+            return true;
+          });
+        } else await run;
+        const responses = await fake.requests();
+        assert.deepEqual(
+          responses.map(({ status, type, body }) => [status, type, body]),
+          [
+            [200, "text/html; charset=utf-8", "home"],
+            [200, "text/html; charset=utf-8", "privacy"],
+            [200, "text/html; charset=utf-8", "not found page"],
+            [200, "text/javascript", "script"],
+            [200, "text/css", "style"],
+            [200, "image/png", "png"],
+            [200, "application/octet-stream", "data"],
+            [404, undefined, ""],
+          ]
+        );
+        assert.equal(logs[0].browser, "FakeBrowser");
+        assert.equal(fake.child.killCalls, 1);
+        await assert.rejects(stat(profile), { code: "ENOENT" });
+        assert.deepEqual(
+          fake.calls
+            .filter((call) => call.method.startsWith("Fetch.") && call.method !== "Fetch.enable")
+            .map((call) => [call.method, call.params.requestId]),
+          [
+            ["Fetch.continueRequest", "local"],
+            ["Fetch.failRequest", "external"],
+          ]
+        );
+        if (!scenario.error) {
+          assert.equal(pauses, 30);
+          assert.equal(logs.length, 31);
+          assert.equal(logs[1].externalRequests, 1);
+          assert.deepEqual(
+            {
+              lcp: logs[1].lcp,
+              fcp: logs[1].fcp,
+              cls: logs[1].cls,
+              ttfb: logs[1].ttfb,
+              shifts: logs[1].shifts,
+              resources: logs[1].resources,
+              documentTransfer: logs[1].documentTransfer,
+            },
+            {
+              lcp: 12,
+              fcp: 10,
+              cls: 0,
+              ttfb: 8,
+              shifts: [],
+              resources: [{ name: "http://127.0.0.1/app.js", transferSize: 24 }],
+              documentTransfer: 128,
+            },
+          );
+          assert.deepEqual(
+            logs.slice(1).map(({ device, route, run }) => [device, route, run]),
+            ["desktop", "mobile"].flatMap((device) =>
+              ["/", "/privacy/", "/404.html"].flatMap((route) =>
+                [1, 2, 3, 4, 5].map((run) => [device, route, run])
+              )
+            )
+          );
+          assert.equal(
+            fake.calls.filter((call) => call.method === "Target.disposeBrowserContext").length,
+            30
+          );
+        }
+      } finally {
+        fake.dispose();
+        await rm(directory, { recursive: true, force: true });
+      }
+    }
+  );
+}
 
 for (const { name, cleanupFails } of [
   {
@@ -350,6 +608,28 @@ test("MeasurementPipe_ProtocolErrorRejectsRequestAndClearsDeadline", async () =>
     await assert.rejects(response, {
       message: '{"code":-32000,"message":"Cannot enable"}',
     });
+    assert.equal(timers.active.size, 0);
+  } finally {
+    input.destroy();
+    output.destroy();
+  }
+});
+
+test("MeasurementPipe_RequestDeadlineRejectsAndIgnoresLateResponse", async () => {
+  const child = childProcessStub();
+  const input = new PassThrough();
+  const output = new PassThrough();
+  child.stderr = { resume() {} };
+  child.stdio = [null, null, child.stderr, input, output];
+  const timers = controlledMeasurementDeadline();
+  const { send } = createMeasurementConnection(child, timers);
+  try {
+    const request = send("Page.enable");
+    const [timer] = timers.active;
+    timer.callback();
+    timers.active.delete(timer);
+    await assert.rejects(request, { message: "CDP timeout: Page.enable" });
+    output.write('{"id":1,"result":{}}\0');
     assert.equal(timers.active.size, 0);
   } finally {
     input.destroy();
@@ -721,6 +1001,47 @@ test("MeasurementLifecycle_ServerCloseDeadlineDestroysOwnedConnectionsAndContinu
     errors.map((error) => error.message).join("\n"),
     /server close was not confirmed within 71 ms/
   );
+});
+
+test("MeasurementLifecycle_SynchronousServerCloseFailureIsReported", async () => {
+  const closeError = new Error("close failed");
+  await assert.rejects(
+    runMeasurementLifecycle(async () => "completed", {
+      server: {
+        listening: true,
+        close() {
+          throw closeError;
+        },
+      },
+    }),
+    (error) => {
+      assert.ok(error instanceof AggregateError);
+      assert.equal(error.errors.length, 1);
+      assert.match(error.errors[0].message, /server close failed/i);
+      assert.equal(error.cause, error.errors[0]);
+      assert.equal(error.errors[0].cause, closeError);
+      return true;
+    }
+  );
+});
+
+test("MeasurementLifecycle_DestroyConnectionsFailureIsPreserved", async () => {
+  const destroyError = new Error("destroy failed");
+  const errors = await cleanupMeasurementResources(
+    {
+      server: {
+        listening: true,
+        close() {},
+        closeAllConnections() {
+          throw destroyError;
+        },
+      },
+    },
+    { exitTimeoutMs: 73, ...immediateDeadline(73) }
+  );
+  assert.equal(errors.length, 1);
+  assert.match(errors[0].message, /server close was not confirmed within 73 ms/i);
+  assert.equal(errors[0].cause, destroyError);
 });
 
 test("MeasurementLifecycle_PreservesOperationalErrorAndAttemptsRemainingCleanup", async () => {

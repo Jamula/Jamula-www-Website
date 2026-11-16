@@ -280,11 +280,16 @@ export async function navigateMeasurementPage(
   }
 }
 
-export async function runMeasurement() {
+export async function runMeasurement({
+  root = resolve("dist"),
+  createProfile = () => mkdtemp(resolve(".performance-profile-")),
+  spawnBrowser = spawn,
+  delay = (milliseconds) => new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds)),
+  log = console.log,
+} = {}) {
   const resources = {};
   return runMeasurementLifecycle(async () => {
-    const root = resolve("dist");
-    const profile = await mkdtemp(resolve(".performance-profile-"));
+    const profile = await createProfile();
     resources.profile = profile;
     const server = createServer(async (req, res) => {
       const pathname = new URL(req.url, "http://127.0.0.1").pathname;
@@ -326,7 +331,7 @@ export async function runMeasurement() {
     const port = server.address().port;
     const edge =
       process.env.EDGE_PATH || "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
-    const browser = spawn(
+    const browser = spawnBrowser(
       edge,
       [
         "--headless=new",
@@ -375,7 +380,7 @@ export async function runMeasurement() {
     documentTransfer: nav?.transferSize ?? null };
 })()`;
     const version = await send("Browser.getVersion");
-    console.log(
+    log(
       JSON.stringify({
         browser: version.product,
         protocol: version.protocolVersion,
@@ -431,7 +436,7 @@ export async function runMeasurement() {
             sessionId,
             `http://127.0.0.1:${port}${route}`
           );
-          await new Promise((r) => setTimeout(r, 3000));
+          await delay(3000);
           const result = await send(
             "Runtime.evaluate",
             { expression: extraction, returnByValue: true },
@@ -443,9 +448,7 @@ export async function runMeasurement() {
             result.result.value?.fcp == null
           )
             throw new Error(`Missing measurements: ${JSON.stringify(result)}`);
-          console.log(
-            JSON.stringify({ device, route, run, externalRequests, ...result.result.value })
-          );
+          log(JSON.stringify({ device, route, run, externalRequests, ...result.result.value }));
           eventHandlers.delete(`${sessionId}:Fetch.requestPaused`);
           await send("Target.disposeBrowserContext", { browserContextId });
         }

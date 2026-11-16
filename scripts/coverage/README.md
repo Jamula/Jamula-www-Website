@@ -1,9 +1,10 @@
 # First-party coverage inventory and gate
 
 `inventory.json` is the current first-party executable inventory for the
-website's browser code and maintained repository automation/tools. The gate
-matches every inventoried source to exactly one Cobertura report entry, rejects
-missing, duplicate, malformed, or unclassified measurements, and calculates
+website's browser code and maintained repository automation/tools. Each
+measured source is bound to exactly one named Cobertura report; the gate rejects
+missing or invalid bindings, sources reported in a different file, duplicate,
+malformed, or unclassified measurements, and calculates
 line/branch rates from covered and valid counts rather than averaging rounded
 percentages. It fails if any component or the weighted aggregate of measured
 sources is below 90% in either metric. The printed aggregate is measured
@@ -60,9 +61,11 @@ internal access, while `Monitor` remains non-public. Run both this command and
 
 The local Edge-based performance diagnostic at
 `www/scripts/measure-local-performance.mjs` is a runnable first-party source,
-not test support. It is explicitly listed as unmeasured under `website-browser`
-until a line/branch report exists; the inventory completeness test prevents
-reclassifying it as a test-only exclusion.
+not test support. It remains explicitly unmeasured in `website-browser`:
+the fake CDP replies with canned values and does not execute the embedded
+browser-side JavaScript or its instrumentation branches. c8 host-line counts
+from those tests would not represent coverage of the diagnostic source. Its
+offline lifecycle tests do not measure real Edge behavior.
 
 ## Collecting reports
 
@@ -105,6 +108,9 @@ if ($reportLine.Count -ne 1) { throw "Astro config collector did not identify ex
 $configReports = "$($reportLine[0])" -replace '^Coverage reports: ', ''
 Copy-Item -LiteralPath (Join-Path $configReports "cobertura-coverage.xml") `
   -Destination "$reports\astro-config\cobertura-coverage.xml" -ErrorAction Stop
+
+node --test www/tests/measure-local-performance.test.mjs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 & .\www\node_modules\.bin\c8.cmd --reporter=cobertura --reports-dir="$reports\automation" `
   --include=".github/scripts/*.cjs" --exclude=".github/scripts/*.test.cjs" `
@@ -200,6 +206,21 @@ make the website component pass while those templates lack validated
 executable-source measurements. Keep the entries unmeasured until a
 compiler-aware collector can distinguish executable template expressions and
 their branches from emitted markup and styles.
+
+The performance diagnostic tests above are correctness checks only, not a
+coverage report. Their fake CDP server returns canned values; it does not
+evaluate the embedded instrumentation or browser-side extraction code. The
+diagnostic therefore remains an unmeasured blocker until its browser logic can
+be measured independently or exercised by a collector that observes its actual
+execution.
+
+The seven unhit V8 branch ranges are: duplicate listen completion (line 14),
+undefined `signalCode` (36), already-exited child at entry (45), exit between
+listener setup and the second check (61), duplicate server-close completion
+(74), path-containment rejection (303–306), and the CLI entry-point path
+(460–465). Uncovered lines are 304–306 and 461–465. These counts include V8's
+line/branch mapping, not independent boolean-condition coverage; the fake CDP
+browser and loopback HTTP tests are not evidence of live Edge or field results.
 
 Collect the .NET application reports from their offline test runners. Test-runner
 source is explicitly excluded in `inventory.json`; application source remains
