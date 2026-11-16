@@ -51,17 +51,26 @@ function compiledSourceReport(modules) {
 
 function inventory(components, excludedSources = []) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     thresholdPercent: 90,
     components,
     excludedSources,
   };
 }
 
-const component = (id, sources, reports, unmeasured = []) => ({
+const component = (
   id,
   sources,
   reports,
+  unmeasured = [],
+  sourceReports = Object.fromEntries(
+    sources.map((source) => [source, reports[0]]),
+  ),
+) => ({
+  id,
+  sources,
+  reports,
+  sourceReports,
   unmeasured,
 });
 const metadataPath = "scripts/monitor/InternalsVisibleTo.cs";
@@ -631,7 +640,7 @@ test("CoverageGate_FailsClosedForMissingReportAndSourceMeasurement", () => {
   );
 });
 
-test("CoverageGate_RejectsDuplicateAndUnclassifiedReportSources", () => {
+test("CoverageGate_RejectsMisboundAndUnclassifiedReportSources", () => {
   const duplicate = evaluateCoverage(
     inventory([component("app", ["src/app.cs"], ["first.xml", "second.xml"])]),
     new Map([
@@ -640,7 +649,7 @@ test("CoverageGate_RejectsDuplicateAndUnclassifiedReportSources", () => {
     ]),
   );
   assert.ok(
-    duplicate.errors.some((error) => error.includes("duplicate source")),
+    duplicate.errors.some((error) => error.includes("source report mismatch")),
   );
 
   const unknown = evaluateCoverage(
@@ -660,6 +669,55 @@ test("CoverageGate_RejectsDuplicateAndUnclassifiedReportSources", () => {
       error.includes("unclassified report source"),
     ),
   );
+});
+
+test("CoverageGate_RejectsSwappedSourceReports", () => {
+  const firstSource = "src/first.js";
+  const secondSource = "src/second.js";
+  const input = inventory([
+    component(
+      "bound",
+      [firstSource, secondSource],
+      ["first.xml", "second.xml"],
+      [],
+      {
+        [firstSource]: "first.xml",
+        [secondSource]: "second.xml",
+      },
+    ),
+  ]);
+  const firstReport = classReport(firstSource, [1], [[1, 1]]);
+  const secondReport = classReport(secondSource, [1], [[1, 1]]);
+  const correctlyBound = evaluateCoverage(
+    input,
+    new Map([
+      ["first.xml", firstReport],
+      ["second.xml", secondReport],
+    ]),
+    "/checkout/repo",
+  );
+  assert.equal(correctlyBound.passed, true);
+
+  const swapped = evaluateCoverage(
+    input,
+    new Map([
+      ["first.xml", secondReport],
+      ["second.xml", firstReport],
+    ]),
+    "/checkout/repo",
+  );
+  assert.equal(swapped.passed, false);
+  assert.ok(
+    swapped.errors.some((error) =>
+      error.includes(`source report mismatch: ${secondSource}`),
+    ),
+  );
+  assert.ok(
+    swapped.errors.some((error) =>
+      error.includes(`source report mismatch: ${firstSource}`),
+    ),
+  );
+  assert.deepEqual(swapped.components[0].sources, []);
 });
 
 test("CoverageGate_KeepsTestOnlyExclusionsExplicitAndUnmeasuredCodeBlocking", () => {
@@ -723,6 +781,19 @@ test("CoverageGate_InventoryClassifiesTrackedExecutableSources", async () => {
   const manifest = JSON.parse(
     await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
   );
+  for (const item of manifest.components) {
+    assert.deepEqual(
+      Object.keys(item.sourceReports ?? {}).sort(),
+      item.sources.slice().sort(),
+      `${item.id} must bind every measured source to exactly one report`,
+    );
+    for (const [source, report] of Object.entries(item.sourceReports ?? {})) {
+      assert.ok(
+        item.reports.includes(report),
+        `${item.id} binds ${source} to an undeclared report`,
+      );
+    }
+  }
   const entries = [
     ...manifest.components.flatMap((item) => [
       ...item.sources,
@@ -767,7 +838,7 @@ test("CoverageGate_InventoryClassifiesTrackedExecutableSources", async () => {
   );
 });
 
-test("CoverageGate_ClassifiesPerformanceDiagnosticAsUnmeasuredNotTestOnly", async () => {
+test("CoverageGate_LeavesFakeCdpPerformanceDiagnosticUnmeasured", async () => {
   const manifest = JSON.parse(
     await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
   );
@@ -775,13 +846,39 @@ test("CoverageGate_ClassifiesPerformanceDiagnosticAsUnmeasuredNotTestOnly", asyn
   const website = manifest.components.find(
     (item) => item.id === "website-browser",
   );
-  const blocker = website.unmeasured.find((item) => item.path === sourcePath);
-
-  assert.ok(blocker, `${sourcePath} must remain a coverage blocker`);
-  assert.match(blocker.reason, /runnable local diagnostic/i);
-  assert.match(blocker.reason, /no line\/branch coverage report/i);
+  const reportPath = "local-performance/cobertura-coverage.xml";
   assert.ok(!website.sources.includes(sourcePath));
+  assert.ok(!website.reports.includes(reportPath));
+  const diagnostic = website.unmeasured.find((item) => item.path === sourcePath);
+  assert.ok(diagnostic);
+  assert.match(diagnostic.reason, /fake CDP tests/);
+  assert.match(diagnostic.reason, /browser-side logic/);
   assert.ok(!manifest.excludedSources.some((item) => item.path === sourcePath));
+  const reports = new Map([
+    [
+      "website/cobertura-coverage.xml",
+      classReport("www/public/analytics-consent.js", [1], [[1, 1]]),
+    ],
+    [
+      "astro-config/cobertura-coverage.xml",
+      sourceReport("astro.config.ts", [`${repositoryRoot}www`]),
+    ],
+  ]);
+  const result = evaluateCoverage(inventory([website]), reports);
+  assert.equal(result.passed, false);
+  assert.ok(
+    result.errors.some((error) => error.includes(`unmeasured source: ${sourcePath}`)),
+  );
+  const measuredAggregate = result.aggregate;
+
+  reports.set(reportPath, sourceReport(sourcePath, [repositoryRoot]));
+  const withMisleadingReport = evaluateCoverage(inventory([website]), reports);
+  assert.deepEqual(withMisleadingReport.aggregate, measuredAggregate);
+  assert.ok(
+    withMisleadingReport.errors.some((error) =>
+      error.includes(`unmeasured source: ${sourcePath}`),
+    ),
+  );
 });
 
 test("CoverageGate_DeduplicatesIdenticalLinkedSourceAcrossExpectedAssemblies", () => {
