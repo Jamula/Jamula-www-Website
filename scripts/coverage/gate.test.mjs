@@ -853,6 +853,8 @@ test("CoverageGate_LeavesFakeCdpPerformanceDiagnosticUnmeasured", async () => {
   assert.ok(diagnostic);
   assert.match(diagnostic.reason, /fake CDP tests/);
   assert.match(diagnostic.reason, /browser-side logic/);
+  assert.match(diagnostic.reason, /v8-to-istanbul initializes lines outside/);
+  assert.match(diagnostic.reason, /no defensible denominator/);
   assert.ok(!manifest.excludedSources.some((item) => item.path === sourcePath));
   const reports = new Map([
     [

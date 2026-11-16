@@ -44,7 +44,7 @@
         },
         {
           "path": "www/scripts/measure-local-performance.mjs",
-          "reason": "Embedded browser JavaScript is not executed by the fake CDP tests; c8 host-line counts would not measure its browser-side logic."
+          "reason": "The fake CDP tests do not execute the embedded browser-side logic. An offline Edge V8 prototype maps each evaluated string to its exact source slice, but v8-to-istanbul initializes lines outside that mapped slice as covered; host and browser records cannot be combined without false line counts, so the diagnostic has no defensible denominator."
         }
       ]
     },
@@ -373,6 +373,10 @@
     {
       "path": "www/tests/measure-local-performance.test.mjs",
       "reason": "Offline lifecycle and inventory tests; assertions are not product behavior."
+    },
+    {
+      "path": "www/tests/measure-local-performance.browser.mjs",
+      "reason": "Opt-in offline real-browser coverage prototype; its assertions are not shipped website behavior."
     },
     {
       "path": "www/tests/analytics-consent.test.mjs",
