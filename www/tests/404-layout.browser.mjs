@@ -32,6 +32,22 @@ const geometry = `(() => ({
   })
 }))()`;
 
+function waitForDocumentCommit(eventHandlers, sessionId, url) {
+  const eventKey = `${sessionId}:Page.frameNavigated`;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      eventHandlers.delete(eventKey);
+      reject(new Error("404 document commit timeout"));
+    }, 5000);
+    eventHandlers.set(eventKey, ({ frame }) => {
+      if (frame.url !== url) return;
+      clearTimeout(timer);
+      eventHandlers.delete(eventKey);
+      resolve();
+    });
+  });
+}
+
 function buildFreshSite() {
   const command = process.platform === "win32" ? "npm.cmd run build" : "npm run build";
   const result = spawnSync(command, {
@@ -235,9 +251,12 @@ test("404 layout is stable across delayed consent and the desktop scrollbar tran
         return result.result.value;
       };
       const route = `/404.html${withoutGutter ? "?without-gutter=1" : ""}`;
-      const loaded = navigateMeasurementPage(send, eventHandlers, sessionId, `${origin}${route}`);
+      const pageUrl = `${origin}${route}`;
+      const committed = waitForDocumentCommit(eventHandlers, sessionId, pageUrl);
+      const loaded = navigateMeasurementPage(send, eventHandlers, sessionId, pageUrl);
       loaded.catch(() => {});
       try {
+        await committed;
         await evaluate(`new Promise((resolve, reject) => {
           const deadline = performance.now() + 5000;
           const check = () => {
