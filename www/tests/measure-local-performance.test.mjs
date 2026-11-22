@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { createServer, get } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { PassThrough, Writable } from "node:stream";
 import test from "node:test";
 import {
@@ -14,6 +16,48 @@ import {
   runMeasurement,
   runMeasurementLifecycle,
 } from "../scripts/measure-local-performance.mjs";
+import {
+  browserEgressIsolationAcknowledgement,
+  requireBrowserEgressIsolationAcknowledgement,
+} from "./browser-egress-isolation.mjs";
+
+test("BrowserEgressIsolation_RequiresExplicitAcknowledgement", () => {
+  for (const value of [undefined, "", "0", "true", " 1", "1 "]) {
+    assert.throws(
+      () => requireBrowserEgressIsolationAcknowledgement({
+        [browserEgressIsolationAcknowledgement]: value,
+      }),
+      /independently enforced external egress isolation is required.*acknowledgment does not verify or create isolation/
+    );
+  }
+  assert.doesNotThrow(() =>
+    requireBrowserEgressIsolationAcknowledgement({
+      [browserEgressIsolationAcknowledgement]: "1",
+    })
+  );
+});
+
+test("BrowserEgressIsolation_StopsBrowserEntrypointsBeforeBuildOrLaunch", () => {
+  const edgePath = resolve("edge-must-not-be-checked-for-egress-gate.exe");
+  const env = { ...process.env, EDGE_PATH: edgePath };
+  delete env[browserEgressIsolationAcknowledgement];
+  delete env.NODE_TEST_CONTEXT;
+  for (const [entrypoint, pattern] of [
+    ["./measure-local-performance.browser.mjs", "real-browser coverage prototype"],
+    ["./404-layout.browser.mjs", "404 layout is stable across delayed consent"],
+  ]) {
+    const result = spawnSync(
+      process.execPath,
+      ["--test", `--test-name-pattern=${pattern}`, fileURLToPath(new URL(entrypoint, import.meta.url))],
+      { encoding: "utf8", env, timeout: 10000 }
+    );
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 1, `${entrypoint}: ${output}`);
+    assert.match(output, /independently enforced external egress isolation is required/);
+    assert.ok(!output.includes(edgePath), `${entrypoint} must not check or launch Edge before the gate`);
+    assert.ok(!output.includes("Fresh site build failed"), `${entrypoint} must not build before the gate`);
+  }
+});
 
 function requestLocal(url) {
   return new Promise((resolveResponse, reject) => {

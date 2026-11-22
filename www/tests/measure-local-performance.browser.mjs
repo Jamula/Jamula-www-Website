@@ -12,6 +12,7 @@ import {
   runMeasurementLifecycle,
   waitForBrowserExit,
 } from "../scripts/measure-local-performance.mjs";
+import { requireBrowserEgressIsolationAcknowledgement } from "./browser-egress-isolation.mjs";
 
 const require = createRequire(new URL("../package.json", import.meta.url));
 const v8ToIstanbul = require("v8-to-istanbul");
@@ -90,7 +91,7 @@ function createBrowserArguments(profile) {
   ];
 }
 
-function assertOfflineArguments(args) {
+function assertBrowserArguments(args) {
   for (const flag of [
     "--disable-background-networking",
     "--disable-component-update",
@@ -99,11 +100,11 @@ function assertOfflineArguments(args) {
     "--disable-quic",
     "--proxy-server=127.0.0.1:9",
   ]) {
-    assert.ok(args.includes(flag), `missing offline browser flag: ${flag}`);
+    assert.ok(args.includes(flag), `missing browser argument: ${flag}`);
   }
   assert.ok(
     args.includes("--host-resolver-rules=MAP * ~NOTFOUND"),
-    "external host resolution must fail closed"
+    "missing host resolver restriction argument"
   );
   assert.equal(args.at(-1), "about:blank", "the browser must not navigate to a site");
 }
@@ -118,11 +119,11 @@ async function failOfflineBrowserStartup(error, child, profile, cleanupOptions) 
   );
 }
 
-async function startOfflineBrowser() {
+async function startBrowser() {
   await access(edgePath);
   const profile = await mkdtemp(join(tmpdir(), "jamula-performance-browser-prototype-"));
   const args = createBrowserArguments(profile);
-  assertOfflineArguments(args);
+  assertBrowserArguments(args);
 
   let child;
   try {
@@ -320,11 +321,12 @@ async function withMetricsFixture(browser, fixture, operation) {
   }
 }
 
-describe("offline real-browser coverage prototype", { timeout: 60000 }, () => {
+describe("real-browser coverage prototype", { timeout: 60000 }, () => {
   let browser;
 
   before(async () => {
-    browser = await startOfflineBrowser();
+    requireBrowserEgressIsolationAcknowledgement();
+    browser = await startBrowser();
     assert.match(browser.browser, /^Edg\//);
   });
 

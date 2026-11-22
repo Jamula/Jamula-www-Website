@@ -149,6 +149,13 @@ conditions before and after each future change; label low-volume field samples
 provisional. Coordinate public Search Console evidence with #94 and optional
 consent-gated analytics with #95 rather than duplicating either work.
 
+The historical browser observations below did not establish browser-wide
+external egress isolation or capture all network traffic. Page-level request
+observations and proxy/DNS arguments do not prove that no external traffic
+occurred. Before any separately authorized rerun, independently enforce
+browser-wide external egress isolation. The browser-test acknowledgment does
+not create or verify isolation; the diagnostic CLI does not enforce it.
+
 ### Local public-site lab observation — 2026-11-13
 
 This is diagnostic evidence for the existing static site at source revision
@@ -272,7 +279,7 @@ tested. This browser test does not add line/branch coverage: the local
 performance harness and Astro template sources remain marked unmeasured in
 `scripts/coverage/inventory.json`, and the coverage gates remain blocked.
 
-Reproduce from the repository root with:
+Historical commands from the repository root (not authorization to rerun):
 
 ```powershell
 node --test www\tests\404-layout.browser.mjs
@@ -316,7 +323,7 @@ tested. This browser test does not add line/branch coverage: the local
 performance harness and Astro template sources remain marked unmeasured in
 `scripts/coverage/inventory.json`, and the coverage gates remain blocked.
 
-Reproduce from the repository root with:
+Historical commands from the repository root (not authorization to rerun):
 
 ```powershell
 node --test www\tests\404-layout.browser.mjs
