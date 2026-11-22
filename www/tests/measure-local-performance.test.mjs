@@ -24,9 +24,10 @@ import {
 test("BrowserEgressIsolation_RequiresExplicitAcknowledgement", () => {
   for (const value of [undefined, "", "0", "true", " 1", "1 "]) {
     assert.throws(
-      () => requireBrowserEgressIsolationAcknowledgement({
-        [browserEgressIsolationAcknowledgement]: value,
-      }),
+      () =>
+        requireBrowserEgressIsolationAcknowledgement({
+          [browserEgressIsolationAcknowledgement]: value,
+        }),
       /independently enforced external egress isolation is required.*acknowledgment does not verify or create isolation/
     );
   }
@@ -48,14 +49,24 @@ test("BrowserEgressIsolation_StopsBrowserEntrypointsBeforeBuildOrLaunch", () => 
   ]) {
     const result = spawnSync(
       process.execPath,
-      ["--test", `--test-name-pattern=${pattern}`, fileURLToPath(new URL(entrypoint, import.meta.url))],
+      [
+        "--test",
+        `--test-name-pattern=${pattern}`,
+        fileURLToPath(new URL(entrypoint, import.meta.url)),
+      ],
       { encoding: "utf8", env, timeout: 10000 }
     );
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     assert.equal(result.status, 1, `${entrypoint}: ${output}`);
     assert.match(output, /independently enforced external egress isolation is required/);
-    assert.ok(!output.includes(edgePath), `${entrypoint} must not check or launch Edge before the gate`);
-    assert.ok(!output.includes("Fresh site build failed"), `${entrypoint} must not build before the gate`);
+    assert.ok(
+      !output.includes(edgePath),
+      `${entrypoint} must not check or launch Edge before the gate`
+    );
+    assert.ok(
+      !output.includes("Fresh site build failed"),
+      `${entrypoint} must not build before the gate`
+    );
   }
 });
 
