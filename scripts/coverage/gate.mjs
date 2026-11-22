@@ -313,7 +313,7 @@ export function evaluateCoverage(
   if (!root.absolute) throw new Error("Repository root must be an absolute path.");
   const errors = [];
   if (
-    inventory?.schemaVersion !== 1 ||
+    inventory?.schemaVersion !== 2 ||
     !Number.isFinite(inventory.thresholdPercent) ||
     inventory.thresholdPercent <= 0 ||
     !Array.isArray(inventory.components) ||
@@ -337,6 +337,9 @@ export function evaluateCoverage(
       seenComponents.has(component.id) ||
       !Array.isArray(component.sources) ||
       !Array.isArray(component.reports) ||
+      !component.sourceReports ||
+      typeof component.sourceReports !== "object" ||
+      Array.isArray(component.sourceReports) ||
       !Array.isArray(component.compiledSources ?? []) ||
       !Array.isArray(component.validatedMetadata ?? []) ||
       !Array.isArray(component.unmeasured ?? [])
@@ -350,6 +353,20 @@ export function evaluateCoverage(
     const measuredSources = [];
     const loadedReports = [];
     const validatedMetadata = [];
+    for (const [source, reportPath] of Object.entries(component.sourceReports)) {
+      if (
+        !component.sources.includes(source) ||
+        typeof reportPath !== "string" ||
+        !component.reports.includes(reportPath)
+      ) {
+        componentErrors.push(`invalid source-to-report binding: ${source}`);
+      }
+    }
+    for (const source of component.sources) {
+      if (!Object.hasOwn(component.sourceReports, source)) {
+        componentErrors.push(`missing source-to-report binding: ${source}`);
+      }
+    }
     const compiledSources = new Map();
     const invalidCompiledSources = new Set();
     const sourceIdentities = new Set(
@@ -479,19 +496,19 @@ export function evaluateCoverage(
       }
       seenSources.add(resolvedSource);
 
-      const matches = [];
-      for (const report of loadedReports) {
-        const classes = report.classes.filter((item) =>
-          item.source === resolvedSource,
-        );
-        if (classes.length > 0) matches.push({ report, classes });
-      }
-      if (matches.length === 0) {
+      const expectedReport = component.sourceReports[source];
+      const report = loadedReports.find(
+        (item) => item.path === expectedReport,
+      );
+      if (!report) {
         componentErrors.push(`missing source measurement: ${source}`);
         continue;
       }
-      if (matches.length > 1) {
-        componentErrors.push(`duplicate source measurement: ${source}`);
+      const classes = report.classes.filter(
+        (item) => item.source === resolvedSource,
+      );
+      if (classes.length === 0) {
+        componentErrors.push(`missing source measurement: ${source}`);
         continue;
       }
 
@@ -499,12 +516,12 @@ export function evaluateCoverage(
       const compiledSource = compiledSources.get(resolvedSource);
       const sourceClasses = compiledSource
         ? selectCompiledSourceClasses(
-            matches[0].classes,
+            classes,
             compiledSource,
             componentErrors,
             source,
           )
-        : matches[0].classes;
+        : classes;
       if (!sourceClasses) continue;
 
       const sourceCounts = emptyCounts();
@@ -536,7 +553,15 @@ export function evaluateCoverage(
         const source = component.sources.find((item) =>
           measuredClass.source === resolveSource(item, root).value,
         );
-        if (source) continue;
+        if (source) {
+          const expectedReport = component.sourceReports[source];
+          if (report.path !== expectedReport) {
+            componentErrors.push(
+              `source report mismatch: ${source} is present in ${report.path}, expected ${expectedReport ?? "no assigned report"}`,
+            );
+          }
+          continue;
+        }
         const excluded = exclusions.find((item) =>
           measuredClass.source === resolveSource(item.path, root).value,
         );

@@ -1,15 +1,18 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "thresholdPercent": 90,
   "components": [
     {
       "id": "website-browser",
       "reports": [
         "website/cobertura-coverage.xml",
-        "astro-config/cobertura-coverage.xml",
-        "local-performance/cobertura-coverage.xml"
+        "astro-config/cobertura-coverage.xml"
       ],
-      "sources": ["www/public/analytics-consent.js", "www/astro.config.ts", "www/scripts/measure-local-performance.mjs"],
+      "sources": ["www/public/analytics-consent.js", "www/astro.config.ts"],
+      "sourceReports": {
+        "www/public/analytics-consent.js": "website/cobertura-coverage.xml",
+        "www/astro.config.ts": "astro-config/cobertura-coverage.xml"
+      },
       "unmeasured": [
         {
           "path": "www/src/components/AnalyticsConsent.astro",
@@ -38,6 +41,10 @@
         {
           "path": "www/src/pages/privacy.astro",
           "reason": "Astro build-time template code has no line/branch source-map report."
+        },
+        {
+          "path": "www/scripts/measure-local-performance.mjs",
+          "reason": "Embedded browser JavaScript is not executed by the fake CDP tests; c8 host-line counts would not measure its browser-side logic."
         }
       ]
     },
@@ -51,6 +58,13 @@
         ".github/scripts/verify-preview.cjs",
         ".github/scripts/verify-swa-csp.cjs"
       ],
+      "sourceReports": {
+        ".github/scripts/production-deployment.cjs": "automation/cobertura-coverage.xml",
+        ".github/scripts/release.cjs": "automation/cobertura-coverage.xml",
+        ".github/scripts/swa-preview.cjs": "automation/cobertura-coverage.xml",
+        ".github/scripts/verify-preview.cjs": "automation/cobertura-coverage.xml",
+        ".github/scripts/verify-swa-csp.cjs": "automation/cobertura-coverage.xml"
+      },
       "unmeasured": [
         {
           "path": ".github/workflows/azure-static-web-apps-preview.yml",
@@ -94,6 +108,9 @@
       "id": "monitor",
       "reports": ["monitor.cobertura.xml"],
       "sources": ["scripts/monitor/Program.cs"],
+      "sourceReports": {
+        "scripts/monitor/Program.cs": "monitor.cobertura.xml"
+      },
       "validatedMetadata": [
         {
           "path": "scripts/monitor/InternalsVisibleTo.cs",
@@ -111,7 +128,14 @@
         "scripts/mbr/Metrics.cs",
         "scripts/mbr/Program.cs",
         "scripts/mbr/wwwroot/dashboard.js"
-      ]
+      ],
+      "sourceReports": {
+        "scripts/mbr/Costs.cs": "mbr-dotnet.cobertura.xml",
+        "scripts/mbr/GitHub.cs": "mbr-dotnet.cobertura.xml",
+        "scripts/mbr/Metrics.cs": "mbr-dotnet.cobertura.xml",
+        "scripts/mbr/Program.cs": "mbr-dotnet.cobertura.xml",
+        "scripts/mbr/wwwroot/dashboard.js": "mbr-ui/cobertura-coverage.xml"
+      }
     },
     {
       "id": "validation-tool",
@@ -121,12 +145,21 @@
         "scripts/validation/PreviewArtifactValidator.cs",
         "scripts/validation/PreviewSiteVerifier.cs",
         "scripts/validation/Program.cs"
-      ]
+      ],
+      "sourceReports": {
+        "scripts/validation/GovernanceValidator.cs": "validation.cobertura.xml",
+        "scripts/validation/PreviewArtifactValidator.cs": "validation.cobertura.xml",
+        "scripts/validation/PreviewSiteVerifier.cs": "validation.cobertura.xml",
+        "scripts/validation/Program.cs": "validation.cobertura.xml"
+      }
     },
     {
       "id": "coverage-gate",
       "reports": ["coverage-gate/cobertura-coverage.xml"],
-      "sources": ["scripts/coverage/gate.mjs"]
+      "sources": ["scripts/coverage/gate.mjs"],
+      "sourceReports": {
+        "scripts/coverage/gate.mjs": "coverage-gate/cobertura-coverage.xml"
+      }
     },
     {
       "id": "sidequest-artifacts-local-runtime",
@@ -135,6 +168,10 @@
         "scripts/spikes/sidequest-artifacts/SectionHost.cs",
         "scripts/spikes/sidequest-artifacts/Gateway/Program.cs"
       ],
+      "sourceReports": {
+        "scripts/spikes/sidequest-artifacts/SectionHost.cs": "sidequest-artifacts/cobertura-coverage.xml",
+        "scripts/spikes/sidequest-artifacts/Gateway/Program.cs": "sidequest-artifacts/cobertura-coverage.xml"
+      },
       "compiledSources": [
         {
           "path": "scripts/spikes/sidequest-artifacts/SectionHost.cs",
@@ -157,6 +194,9 @@
       "id": "squad-maintenance-templates",
       "reports": ["ralph-triage/cobertura-coverage.xml"],
       "sources": [".squad/templates/ralph-triage.js"],
+      "sourceReports": {
+        ".squad/templates/ralph-triage.js": "ralph-triage/cobertura-coverage.xml"
+      },
       "unmeasured": [
         {
           "path": ".squad/templates/scripts/notes/fetch.ps1",

@@ -1,9 +1,10 @@
 # First-party coverage inventory and gate
 
 `inventory.json` is the current first-party executable inventory for the
-website's browser code and maintained repository automation/tools. The gate
-matches every inventoried source to exactly one Cobertura report entry, rejects
-missing, duplicate, malformed, or unclassified measurements, and calculates
+website's browser code and maintained repository automation/tools. Each
+measured source is bound to exactly one named Cobertura report; the gate rejects
+missing or invalid bindings, sources reported in a different file, duplicate,
+malformed, or unclassified measurements, and calculates
 line/branch rates from covered and valid counts rather than averaging rounded
 percentages. It fails if any component or the weighted aggregate of measured
 sources is below 90% in either metric. The printed aggregate is measured
@@ -60,9 +61,11 @@ internal access, while `Monitor` remains non-public. Run both this command and
 
 The local Edge-based performance diagnostic at
 `www/scripts/measure-local-performance.mjs` is a runnable first-party source,
-not test support. Its separate offline c8 report is required by
-`website-browser`; a missing or incorrectly attributed report fails closed.
-Its fake browser and loopback server tests do not measure real Edge behavior.
+not test support. It remains explicitly unmeasured in `website-browser`:
+the fake CDP replies with canned values and does not execute the embedded
+browser-side JavaScript or its instrumentation branches. c8 host-line counts
+from those tests would not represent coverage of the diagnostic source. Its
+offline lifecycle tests do not measure real Edge behavior.
 
 ## Collecting reports
 
@@ -71,7 +74,7 @@ From the repository root in PowerShell, create isolated report directories:
 ```powershell
 $reports = Join-Path (Get-Location) "coverage-reports"
 New-Item -ItemType Directory -Force `
-  "$reports\website", "$reports\astro-config", "$reports\local-performance", "$reports\automation", "$reports\mbr-ui", "$reports\coverage-gate", "$reports\ralph-triage", "$reports\sidequest-artifacts" | Out-Null
+  "$reports\website", "$reports\astro-config", "$reports\automation", "$reports\mbr-ui", "$reports\coverage-gate", "$reports\ralph-triage", "$reports\sidequest-artifacts" | Out-Null
 ```
 
 Install website dependencies with `npm ci --prefix www` if needed. The gate
@@ -106,13 +109,7 @@ $configReports = "$($reportLine[0])" -replace '^Coverage reports: ', ''
 Copy-Item -LiteralPath (Join-Path $configReports "cobertura-coverage.xml") `
   -Destination "$reports\astro-config\cobertura-coverage.xml" -ErrorAction Stop
 
-if (Test-Path -LiteralPath "$reports\local-performance\cobertura-coverage.xml") {
-  Remove-Item -LiteralPath "$reports\local-performance\cobertura-coverage.xml" -Force -ErrorAction Stop
-}
-& .\www\node_modules\.bin\c8.cmd --all --include="www/scripts/measure-local-performance.mjs" `
-  --reporter=text --reporter=cobertura --reporter=json `
-  --reports-dir="$reports\local-performance" --check-coverage --lines=90 --branches=90 --per-file `
-  node --test www/tests/measure-local-performance.test.mjs
+node --test www/tests/measure-local-performance.test.mjs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 & .\www\node_modules\.bin\c8.cmd --reporter=cobertura --reports-dir="$reports\automation" `
@@ -151,12 +148,12 @@ inventoried source. This measures the configuration only, not rendered HTML or
 the seven Astro templates. The collector reports c8/V8 branch counts, which do
 not establish independent coverage of every boolean condition.
 
-On 2026-11-15 the local-performance collector above passed 29 offline tests
-and measured **457/465 lines (98.28%)** and **122/129 branches (94.57%)**
-for `www/scripts/measure-local-performance.mjs`. c8's text report truncates
-the line percentage to 98.27%; the counts are authoritative. The gate resolved
-the report to this checkout and counted the same source; with only this report
-present it still failed for missing reports and unmeasured sources.
+The performance diagnostic tests above are correctness checks only, not a
+coverage report. Their fake CDP server returns canned values; it does not
+evaluate the embedded instrumentation or browser-side extraction code. The
+diagnostic therefore remains an unmeasured blocker until its browser logic can
+be measured independently or exercised by a collector that observes its actual
+execution.
 
 The seven unhit V8 branch ranges are: duplicate listen completion (line 14),
 undefined `signalCode` (36), already-exited child at entry (45), exit between
