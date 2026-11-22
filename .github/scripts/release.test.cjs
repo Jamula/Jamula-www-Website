@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { selectRelease, metadata, verifyMetadata } = require("./release.cjs");
-const { execute } = require("./production-deployment.cjs");
+const { api, execute } = require("./production-deployment.cjs");
 
 const sha = "a".repeat(40);
 const oldSha = "b".repeat(40);
@@ -38,7 +38,7 @@ test("required PR validation builds and tests explicit release and versionless m
   const commands = [
     "npm exec -- astro build",
     "node scripts/test_built_site.mjs",
-    "node --test tests/*.test.mjs",
+    null,
   ];
   let previousIndex = -1;
   for (const [index, name] of names.entries()) {
@@ -56,8 +56,11 @@ test("required PR validation builds and tests explicit release and versionless m
       /^        if: steps\.changes\.outputs\.website == 'true'$/m,
     );
     assert.match(step, /^        env:$/m);
-    if (index === 2) {
-      assert.match(step, /^        run: >-\n          node --experimental-test-coverage --test\n          --test-coverage-include=public\/analytics-consent\.js\n          --test-coverage-lines=90 --test-coverage-branches=90\n          tests\/\*\.test\.mjs$/m);
+    if (index % 3 === 2) {
+      assert.match(
+        step,
+        /^        run: >-\n          node --experimental-test-coverage --test\n          --test-coverage-include=public\/analytics-consent\.js\n          --test-coverage-lines=90 --test-coverage-branches=90\n          tests\/\*\.test\.mjs$/m,
+      );
     } else {
       assert.ok(step.includes(`\n        run: ${commands[index % 3]}\n`));
     }
@@ -267,6 +270,53 @@ test("deployment record must exist before its in-progress status and output surv
   );
   assert.equal(output, "id=42\n");
   assert.throws(() => execute("status", ["42", "invalid", ""], env, () => {}));
+});
+
+test("deployment API sends JSON on stdin and returns the selected response value", () => {
+  let invocation;
+  const body = { ref: sha, production_environment: true };
+  const result = api("repos/test/repo/deployments", body, ".id", (...args) => {
+    invocation = args;
+    return " 42\n";
+  });
+  assert.equal(result, "42");
+  assert.deepEqual(invocation, [
+    "gh",
+    [
+      "api",
+      "--method",
+      "POST",
+      "repos/test/repo/deployments",
+      "--input",
+      "-",
+      "--jq",
+      ".id",
+    ],
+    {
+      input: JSON.stringify(body),
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "inherit"],
+    },
+  ]);
+});
+
+test("deployment API omits the jq filter when no response projection is requested", () => {
+  let command;
+  assert.equal(
+    api("repos/test/repo/deployments", { ref: sha }, undefined, (...args) => {
+      command = args[1];
+      return "created";
+    }),
+    "created",
+  );
+  assert.deepEqual(command, [
+    "api",
+    "--method",
+    "POST",
+    "repos/test/repo/deployments",
+    "--input",
+    "-",
+  ]);
 });
 
 test("deployment record rejects invalid identity and status before any side effects", () => {

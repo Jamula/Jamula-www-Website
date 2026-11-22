@@ -44,7 +44,7 @@
         },
         {
           "path": "www/scripts/measure-local-performance.mjs",
-          "reason": "The fake CDP tests do not execute the embedded browser-side logic. An Edge V8 prototype gated on independently enforced external egress isolation maps each evaluated string to its exact source slice, but v8-to-istanbul initializes lines outside that mapped slice as covered; host and browser records cannot be combined without false line counts, so the diagnostic has no defensible denominator."
+          "reason": "The fake CDP tests do not execute the embedded browser-side logic; c8 host-line counts would not measure it. An Edge V8 prototype gated on independently enforced external egress isolation maps each evaluated string to its exact source slice, but v8-to-istanbul initializes lines outside that mapped slice as covered; host and browser records cannot be combined without false line counts, so the diagnostic has no defensible denominator."
         }
       ]
     },
