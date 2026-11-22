@@ -63,9 +63,11 @@ The local Edge-based performance diagnostic at
 `www/scripts/measure-local-performance.mjs` is a runnable first-party source,
 not test support. It remains explicitly unmeasured in `website-browser`:
 the fake CDP replies with canned values and do not execute the embedded
-browser-side JavaScript. The earlier five-test Edge run had no OS-level egress
-isolation or packet capture, so whether any external requests occurred is
-unknown; no external navigation was intentional.
+browser-side JavaScript or its instrumentation branches. c8 host-line counts
+from those tests would not represent coverage of the diagnostic source. The
+earlier five-test Edge run had no OS-level egress isolation or packet capture,
+so whether any external requests occurred is unknown; no external navigation
+was intentional.
 
 The opt-in real-browser tests are not offline by proof of Chromium flags.
 An isolated profile, `about:blank`, disabled background networking, proxy,
