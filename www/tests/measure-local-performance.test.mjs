@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { createServer, get } from "node:http";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { PassThrough, Writable } from "node:stream";
 import test from "node:test";
 import {
@@ -125,6 +125,14 @@ for (const scenario of [
     name: "MeasurementRun_CollectsAllSamplesAndBlocksExternalRequests",
   },
   {
+    name: "MeasurementRun_RelativeRootServesFiles",
+    rootStyle: "relative",
+  },
+  {
+    name: "MeasurementRun_TrailingSeparatorRootServesFiles",
+    rootStyle: "trailing-separator",
+  },
+  {
     name: "MeasurementRun_MissingMetricsFailsAndCleansUp",
     error: true,
     runtimeEvaluation: { result: { value: {} } },
@@ -153,6 +161,12 @@ for (const scenario of [
   test(scenario.name, { timeout: 5000 }, async () => {
     const directory = await mkdtemp(join(tmpdir(), "jamula-performance-test-"));
     const root = join(directory, "dist");
+    const measurementRoot =
+      scenario.rootStyle === "relative"
+        ? relative(process.cwd(), root)
+        : scenario.rootStyle === "trailing-separator"
+          ? `${root}${sep}`
+          : root;
     const profile = join(directory, "profile");
     const fake = fakeMeasurementBrowser({
       runtimeEvaluation: scenario.runtimeEvaluation,
@@ -173,7 +187,7 @@ for (const scenario of [
       ])
         await writeFile(join(root, file), body);
       const run = runMeasurement({
-        root,
+        root: measurementRoot,
         createProfile: async () => profile,
         spawnBrowser: (executable, args, options) => {
           assert.ok(executable);
