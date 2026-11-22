@@ -129,19 +129,67 @@ test("404 stays anchored when delayed consent initialization introduces overflow
         },
         sessionId
       );
-      const evaluate = async (expression) => {
+      const evaluate = async (expression, contextId) => {
         const result = await send(
           "Runtime.evaluate",
-          { expression, returnByValue: true, awaitPromise: true },
+          { expression, returnByValue: true, awaitPromise: true, contextId },
           sessionId
         );
         assert.equal(result.exceptionDetails, undefined, JSON.stringify(result.exceptionDetails));
         return result.result.value;
       };
+      const destinationContext = new Promise((resolveContext, rejectContext) => {
+        const contexts = new Map();
+        let destinationFrameId;
+        const events = [
+          "Page.frameNavigated",
+          "Runtime.executionContextCreated",
+          "Runtime.executionContextDestroyed",
+          "Runtime.executionContextsCleared",
+        ];
+        const cleanup = () => {
+          clearTimeout(timeout);
+          for (const event of events) eventHandlers.delete(`${sessionId}:${event}`);
+        };
+        const check = () => {
+          for (const [id, frameId] of contexts) {
+            if (frameId === destinationFrameId) {
+              cleanup();
+              resolveContext(id);
+              return;
+            }
+          }
+        };
+        const timeout = setTimeout(() => {
+          cleanup();
+          rejectContext(new Error("No default execution context for 404 page"));
+        }, 5000);
+        eventHandlers.set(`${sessionId}:Page.frameNavigated`, ({ frame }) => {
+          if (!frame.parentId && frame.url === `${origin}/404.html`) {
+            destinationFrameId = frame.id;
+            check();
+          }
+        });
+        eventHandlers.set(`${sessionId}:Runtime.executionContextCreated`, ({ context }) => {
+          if (context.auxData?.isDefault && context.auxData.frameId) {
+            contexts.set(context.id, context.auxData.frameId);
+            check();
+          }
+        });
+        eventHandlers.set(
+          `${sessionId}:Runtime.executionContextDestroyed`,
+          ({ executionContextId }) => {
+            contexts.delete(executionContextId);
+          }
+        );
+        eventHandlers.set(`${sessionId}:Runtime.executionContextsCleared`, () => contexts.clear());
+      });
       const loaded = navigateMeasurementPage(send, eventHandlers, sessionId, `${origin}/404.html`);
       loaded.catch(() => {});
       try {
-        await evaluate(`new Promise((resolve, reject) => {
+        const contextId = await destinationContext;
+        await evaluate(
+          `new Promise((resolve, reject) => {
           const deadline = performance.now() + 5000;
           const check = () => {
             if (document.querySelector(".analytics") && performance.getEntriesByName("first-contentful-paint").length)
@@ -150,7 +198,9 @@ test("404 stays anchored when delayed consent initialization introduces overflow
             else requestAnimationFrame(check);
           };
           requestAnimationFrame(check);
-        })`);
+        })`,
+          contextId
+        );
         assert.ok(heldRequest, "Consent module must be held until initial paint");
         const before = await evaluate(geometry);
         assert.equal(before.panelHidden, true);
