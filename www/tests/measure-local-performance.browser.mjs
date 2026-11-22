@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { after, before, describe, it } from "node:test";
 import {
+  cleanupMeasurementResources,
   createMeasurementConnection,
   waitForBrowserExit,
 } from "../scripts/measure-local-performance.mjs";
@@ -185,9 +186,14 @@ async function startBrowser() {
       },
     };
   } catch (error) {
-    if (child && !child.exitCode && !child.signalCode) child.kill();
-    if (child) await waitForBrowserExit(child, 5000).catch(() => {});
-    await rm(profile, { recursive: true, force: true });
+    const cleanupErrors = await cleanupMeasurementResources({ browser: child, profile });
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError(
+        [error, ...cleanupErrors],
+        "Browser startup failed and cleanup did not complete.",
+        { cause: error }
+      );
+    }
     throw error;
   }
 }
