@@ -148,12 +148,14 @@ static class Monitor
         new(@"<title\b[^>]*>(.*?)</title\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
     public static Task<int> RunAsync(CancellationToken ct) =>
-        RunAsync(ct, ResolveHostAddressesAsync, CreateProductionHandler);
+        RunAsync(ct, ResolveHostAddressesAsync, CreateProductionHandler, Console.Out, Console.Error);
 
     internal static async Task<int> RunAsync(
         CancellationToken ct,
         Func<string, AddressFamily, CancellationToken, Task<IPAddress[]>> resolveHostAddressesAsync,
-        Func<HttpMessageHandler> createHandler)
+        Func<HttpMessageHandler> createHandler,
+        TextWriter output,
+        TextWriter errorOutput)
     {
         IPAddress[] addresses;
         try
@@ -167,7 +169,7 @@ static class Monitor
         }
         catch (SocketException ex)
         {
-            Console.Error.WriteLine(
+            errorOutput.WriteLine(
                 $"::error::DNS: resolution failed for {Config.ApexHost}: {ex.Message}");
             return 1;
         }
@@ -181,20 +183,20 @@ static class Monitor
 
         if (ipv4Addresses.Count == 0)
         {
-            Console.Error.WriteLine(
+            errorOutput.WriteLine(
                 $"::error::DNS: {Config.ApexHost} returned no IPv4 A record (empty response).");
             return 1;
         }
 
         if (ipv4Addresses.Count != 1 || ipv4Addresses[0] != Config.ApprovedIp)
         {
-            Console.Error.WriteLine(
+            errorOutput.WriteLine(
                 $"::error::DNS drift: {Config.ApexHost} resolves to [{string.Join(", ", ipv4Addresses)}] — "
                 + $"expected exactly [{Config.ApprovedIp}].");
             return 2;
         }
 
-        Console.WriteLine($"DNS OK: {Config.ApexHost} → {ipv4Addresses[0]}");
+        output.WriteLine($"DNS OK: {Config.ApexHost} → {ipv4Addresses[0]}");
 
         HttpMessageHandler handler = createHandler();
         HttpClient client;
@@ -212,7 +214,7 @@ static class Monitor
         }
 
         using (client)
-            return await CheckApprovedHostsAsync(client, Config.ApprovedHosts, Console.Out, ct);
+            return await CheckApprovedHostsAsync(client, Config.ApprovedHosts, output, ct);
     }
 
     private static Task<IPAddress[]> ResolveHostAddressesAsync(
