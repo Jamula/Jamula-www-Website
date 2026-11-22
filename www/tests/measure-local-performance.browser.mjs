@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { after, before, describe, it } from "node:test";
 import {
   createMeasurementConnection,
+  runMeasurementLifecycle,
   waitForBrowserExit,
 } from "../scripts/measure-local-performance.mjs";
 
@@ -106,6 +108,16 @@ function assertOfflineArguments(args) {
   assert.equal(args.at(-1), "about:blank", "the browser must not navigate to a site");
 }
 
+async function failOfflineBrowserStartup(error, child, profile, cleanupOptions) {
+  return runMeasurementLifecycle(
+    async () => {
+      throw error;
+    },
+    { browser: child, profile },
+    cleanupOptions
+  );
+}
+
 async function startOfflineBrowser() {
   await access(edgePath);
   const profile = await mkdtemp(join(tmpdir(), "jamula-performance-browser-prototype-"));
@@ -184,12 +196,87 @@ async function startOfflineBrowser() {
       },
     };
   } catch (error) {
-    if (child && !child.exitCode && !child.signalCode) child.kill();
-    if (child) await waitForBrowserExit(child, 5000).catch(() => {});
-    await rm(profile, { recursive: true, force: true });
-    throw error;
+    await failOfflineBrowserStartup(error, child, profile);
   }
 }
+
+it("OfflineBrowserCleanup_RetainsProfileAndReportsTimeoutWithStartupFailure", async () => {
+  const child = new EventEmitter();
+  child.exitCode = null;
+  child.signalCode = null;
+  let killed = false;
+  child.kill = () => {
+    killed = true;
+    return true;
+  };
+  const startupError = new Error("browser startup failed");
+  let removed = false;
+
+  await assert.rejects(
+    failOfflineBrowserStartup(startupError, child, "profile-in-use", {
+      exitTimeoutMs: 1,
+      scheduleTimeout: (callback) => {
+        queueMicrotask(callback);
+        return 1;
+      },
+      cancelTimeout: () => {},
+      removeProfile: async () => {
+        removed = true;
+      },
+    }),
+    (error) => {
+      assert.ok(error instanceof AggregateError);
+      assert.equal(error.cause, startupError);
+      assert.equal(error.errors[0], startupError);
+      assert.match(error.errors[1].message, /exit was not confirmed/);
+      assert.match(error.errors[2].message, /profile retained.*profile-in-use/i);
+      return true;
+    }
+  );
+  assert.equal(killed, true);
+  assert.equal(removed, false);
+});
+
+it("OfflineBrowserCleanup_RemovesProfileAfterExitAndPreservesStartupError", async () => {
+  const child = new EventEmitter();
+  child.exitCode = null;
+  child.signalCode = null;
+  child.kill = () => {
+    queueMicrotask(() => {
+      child.exitCode = 0;
+      child.emit("exit", 0, null);
+    });
+    return true;
+  };
+  const startupError = new Error("browser startup failed");
+  const removed = [];
+  await assert.rejects(
+    failOfflineBrowserStartup(startupError, child, "exited-profile", {
+      removeProfile: async (...args) => removed.push(args),
+    }),
+    (error) => error === startupError
+  );
+  assert.deepEqual(removed, [["exited-profile", { recursive: true, force: true }]]);
+});
+
+it("OfflineBrowserCleanup_ReportsProfileRemovalFailureWithStartupFailure", async () => {
+  const startupError = new Error("browser startup failed");
+  const removalError = new Error("profile removal failed");
+  await assert.rejects(
+    failOfflineBrowserStartup(startupError, undefined, "unused-profile", {
+      removeProfile: async () => {
+        throw removalError;
+      },
+    }),
+    (error) => {
+      assert.ok(error instanceof AggregateError);
+      assert.equal(error.cause, startupError);
+      assert.equal(error.errors[0], startupError);
+      assert.equal(error.errors[1].cause, removalError);
+      return true;
+    }
+  );
+});
 
 async function withMetricsFixture(browser, fixture, operation) {
   await browser.evaluate(`(() => {
