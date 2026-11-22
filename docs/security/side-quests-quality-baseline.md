@@ -308,10 +308,11 @@ a semantic smoke check, not a WCAG audit. Before navigation, the test verifies
 the browser's failing loopback proxy and blocked-DNS arguments; it then proves
 CDP interception by failing a synthetic `.invalid` request. The broader
 30-sample local harness recorded zero non-loopback page requests in all six
-route/device cells. These page-level observations do not establish whether
-the browser contacted a Jamula host, monitor collector, or other destination:
-without independently verified OS egress isolation or packet capture, actual
-network traffic remains unknown.
+route/device cells. The test made no intentional navigation to a Jamula host
+or monitor collector. These page-level observations do not establish whether
+the browser contacted those or other destinations: without independently
+verified OS egress isolation or packet capture, actual network traffic remains
+unknown.
 
 The global root rule was also measured against the current home, privacy, and
 404 layouts in five cold contexts per desktop and mobile-emulated cell. Maximum
