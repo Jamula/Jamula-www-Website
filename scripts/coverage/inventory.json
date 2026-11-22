@@ -44,7 +44,7 @@
         },
         {
           "path": "www/scripts/measure-local-performance.mjs",
-          "reason": "The fake CDP tests do not execute the embedded browser-side logic. An Edge V8 prototype gated on independently enforced external egress isolation maps each evaluated string to its exact source slice, but v8-to-istanbul initializes lines outside that mapped slice as covered; host and browser records cannot be combined without false line counts, so the diagnostic has no defensible denominator."
+          "reason": "The fake CDP tests do not execute the embedded browser-side logic. The Edge V8 prototype requires independently enforced external egress isolation; its acknowledgment check does not enforce or verify isolation. It maps each evaluated string to its exact source slice, but v8-to-istanbul initializes lines outside that mapped slice as covered; host and browser records cannot be combined without false line counts, so the diagnostic has no defensible denominator."
         }
       ]
     },
@@ -376,7 +376,7 @@
     },
     {
       "path": "www/tests/404-layout.browser.mjs",
-      "reason": "Opt-in offline browser regression test; its assertions are not shipped browser code."
+      "reason": "Opt-in real-browser regression test requiring independently enforced external egress isolation; its acknowledgment check does not enforce or verify isolation, and real Edge is not automatically offline. Its assertions are not shipped browser code."
     },
     {
       "path": "www/tests/browser-egress-isolation.mjs",

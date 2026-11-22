@@ -174,7 +174,10 @@ Edge process and a fresh isolated browser context per sample with cache
 disabled and service workers bypassed. It intercepts page requests and blocks
 non-loopback URLs; the browser is also configured with a loopback-only failing
 proxy for non-local destinations and blocked DNS. No external page requests
-were observed. No analytics choice was made: fresh consent state is off.
+were observed through the browser/CDP page-request observations. These do not
+establish all network activity: no independently verified OS egress isolation
+or packet capture was available, so actual network traffic is unknown. No
+analytics choice was made: fresh consent state is off.
 Each sample observes through three seconds after `load`, with no interaction,
 CPU or network throttling. Viewports are 1365×768 CSS px at DPR 1 (desktop)
 and 390×844 at DPR 2.6 with mobile emulation. These are viewport classes on
@@ -213,8 +216,8 @@ budget assessment.
 ### Bounded-cleanup recheck — 2026-11-13
 
 The local lab runner's lifecycle and inventory changes were rechecked in a
-working tree based on rejected artifact commit `c0bb036`; these commands did
-not access production or an external measurement service:
+working tree based on rejected artifact commit `c0bb036`. Actual network
+traffic during the historical browser run is unknown, as described above.
 
 The Edge commands in this historical recheck are not current validation or
 authorization to rerun. Before any separately authorized rerun, independently
@@ -233,7 +236,7 @@ node --test www\tests\measure-local-performance.test.mjs
 Push-Location www
 node scripts\measure-local-performance.mjs
 Pop-Location
-# passed: 30 samples (5 for each of 6 route/viewport cells); 0 non-loopback requests observed
+# passed: 30 samples (5 for each of 6 route/viewport cells); 0 non-loopback page requests observed
 ```
 
 The harness still uses the same Edge/CDP collection, routes, desktop and
@@ -270,7 +273,10 @@ a semantic smoke check, not a WCAG audit. Before navigation, the test verifies
 the browser's failing loopback proxy and blocked-DNS arguments; it then proves
 CDP interception by failing a synthetic `.invalid` request. The broader
 30-sample local harness recorded zero non-loopback page requests in all six
-route/device cells. No Jamula host or monitor collector was contacted.
+route/device cells. These page-level observations do not establish whether
+the browser contacted a Jamula host, monitor collector, or other destination:
+without independently verified OS egress isolation or packet capture, actual
+network traffic remains unknown.
 
 The global root rule was also measured against the current home, privacy, and
 404 layouts in five cold contexts per desktop and mobile-emulated cell. Maximum
@@ -296,7 +302,7 @@ node --test www\tests\404-layout.browser.mjs
 Push-Location www
 node scripts\measure-local-performance.mjs
 Pop-Location
-# passed: 30 samples across 6 route/device cells; 0 non-loopback requests
+# passed: 30 samples across 6 route/device cells; 0 non-loopback page requests
 ```
 
 INP was not measured: an idle synthetic visit without representative
