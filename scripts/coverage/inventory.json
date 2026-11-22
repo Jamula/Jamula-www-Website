@@ -44,7 +44,7 @@
         },
         {
           "path": "www/scripts/measure-local-performance.mjs",
-          "reason": "The fake CDP tests do not execute the embedded browser-side logic; c8 host-line counts would not measure it. An Edge V8 prototype gated on independently enforced external egress isolation maps each evaluated string to its exact source slice, but v8-to-istanbul initializes lines outside that mapped slice as covered; host and browser records cannot be combined without false line counts, so the diagnostic has no defensible denominator."
+          "reason": "The fake CDP tests do not execute the embedded browser-side logic; c8 host-line counts would not measure it. The Edge V8 prototype requires independently enforced external egress isolation; its acknowledgment check does not enforce or verify isolation. It maps each evaluated string to its exact source slice, but v8-to-istanbul initializes lines outside that mapped slice as covered; host and browser records cannot be combined without false line counts, so the diagnostic has no defensible denominator."
         }
       ]
     },
@@ -208,11 +208,11 @@
         },
         {
           "path": ".squad/templates/skills/distributed-mesh/sync-mesh.ps1",
-          "reason": "First-party maintenance script template has no line/branch coverage report."
+          "reason": "Offline fake-Git and fake-web-request behavior tests do not measure source execution. Available Pester 3.4.0 CodeCoverage has no branch counts or repository-pinned Cobertura export, and dotnet-coverage measures CLR code rather than PowerShell source; no defensible line/branch denominator is available."
         },
         {
           "path": ".squad/templates/skills/distributed-mesh/sync-mesh.sh",
-          "reason": "First-party maintenance script template has no line/branch coverage report."
+          "reason": "Offline fake-command behavior tests do not measure shell source lines or branches; no compatible offline line/branch collector is available."
         },
         {
           "path": ".squad/templates/workflows/squad-ci.yml",
@@ -291,6 +291,14 @@
       "reason": "Offline workflow test source; its assertions are not product behavior."
     },
     {
+      "path": "scripts/coverage/squad-triage-mapping.test.cjs",
+      "reason": "Offline V8 source attribution control; its assertions are not product behavior."
+    },
+    {
+      "path": "scripts/coverage/sync-mesh.test.mjs",
+      "reason": "Offline shell template behavior tests and command doubles, not product behavior."
+    },
+    {
       "path": "scripts/coverage/ralph-triage-fixture.cjs",
       "reason": "Offline CLI test doubles, not production automation."
     },
@@ -301,6 +309,14 @@
     {
       "path": "scripts/coverage/write-note-fixture.ps1",
       "reason": "Offline PowerShell test doubles, not a maintenance script."
+    },
+    {
+      "path": "scripts/coverage/sync-mesh.test.cjs",
+      "reason": "Offline PowerShell template behavior tests and coverage inventory assertions, not a maintenance script."
+    },
+    {
+      "path": "scripts/coverage/sync-mesh-fixture.ps1",
+      "reason": "Offline PowerShell fixture with fake Git and web request functions, not a maintenance script."
     },
     {
       "path": "scripts/mbr/tests/Program.cs",
@@ -360,7 +376,7 @@
     },
     {
       "path": "www/tests/404-layout.browser.mjs",
-      "reason": "Opt-in browser regression test requiring independently enforced external egress isolation; its assertions are not shipped browser code."
+      "reason": "Opt-in real-browser regression test requiring independently enforced external egress isolation; its acknowledgment check does not enforce or verify isolation, and real Edge is not automatically offline. Its assertions are not shipped browser code."
     },
     {
       "path": "www/tests/browser-egress-isolation.mjs",

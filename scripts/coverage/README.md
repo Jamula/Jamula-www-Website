@@ -168,6 +168,16 @@ tests stub Git, HTTPS and output writes; no GitHub request or result file is
 created. c8 reports V8 line and branch counts, not independent boolean
 condition coverage. Other Squad templates remain unmeasured.
 
+Run `node --test scripts\coverage\sync-mesh.test.mjs` for offline shell mesh
+behavior tests. The harness pins the audited template content, runs a copy in
+a disposable directory, and intercepts every external command through a
+private PATH. Git, curl and jq are deterministic fakes; only a constrained
+mkdir wrapper invokes the local mkdir executable. Fixtures contain no real
+remote addresses or credentials. The jq fake does not verify actual jq
+semantics, and the harness is not an OS-level network sandbox. No available
+offline collector provides defensible shell line and branch counts, so the
+template stays unmeasured and remains a gate blocker.
+
 The notes-fetch PowerShell template has offline behavior tests:
 `node --test scripts/coverage/notes-fetch.test.cjs`. The harness uses a fake Git
 function and a disposable repository-shaped directory; it does not touch real
@@ -183,6 +193,13 @@ hits are not source coverage or a line-and-branch report. The focused test also
 rejects an inventory mutation that reclassifies this template as measured.
 Keep it explicitly unmeasured until a semantics-preserving collector proves
 complete attribution against the original source.
+The same offline test demonstrates one concrete instrumentation hazard: adding
+`Write-Output` to the `$existing` condition in a temporary copy makes a missing
+refspec truthy, so the script skips the fake Git `config --add` call. The
+uninstrumented source adds it. This rejects that particular probe, not every
+possible instrumentation method; it does not measure source coverage or
+establish a complete denominator. The test only runs with the fake Git fixture.
+These behavior checks do not complete the #109 coverage gate.
 
 The same offline test demonstrates one concrete instrumentation hazard: adding
 `Write-Output` to the `$existing` condition in a temporary copy makes a missing
@@ -190,6 +207,29 @@ refspec truthy, so the script skips the fake Git `config --add` call. The
 uninstrumented source adds it. This rejects that particular probe, not every
 possible instrumentation method; it does not measure source coverage or
 establish a complete denominator. The test only runs with the fake Git fixture.
+
+Two debugger controls run with `node --test scripts/coverage/notes-fetch.test.cjs`.
+On PowerShell 7.7.0, an empty-action breakpoint at the original `$existing`
+condition has one hit for both missing and existing refspecs, despite opposite
+outcomes; for these two scenarios, stdout, stderr, exit status, and fake Git
+calls match the uninstrumented runs. A separate synthetic `-and` fixture places
+a column breakpoint at its right-hand `Test-Path` operand: it hits once whether
+that fake operand runs or is short-circuited. The current template has no
+`-and`/`-or` AST nodes; this fixture tests a limitation, not template coverage.
+These checks do not prove all debugger approaches unsound, but breakpoint hits
+alone cannot establish operand outcomes or a complete denominator, and
+exception paths and every source statement have not been attributed and
+validated. The template remains unmeasured.
+
+On PowerShell 7.7.0, `Set-PSDebug -Trace 1` adds host-visible trace output
+when the original template runs with fake Git; redirecting stream 5 does not
+remove that output. In the tested setup scenario the traced and untraced runs
+have the same exit status, stderr, and fake Git calls, but not the same stdout.
+A separate synthetic `-and` test shows the same traced condition line when its
+right-hand variable is short-circuited and when it is evaluated. This does not
+establish that every tracing or AST-based approach fails, nor does it test all
+error, scope, or side-effect behavior. Tracing is not a source coverage report,
+and notes-fetch remains unmeasured.
 
 The live `.github/workflows/squad-triage.yml` JavaScript block has deterministic
 offline behavioral tests: `node --test scripts/coverage/squad-triage.test.cjs`.
@@ -207,10 +247,38 @@ source paths, so treating the YAML as measured from the script alone would hide
 those behaviors. It remains an unmeasured blocker; no counts are added to the
 gate. V8 branch ranges are not independent boolean-condition coverage.
 
+`node --test scripts/coverage/squad-triage-mapping.test.cjs` checks a more
+limited mapping experiment. The script's generated lines can be aligned to the
+YAML block without including metadata, and an in-memory exact-source guard
+rejects synthetic candidate strings that differ from the source extracted
+from the unchanged workflow. It does not mutate the workflow text or prove
+that a workflow/source mutation is caught by the mapping or coverage path.
+However, even when the pinned `v8-to-istanbul` converter receives the exact VM
+source, the missing-roster early-return control falsely marks the later
+dispatch condition as covered. Its line report includes blank and comment
+lines, too, so it is not an executable-line denominator. V8's dynamically
+reported ranges also do not independently establish a complete static branch
+denominator. This experiment is diagnostic only: it is not a source-mapped
+coverage report, an Actions integration run, or evidence for the 90% gate.
+
 Run `node --test scripts\coverage\write-note.test.cjs` for offline PowerShell
 note-writer behavior checks. A disposable fixture intercepts Git and sleeps;
 these checks do not produce source-level line or branch coverage, so
 `write-note.ps1` remains unmeasured and the gate remains blocked.
+
+The distributed-mesh PowerShell template has offline behavior checks:
+`node --test scripts/coverage/sync-mesh.test.cjs`. Its disposable PowerShell
+fixture verifies that `git` and `Invoke-WebRequest` resolve to scoped fake
+functions before invoking the tracked source; all paths and generated state
+stay under a temporary directory, and the fixture's `PATH` excludes system
+executables. These checks cover initialization/idempotency and success/failure
+handling for both remote zones, but do not produce source coverage. The
+available Pester 3.4.0 CodeCoverage output has line hits but no branch counts or
+repository-pinned Cobertura export; dotnet-coverage measures CLR code, not
+PowerShell source. AST inspection, behavior assertions, and line hits do not
+establish a complete source line/branch denominator. Keep
+`sync-mesh.ps1` explicitly unmeasured until a semantics-preserving collector
+produces defensible attribution for both metrics.
 
 The Astro collector writes a fresh temporary directory on each run; the copy
 above uses the directory printed by that successful run. Its Cobertura
@@ -219,20 +287,20 @@ inventoried source. This measures the configuration only, not rendered HTML or
 the seven Astro templates. The collector reports c8/V8 branch counts, which do
 not establish independent coverage of every boolean condition.
 
-The author reported an offline Astro 7.4.4 / c8 9.1.0 investigation in which
-the compiler emitted inline source maps identifying the original `.astro`
-files. That map alone was not sufficient for coverage attribution. With the
-normal `vite.build.sourcemap: false` setting, c8 reported no covered lines or
-branches for the seven templates. Enabling build sourcemaps in a temporary
-config and using c8's `--exclude-after-remap` option reportedly produced
-**1,110/1,110 lines (100%) and 3/3 branches (100%)** across the templates, but
-Cobertura marked static HTML and CSS source lines as covered. Its only branch
-entries reportedly mapped to `<BaseLayout>` invocations in `404.astro:9`,
-`index.astro:24`, and `privacy.astro:9`, not to template conditional
-expressions. These counts are author-reported and were not independently
-verified during this integration; they are not executable-source coverage and
-must not enter the inventory or 90% gate. Production source maps remain
-disabled.
+An offline Astro 7.4.4 / c8 9.1.0 investigation confirmed that the compiler
+emits inline source maps whose `sources` identify the original `.astro` files.
+That map alone is not sufficient for coverage attribution. With the normal
+`vite.build.sourcemap: false` setting, c8's build report gave the seven
+templates no covered lines or branches. Enabling build sourcemaps in a
+temporary config and using c8's `--exclude-after-remap` option did remap the
+generated V8 data, but reported **1,110/1,110 lines (100%) and 3/3 branches
+(100%)** across the seven templates. Its Cobertura entries mark static HTML and
+CSS source lines as covered. Its only branch entries mapped to the `<BaseLayout>`
+invocations in `404.astro:9`, `index.astro:24`, and `privacy.astro:9`, not to
+the template's conditional expressions. Those mapped numbers therefore are not
+executable-source line/branch coverage and must not enter the inventory or the
+90% gate. The source-map configuration used for the experiment was temporary;
+production source maps remain disabled.
 
 `CoverageGate_KeepsAllAstroTemplatesAsUnmeasuredBlockers` protects the exact
 seven paths and confirms that complete browser and Astro-config reports cannot
@@ -240,6 +308,14 @@ make the website component pass while those templates lack validated
 executable-source measurements. Keep the entries unmeasured until a
 compiler-aware collector can distinguish executable template expressions and
 their branches from emitted markup and styles.
+
+A test-only compiler-AST probe maps one `SiteFooter.astro` `releaseVersion &&
+<span>` expression back to its source location and confirms that an
+instrumented expression preserves its result and render side effects while
+recording both observed short-circuit outcomes. This proves only that one
+expression can be mapped and probed; V8 precise coverage returned the same
+range for the taken and untaken runs. The probe does not measure template source
+lines or establish a complete branch denominator.
 
 The performance diagnostic tests above are correctness checks only, not a
 coverage report. Their fake CDP server returns canned values; it does not
@@ -416,10 +492,11 @@ console-only runner summary as a successful gate.
 ## Current blockers
 
 - The website has seven `.astro` templates with build-time logic that remain
-  unmeasured. Astro source-map V8 coverage can remap static markup and styles to
-  covered lines while leaving the executable branch denominator incomplete;
-  separate configuration and browser reports do not measure those templates.
-  Build and generated-site tests are not source coverage.
+  unmeasured. Astro source maps remap static markup and styles to covered lines,
+  and the resulting V8 branch denominator is incomplete; the separate
+  configuration and browser reports do not measure those templates. The
+  one-expression test probe does not provide template source coverage or a
+  complete denominator. Build and generated-site tests are not source coverage.
 - `scripts/monitor/InternalsVisibleTo.cs` has no executable lines for Cobertura
   to measure. The exact-content guard validates only the allowlisted friend
   assembly declaration; it contributes no invented coverage counts. Any other
