@@ -103,6 +103,12 @@ The prior runbook draft recorded a reported MBR collector run for `2026-11` on
 `2026-11-08T22:48:46Z`. The draft's source notes are retained here as a
 historical report, not as independently verified measurements:
 
+These details are reported in the inherited runbook draft and were not
+independently verified for this revision: the local snapshot was not inspected
+and the source requests were not rerun. Treat the date, window, observation time,
+and source-health statements below as unverified reports, not accepted
+measurements or proof that the review process completed.
+
 | Evidence | Prior draft's reported result |
 | --- | --- |
 | GitHub pull-request and issue sources | Reported complete-page source health; not independently verified here. These sources show delivery activity and current backlog, not feature outcomes. |
