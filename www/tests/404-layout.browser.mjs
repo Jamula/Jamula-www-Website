@@ -13,6 +13,7 @@ import {
   navigateMeasurementPage,
   runMeasurementLifecycle,
 } from "../scripts/measure-local-performance.mjs";
+import { requireBrowserEgressIsolationAcknowledgement } from "./browser-egress-isolation.mjs";
 
 const siteRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = resolve(siteRoot, "dist");
@@ -61,6 +62,7 @@ function buildFreshSite() {
 }
 
 test("404 layout is stable across delayed consent and the desktop scrollbar transition", async (t) => {
+  requireBrowserEgressIsolationAcknowledgement();
   buildFreshSite();
 
   const resources = {};
