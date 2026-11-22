@@ -720,6 +720,45 @@ test("CoverageGate_RejectsSwappedSourceReports", () => {
   assert.deepEqual(swapped.components[0].sources, []);
 });
 
+test("CoverageGate_RejectsInvalidAndMissingSourceReportBindings", () => {
+  const source = "src/app.js";
+  const report = "app.xml";
+  const reportContent = classReport(source, [1], [[1, 1]]);
+  const missing = evaluateCoverage(
+    inventory([component("missing", [source], [report], [], {})]),
+    new Map([[report, reportContent]]),
+    "/checkout/repo",
+  );
+  assert.equal(missing.passed, false);
+  assert.ok(
+    missing.errors.some((error) =>
+      error.includes(`missing source-to-report binding: ${source}`),
+    ),
+  );
+
+  const invalid = evaluateCoverage(
+    inventory([
+      component("invalid", [source], [report], [], {
+        [source]: "undeclared.xml",
+        "src/untracked.js": report,
+      }),
+    ]),
+    new Map([[report, reportContent]]),
+    "/checkout/repo",
+  );
+  assert.equal(invalid.passed, false);
+  assert.ok(
+    invalid.errors.some((error) =>
+      error.includes(`invalid source-to-report binding: ${source}`),
+    ),
+  );
+  assert.ok(
+    invalid.errors.some((error) =>
+      error.includes("invalid source-to-report binding: src/untracked.js"),
+    ),
+  );
+});
+
 test("CoverageGate_KeepsTestOnlyExclusionsExplicitAndUnmeasuredCodeBlocking", () => {
   const result = evaluateCoverage(
     inventory(
