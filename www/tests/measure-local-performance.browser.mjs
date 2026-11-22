@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { after, before, describe, it } from "node:test";
 import {
