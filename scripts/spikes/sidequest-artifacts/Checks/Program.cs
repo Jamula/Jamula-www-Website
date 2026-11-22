@@ -369,17 +369,20 @@ internal sealed class Fixture(string root, bool coverage) : IAsyncDisposable
     {
         await Case("Publisher_IndependentSectionBuildsOnlyTheSelectedProject", async () =>
         {
-            var result = await InvokePublisherAsync(new()
+            foreach (var section in Sections.Append("Gateway"))
             {
-                ["Section"] = "Finance",
-                ["Version"] = "2.3.4",
-            });
-            Require(result.ExitCode == 0);
-            Require(result.Calls.Length == 1);
-            Require(result.Calls[0].SequenceEqual(
-                PublishArguments("Finance", "2.3.4", OutputRoot(result))));
-            Require(result.StandardOutput.Trim() == "RELEASED:Finance/2.3.4");
-            Require(string.IsNullOrWhiteSpace(result.StandardError));
+                var result = await InvokePublisherAsync(new()
+                {
+                    ["Section"] = section,
+                    ["Version"] = "2.3.4",
+                });
+                Require(result.ExitCode == 0);
+                Require(result.Calls.Length == 1);
+                Require(result.Calls[0].SequenceEqual(
+                    PublishArguments(section, "2.3.4", OutputRoot(result))));
+                Require(result.StandardOutput.Trim() == $"RELEASED:{section}/2.3.4");
+                Require(string.IsNullOrWhiteSpace(result.StandardError));
+            }
         });
         await Case("Publisher_DefaultsToUniqueReleaseRootsAndVersion", async () =>
         {

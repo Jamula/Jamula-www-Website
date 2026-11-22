@@ -50,13 +50,14 @@ dotnet run --project scripts\spikes\sidequest-artifacts\Checks\Checks.csproj --c
 ```
 
 This mode substitutes an in-process `dotnet` function that records the exact
-publish arguments and returns controlled exit codes. It does not invoke a real
+publish arguments and returns controlled exit codes. It launches `pwsh` to run
+the publisher script, so PowerShell 7 is required. It does not invoke a real
 build, access a package feed, or create release artifacts. A successful run
 reports **9 publisher checks passed, 0 skipped, 0 failed**:
 
 | Requirement | Check |
 | --- | --- |
-| Independent publish selects only the requested project and preserves offline arguments | `Publisher_IndependentSectionBuildsOnlyTheSelectedProject` |
+| Independent publish selects only the requested Admin, Finance, Tech, or Gateway project and preserves offline arguments | `Publisher_IndependentSectionBuildsOnlyTheSelectedProject` |
 | Default version and unique release roots | `Publisher_DefaultsToUniqueReleaseRootsAndVersion` |
 | `-All` publishes the four projects in order | `Publisher_AllBuildsTheFourProjectsInOrder` |
 | Reused destinations fail before invoking `dotnet` | `Publisher_RejectsReusedDestinationBeforeAnyBuild` |
@@ -66,8 +67,8 @@ reports **9 publisher checks passed, 0 skipped, 0 failed**:
 | Invalid version is rejected before invoking `dotnet` | `Publisher_RejectsInvalidVersionBeforeAnyBuild` |
 | A section or `-All` selection is required | `Publisher_RequiresSectionOrAll` |
 
-These checks inject ordered cleanup failures deterministically and use one
-owned sleeping .NET child (the checks assembly's internal `--cleanup-child`
+The `--cleanup` checks inject ordered cleanup failures deterministically and use
+one owned sleeping .NET child (the checks assembly's internal `--cleanup-child`
 mode, bounded to 60 seconds) to verify that successful startup cleanup rethrows
 the original callback exception and terminates the child. This focused command
 requires only the existing .NET SDK/runtime, not PowerShell.
