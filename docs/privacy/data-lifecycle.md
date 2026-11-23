@@ -208,7 +208,10 @@ records. A later opt-in after stopping requires a clean document reload.
   account-side Enhanced measurement. GA's inherent automatically collected
   session/first-visit/engagement information is not a Jamula conversion and
   cannot be represented as "only two event names ever reach Google." The
-  administrator must also document aggregate-report review, export and
+  The administrator must allow Google's documented 24-hour implementation window
+  after any retention-setting change before treating the selected retention as
+  effective.
+  The administrator must also document aggregate-report review, export and
   deletion; standard aggregate reports are outside the user/event retention
   setting.
 - The designated vendor/privacy owners must record the Google contracting
