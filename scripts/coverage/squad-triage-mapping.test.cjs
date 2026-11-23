@@ -7,7 +7,7 @@ const { createRequire } = require("node:module");
 const os = require("node:os");
 const path = require("node:path");
 const { test } = require("node:test");
-const { pathToFileURL } = require("node:url");
+const { fileURLToPath } = require("node:url");
 
 const root = path.resolve(__dirname, "../..");
 const workflowPath = path.join(root, ".github/workflows/squad-triage.yml");
@@ -58,7 +58,9 @@ function collectCoverage(testName) {
         fs.readFileSync(path.join(directory, file), "utf8"),
       );
       return report.result.filter(
-        (entry) => entry.url === pathToFileURL(workflowPath).href,
+        (entry) =>
+          entry.url.startsWith("file:") &&
+          path.resolve(fileURLToPath(entry.url)) === workflowPath,
       );
     });
     assert.equal(

@@ -52,11 +52,11 @@ echo TEAM_TWO`,
 echo fixture-date`,
 };
 
-function fixture(t) {
+function fixture(t, { spaceInPath = false } = {}) {
   const contents = readFileSync(source, "utf8").replace(/\r\n/g, "\n");
   assert.equal(createHash("sha256").update(contents).digest("hex"), auditedHash,
     "Shell source changed: audit all execution and fixture inputs before updating the hash");
-  const root = mkdtempSync(path.join(os.tmpdir(), "mesh-offline-"));
+  const root = mkdtempSync(path.join(os.tmpdir(), spaceInPath ? "mesh offline-" : "mesh-offline-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const bin = path.join(root, "bin");
   mkdirSync(bin);
@@ -68,7 +68,7 @@ function fixture(t) {
   const shellBin = process.platform === "win32"
     ? `/${bin[0].toLowerCase()}${bin.slice(2).replaceAll("\\", "/")}`
     : bin;
-  assert.match(shellBin, /^\/[a-zA-Z0-9_./-]+$/, "unsafe or unsupported temporary path");
+  assert.match(shellBin, /^\/[a-zA-Z0-9_./~ -]+$/, "unsafe or unsupported temporary path");
   const run = (args = [], extra = {}) => {
     const env = {
       PATH: shellBin,
@@ -131,6 +131,17 @@ test("MeshSync_TrustedCloneAndOpaqueFetch_UseFixtureCommands", (t) => {
     "git <clone> <--quiet> <--depth> <1> <--branch> <stable> <fixture-repo> <work/cache/trusted>\n" +
     "curl <--silent> <--fail> <fixture-contract> <-o> <work/cache/opaque/SUMMARY.md>\n");
   assert.match(result.stdout, /Mesh sync complete/);
+});
+
+test("MeshSync_PathWithSpaces_UsesFixtureCommandsOffline", (t) => {
+  const f = fixture(t, { spaceInPath: true });
+  assert.match(path.basename(f.root), /^mesh offline-/);
+  const result = f.run();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(f.read("commands.log"),
+    "git <clone> <--quiet> <--depth> <1> <--branch> <stable> <fixture-repo> <work/cache/trusted>\n" +
+    "curl <--silent> <--fail> <fixture-contract> <-o> <work/cache/opaque/SUMMARY.md>\n");
+  assert.equal(f.read("work/cache/opaque/SUMMARY.md"), "published contract\n");
 });
 
 test("MeshSync_TrustedPullAndBearerFetch_UseExistingCheckoutAndToken", (t) => {

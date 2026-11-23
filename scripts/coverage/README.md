@@ -63,19 +63,23 @@ The local Edge-based performance diagnostic at
 `www/scripts/measure-local-performance.mjs` is a runnable first-party source,
 not test support. It remains explicitly unmeasured in `website-browser`:
 the fake CDP replies with canned values and do not execute the embedded
-browser-side JavaScript. The earlier five-test Edge run had no OS-level egress
-isolation or packet capture, so whether any external requests occurred is
-unknown; no external navigation was intentional.
+browser-side JavaScript or its instrumentation branches. c8 host-line counts
+from those tests would not represent coverage of the diagnostic source. The
+earlier five-test Edge run had no OS-level egress isolation or packet capture,
+so whether any external requests occurred is unknown; no external navigation
+was intentional.
 
-The opt-in real-browser prototype is not offline by proof of its Chromium flags.
-Its isolated profile, `about:blank`, disabled background networking, proxy, and
-host-resolver rules are not an independently enforced egress boundary and do
-not rule out implicit proxy bypass, literal-IP access, or background traffic.
-Any real-browser run requires independently enforced external egress isolation.
-Before launching Edge, the test fails closed unless
+The opt-in real-browser tests are not offline by proof of Chromium flags.
+An isolated profile, `about:blank`, disabled background networking, proxy,
+host-resolver rules, and page-level interception are not an independently
+enforced egress boundary and do not rule out implicit proxy bypass, literal-IP
+access, or background traffic. Any real-browser run requires independently
+enforced external egress isolation. Before launching Edge or building the 404
+browser fixture, these tests fail closed unless
 `JAMULA_BROWSER_EGRESS_ISOLATION_ACK=1` is set. Set it only after applying that
 independent control; the acknowledgment is a deliberate opt-in, not verification
 or enforcement of isolation. Do not set it when no egress boundary is in place.
+The diagnostic CLI does not enforce this acknowledgment or isolation.
 With isolation independently enforced, run
 `node --test www/tests/measure-local-performance.browser.mjs` to execute the
 exact strings in local Edge through CDP, collect V8 ranges, and validate an

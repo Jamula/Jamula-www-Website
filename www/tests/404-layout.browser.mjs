@@ -33,21 +33,87 @@ const geometry = `(() => ({
   })
 }))()`;
 
-function waitForDocumentCommit(eventHandlers, sessionId, url) {
-  const eventKey = `${sessionId}:Page.frameNavigated`;
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      eventHandlers.delete(eventKey);
-      reject(new Error("404 document commit timeout"));
-    }, 5000);
-    eventHandlers.set(eventKey, ({ frame }) => {
-      if (frame.url !== url) return;
+function waitForMainFrameExecutionContext(eventHandlers, sessionId, frameId, url) {
+  const contextKey = `${sessionId}:Runtime.executionContextCreated`;
+  const commitKey = `${sessionId}:Page.frameNavigated`;
+  let timer;
+  let cancelWait;
+  const ready = new Promise((resolveReady, rejectReady) => {
+    let committed = false;
+    let contextId;
+    const cleanup = () => {
       clearTimeout(timer);
-      eventHandlers.delete(eventKey);
-      resolve();
+      eventHandlers.delete(contextKey);
+      eventHandlers.delete(commitKey);
+    };
+    const resolveWhenReady = () => {
+      if (!committed || contextId === undefined) return;
+      cleanup();
+      resolveReady(contextId);
+    };
+    eventHandlers.set(contextKey, ({ context }) => {
+      if (context.auxData?.frameId !== frameId || !context.auxData?.isDefault) return;
+      contextId = context.id;
+      resolveWhenReady();
     });
+    eventHandlers.set(commitKey, ({ frame }) => {
+      if (frame.id !== frameId || frame.url !== url) return;
+      committed = true;
+      resolveWhenReady();
+    });
+    cancelWait = cleanup;
+    timer = setTimeout(() => {
+      cleanup();
+      rejectReady(new Error("404 document commit or main-frame execution context timeout"));
+    }, 5000);
   });
+  return { ready, cancel: () => cancelWait?.() };
 }
+
+test("404 document readiness waits for the matching commit and default context", async () => {
+  for (const contextFirst of [false, true]) {
+    const handlers = new Map();
+    const { ready, cancel } = waitForMainFrameExecutionContext(
+      handlers,
+      "session",
+      "main",
+      "http://localhost/404.html"
+    );
+    let settled = false;
+    ready.then(
+      () => {
+        settled = true;
+      },
+      () => {}
+    );
+    const commit = (frame) => handlers.get("session:Page.frameNavigated")({ frame });
+    const context = (id, frameId, isDefault) =>
+      handlers.get("session:Runtime.executionContextCreated")({
+        context: { id, auxData: { frameId, isDefault } },
+      });
+    commit({ id: "child", url: "http://localhost/404.html" });
+    commit({ id: "main", url: "about:blank" });
+    context(1, "child", true);
+    context(2, "main", false);
+    if (contextFirst) context(3, "main", true);
+    else commit({ id: "main", url: "http://localhost/404.html" });
+    await Promise.resolve();
+    assert.equal(settled, false);
+    if (contextFirst) commit({ id: "main", url: "http://localhost/404.html" });
+    else context(3, "main", true);
+    assert.equal(await ready, 3);
+    assert.equal(handlers.size, 0);
+    cancel();
+  }
+});
+
+test("404 document readiness cancellation removes its event handlers", () => {
+  const handlers = new Map();
+  const { cancel } = waitForMainFrameExecutionContext(handlers, "session", "main", "url");
+  assert.equal(handlers.size, 2);
+  cancel();
+  assert.equal(handlers.size, 0);
+});
 
 function buildFreshSite() {
   const command = process.platform === "win32" ? "npm.cmd run build" : "npm run build";
@@ -243,10 +309,15 @@ test("404 layout is stable across delayed consent and the desktop scrollbar tran
         },
         sessionId
       );
-      const evaluate = async (expression) => {
+      const evaluate = async (expression, contextId) => {
         const result = await send(
           "Runtime.evaluate",
-          { expression, returnByValue: true, awaitPromise: true },
+          {
+            expression,
+            returnByValue: true,
+            awaitPromise: true,
+            ...(contextId === undefined ? {} : { contextId }),
+          },
           sessionId
         );
         assert.equal(result.exceptionDetails, undefined, JSON.stringify(result.exceptionDetails));
@@ -254,12 +325,19 @@ test("404 layout is stable across delayed consent and the desktop scrollbar tran
       };
       const route = `/404.html${withoutGutter ? "?without-gutter=1" : ""}`;
       const pageUrl = `${origin}${route}`;
-      const committed = waitForDocumentCommit(eventHandlers, sessionId, pageUrl);
+      const { frameTree } = await send("Page.getFrameTree", {}, sessionId);
+      const mainFrameContext = waitForMainFrameExecutionContext(
+        eventHandlers,
+        sessionId,
+        frameTree.frame.id,
+        pageUrl
+      );
       const loaded = navigateMeasurementPage(send, eventHandlers, sessionId, pageUrl);
       loaded.catch(() => {});
       try {
-        await committed;
-        await evaluate(`new Promise((resolve, reject) => {
+        const contextId = await mainFrameContext.ready;
+        await evaluate(
+          `new Promise((resolve, reject) => {
           const deadline = performance.now() + 5000;
           const check = () => {
             if (document.querySelector(".analytics") && performance.getEntriesByName("first-contentful-paint").length)
@@ -268,7 +346,9 @@ test("404 layout is stable across delayed consent and the desktop scrollbar tran
             else requestAnimationFrame(check);
           };
           requestAnimationFrame(check);
-        })`);
+        })`,
+          contextId
+        );
         assert.ok(heldConsentRequest, "Consent module must be held until initial paint");
         const before = await evaluate(geometry);
         assert.equal(before.panelHidden, true);
@@ -379,6 +459,7 @@ test("404 layout is stable across delayed consent and the desktop scrollbar tran
         assert.deepEqual(externalRequests, []);
         assert.deepEqual(requestErrors, []);
       } finally {
+        mainFrameContext.cancel();
         if (heldConsentRequest)
           await send("Fetch.continueRequest", { requestId: heldConsentRequest }, sessionId);
         await loaded.catch((error) => requestErrors.push(error));
