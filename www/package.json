@@ -17,16 +17,17 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@astrojs/sitemap": "^3.7.4",
-    "astro": "^7.4.4"
+    "@astrojs/sitemap": "^3.7.6",
+    "astro": "^7.4.13"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
+    "@astrojs/compiler-rs": "0.5.3",
     "@typescript/native": "npm:typescript@^7.0.2",
-    "c8": "9.1.0",
-    "parse5": "^8.1.0",
-    "postcss": "^8.5.32",
-    "prettier": "^3.9.10",
+    "c8": "12.0.0",
+    "parse5": "^8.1.1",
+    "postcss": "^8.5.33",
+    "prettier": "^3.10.1",
     "prettier-plugin-astro": "^1.1.2",
     "saxes": "6.0.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2"

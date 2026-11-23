@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "thresholdPercent": 90,
   "components": [
     {
@@ -9,38 +9,42 @@
         "astro-config/cobertura-coverage.xml"
       ],
       "sources": ["www/public/analytics-consent.js", "www/astro.config.ts"],
+      "sourceReports": {
+        "www/public/analytics-consent.js": "website/cobertura-coverage.xml",
+        "www/astro.config.ts": "astro-config/cobertura-coverage.xml"
+      },
       "unmeasured": [
         {
-          "path": "www/scripts/measure-local-performance.mjs",
-          "reason": "Runnable local diagnostic for built-site performance; no line/branch coverage report exists."
-        },
-        {
           "path": "www/src/components/AnalyticsConsent.astro",
-          "reason": "Astro build-time template code has no line/branch source-map report."
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
         },
         {
           "path": "www/src/components/SiteFooter.astro",
-          "reason": "Astro build-time template code has no line/branch source-map report."
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
         },
         {
           "path": "www/src/components/SiteHeader.astro",
-          "reason": "Astro build-time template code has no line/branch source-map report."
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
         },
         {
           "path": "www/src/layouts/BaseLayout.astro",
-          "reason": "Astro build-time template code has no line/branch source-map report."
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
         },
         {
           "path": "www/src/pages/404.astro",
-          "reason": "Astro build-time template code has no line/branch source-map report."
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
         },
         {
           "path": "www/src/pages/index.astro",
-          "reason": "Astro build-time template code has no line/branch source-map report."
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
         },
         {
           "path": "www/src/pages/privacy.astro",
-          "reason": "Astro build-time template code has no line/branch source-map report."
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
+        },
+        {
+          "path": "www/scripts/measure-local-performance.mjs",
+          "reason": "The fake CDP tests do not execute the embedded browser-side logic; c8 host-line counts would not measure it. The Edge V8 prototype requires independently enforced external egress isolation; its acknowledgment check does not enforce or verify isolation. It maps each evaluated string to its exact source slice, but v8-to-istanbul initializes lines outside that mapped slice as covered; host and browser records cannot be combined without false line counts, so the diagnostic has no defensible denominator."
         }
       ]
     },
@@ -54,6 +58,13 @@
         ".github/scripts/verify-preview.cjs",
         ".github/scripts/verify-swa-csp.cjs"
       ],
+      "sourceReports": {
+        ".github/scripts/production-deployment.cjs": "automation/cobertura-coverage.xml",
+        ".github/scripts/release.cjs": "automation/cobertura-coverage.xml",
+        ".github/scripts/swa-preview.cjs": "automation/cobertura-coverage.xml",
+        ".github/scripts/verify-preview.cjs": "automation/cobertura-coverage.xml",
+        ".github/scripts/verify-swa-csp.cjs": "automation/cobertura-coverage.xml"
+      },
       "unmeasured": [
         {
           "path": ".github/workflows/azure-static-web-apps-preview.yml",
@@ -81,7 +92,7 @@
         },
         {
           "path": ".github/workflows/squad-triage.yml",
-          "reason": "GitHub Actions workflow control logic lacks source-level coverage collection."
+          "reason": "Offline tests exercise the embedded JavaScript, but no report measures both that block and GitHub Actions workflow control logic."
         },
         {
           "path": ".github/workflows/sync-squad-labels.yml",
@@ -97,6 +108,9 @@
       "id": "monitor",
       "reports": ["monitor.cobertura.xml"],
       "sources": ["scripts/monitor/Program.cs"],
+      "sourceReports": {
+        "scripts/monitor/Program.cs": "monitor.cobertura.xml"
+      },
       "validatedMetadata": [
         {
           "path": "scripts/monitor/InternalsVisibleTo.cs",
@@ -114,7 +128,14 @@
         "scripts/mbr/Metrics.cs",
         "scripts/mbr/Program.cs",
         "scripts/mbr/wwwroot/dashboard.js"
-      ]
+      ],
+      "sourceReports": {
+        "scripts/mbr/Costs.cs": "mbr-dotnet.cobertura.xml",
+        "scripts/mbr/GitHub.cs": "mbr-dotnet.cobertura.xml",
+        "scripts/mbr/Metrics.cs": "mbr-dotnet.cobertura.xml",
+        "scripts/mbr/Program.cs": "mbr-dotnet.cobertura.xml",
+        "scripts/mbr/wwwroot/dashboard.js": "mbr-ui/cobertura-coverage.xml"
+      }
     },
     {
       "id": "validation-tool",
@@ -124,12 +145,21 @@
         "scripts/validation/PreviewArtifactValidator.cs",
         "scripts/validation/PreviewSiteVerifier.cs",
         "scripts/validation/Program.cs"
-      ]
+      ],
+      "sourceReports": {
+        "scripts/validation/GovernanceValidator.cs": "validation.cobertura.xml",
+        "scripts/validation/PreviewArtifactValidator.cs": "validation.cobertura.xml",
+        "scripts/validation/PreviewSiteVerifier.cs": "validation.cobertura.xml",
+        "scripts/validation/Program.cs": "validation.cobertura.xml"
+      }
     },
     {
       "id": "coverage-gate",
       "reports": ["coverage-gate/cobertura-coverage.xml"],
-      "sources": ["scripts/coverage/gate.mjs"]
+      "sources": ["scripts/coverage/gate.mjs"],
+      "sourceReports": {
+        "scripts/coverage/gate.mjs": "coverage-gate/cobertura-coverage.xml"
+      }
     },
     {
       "id": "sidequest-artifacts-local-runtime",
@@ -138,6 +168,10 @@
         "scripts/spikes/sidequest-artifacts/SectionHost.cs",
         "scripts/spikes/sidequest-artifacts/Gateway/Program.cs"
       ],
+      "sourceReports": {
+        "scripts/spikes/sidequest-artifacts/SectionHost.cs": "sidequest-artifacts/cobertura-coverage.xml",
+        "scripts/spikes/sidequest-artifacts/Gateway/Program.cs": "sidequest-artifacts/cobertura-coverage.xml"
+      },
       "compiledSources": [
         {
           "path": "scripts/spikes/sidequest-artifacts/SectionHost.cs",
@@ -152,7 +186,7 @@
       "unmeasured": [
         {
           "path": "scripts/spikes/sidequest-artifacts/Publish-Local.ps1",
-          "reason": "Runnable local publisher; no compatible line/branch coverage report exists. Kept as a blocker, not classified as test-only."
+          "reason": "Runnable local publisher; offline --publisher behavior checks are not source coverage. Available Pester 3.4 command coverage has no branch counts or repository-pinned Cobertura export, and dotnet-coverage measures CLR code rather than PowerShell source. No compatible line/branch coverage report exists; kept as a blocker, not classified as test-only."
         }
       ]
     },
@@ -160,6 +194,9 @@
       "id": "squad-maintenance-templates",
       "reports": ["ralph-triage/cobertura-coverage.xml"],
       "sources": [".squad/templates/ralph-triage.js"],
+      "sourceReports": {
+        ".squad/templates/ralph-triage.js": "ralph-triage/cobertura-coverage.xml"
+      },
       "unmeasured": [
         {
           "path": ".squad/templates/scripts/notes/fetch.ps1",
@@ -171,11 +208,11 @@
         },
         {
           "path": ".squad/templates/skills/distributed-mesh/sync-mesh.ps1",
-          "reason": "First-party maintenance script template has no line/branch coverage report."
+          "reason": "Offline fake-Git and fake-web-request behavior tests do not measure source execution. Available Pester 3.4.0 CodeCoverage has no branch counts or repository-pinned Cobertura export, and dotnet-coverage measures CLR code rather than PowerShell source; no defensible line/branch denominator is available."
         },
         {
           "path": ".squad/templates/skills/distributed-mesh/sync-mesh.sh",
-          "reason": "First-party maintenance script template has no line/branch coverage report."
+          "reason": "Offline fake-command behavior tests do not measure shell source lines or branches; no compatible offline line/branch collector is available."
         },
         {
           "path": ".squad/templates/workflows/squad-ci.yml",
@@ -242,12 +279,44 @@
       "reason": "Test-only source; its assertions are not product behavior."
     },
     {
+      "path": "scripts/coverage/notes-fetch.test.cjs",
+      "reason": "Offline PowerShell template behavior tests; assertions are not product behavior."
+    },
+    {
       "path": "scripts/coverage/ralph-triage.test.cjs",
       "reason": "Offline test source; its assertions are not product behavior."
     },
     {
+      "path": "scripts/coverage/squad-triage.test.cjs",
+      "reason": "Offline workflow test source; its assertions are not product behavior."
+    },
+    {
+      "path": "scripts/coverage/squad-triage-mapping.test.cjs",
+      "reason": "Offline V8 source attribution control; its assertions are not product behavior."
+    },
+    {
+      "path": "scripts/coverage/sync-mesh.test.mjs",
+      "reason": "Offline shell template behavior tests and command doubles, not product behavior."
+    },
+    {
       "path": "scripts/coverage/ralph-triage-fixture.cjs",
       "reason": "Offline CLI test doubles, not production automation."
+    },
+    {
+      "path": "scripts/coverage/write-note.test.cjs",
+      "reason": "Offline behavior tests and assertions, not a maintenance script."
+    },
+    {
+      "path": "scripts/coverage/write-note-fixture.ps1",
+      "reason": "Offline PowerShell test doubles, not a maintenance script."
+    },
+    {
+      "path": "scripts/coverage/sync-mesh.test.cjs",
+      "reason": "Offline PowerShell template behavior tests and coverage inventory assertions, not a maintenance script."
+    },
+    {
+      "path": "scripts/coverage/sync-mesh-fixture.ps1",
+      "reason": "Offline PowerShell fixture with fake Git and web request functions, not a maintenance script."
     },
     {
       "path": "scripts/mbr/tests/Program.cs",
@@ -302,6 +371,18 @@
       "reason": "Test-only source; its assertions are not product behavior."
     },
     {
+      "path": "www/tests/astro-short-circuit-probe.test.mjs",
+      "reason": "Compiler-aware Astro probe test; its assertions are not product behavior."
+    },
+    {
+      "path": "www/tests/404-layout.browser.mjs",
+      "reason": "Opt-in real-browser regression test requiring independently enforced external egress isolation; its acknowledgment check does not enforce or verify isolation, and real Edge is not automatically offline. Its assertions are not shipped browser code."
+    },
+    {
+      "path": "www/tests/browser-egress-isolation.mjs",
+      "reason": "Test-only guard shared by opt-in real-browser tests and offline tests; it is not shipped website behavior."
+    },
+    {
       "path": "www/tests/homepage-contact.test.mjs",
       "reason": "Test-only source; its assertions are not product behavior."
     },
@@ -312,6 +393,10 @@
     {
       "path": "www/tests/measure-local-performance.test.mjs",
       "reason": "Offline lifecycle and inventory tests; assertions are not product behavior."
+    },
+    {
+      "path": "www/tests/measure-local-performance.browser.mjs",
+      "reason": "Opt-in real-browser coverage prototype requiring independently enforced external egress isolation; its assertions are not shipped website behavior."
     },
     {
       "path": "www/tests/analytics-consent.test.mjs",

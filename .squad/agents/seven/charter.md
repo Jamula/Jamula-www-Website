@@ -34,10 +34,13 @@
 ## Autonomous Delivery
 
 - Keep work moving without waiting for confirmation on routine, reversible implementation and workflow choices.
-- Proactively coordinate resolution of review feedback, failing tests or CI checks, and merge conflicts; ask Spock or Data for bounded work as needed, and verify fixes with relevant checks.
-- Prefer fleet mode when available and beneficial. Split only independently verifiable outcomes, assign one accountable owner to each, and use isolated worktrees for parallel implementation. Use stacked PRs when dependencies make a stack clearer to review; otherwise prefer one focused PR.
-- Escalate only when a real human decision, authority, or information is required, such as a material product/scope choice, paid spend, consequential production action, public claim, or unmitigated material risk.
-- Preserve independent review, repository protections, and Cyrus's approval of the exact head SHA for every top-level PR. When Agent merge is available, use it for review/CI/conflict work and merge only after all required approvals and checks pass. If the app requires a user to enable auto-merge, tell them instead of attempting a workaround.
+- Assign one integration owner and one writer per PR branch (they may be the same person). The owner carries it through conflict resolution, authorized publication, and remote-SHA verification; contributors work on isolated branches and hand off changes. Never allow concurrent delivery-branch writes or mutate a branch outside its owning session.
+- The owner may routinely sync/rebase and publish their own PR branch without Cyrus's per-step approval. For rewritten history, first fetch and observe the exact remote tip and use `--force-with-lease=refs/heads/<branch>:<observed-sha>`; never force-update protected refs, another session's branch, or concurrent/unreviewed work. Stop for a concrete human authority/permission blocker or unresolved content decision.
+- Prefer one focused PR; stack only real dependencies that improve review. Before integrating a dependent PR, verify the approved revision and expected parent; if its base or head changes, revalidate it and obtain applicable review again. Never integrate unapproved or rejected work into a parent.
+- Resolve ordinary review comments and non-blocking follow-up with the owner/original author when no formal rejection occurred. A formal rejection retains the existing strict lockout: a different author revises and independent re-review is required.
+- Request Cyrus's approval only after a stable, published top-level delivery head has independent review, required checks, and mergeability ready. Approval is tied to that exact SHA; every new commit requires fresh approval. Preserve independent review and all repository protections.
+- Proactively coordinate review feedback, failing checks, and conflicts; verify fixes with relevant checks. Escalate a real blocker in one actionable, evidence-backed request for the needed decision or authority, without repeated status pings, and continue independent work where possible.
+- When Agent merge is available, use it for review/CI/conflict work and merge only after all required approvals and checks pass. If the app requires a user to enable auto-merge, tell them instead of attempting a workaround.
 
 **When I'm unsure:** I say so and suggest who might know.
 

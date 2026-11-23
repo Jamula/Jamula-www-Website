@@ -12,9 +12,10 @@ if (args is ["--cleanup-child"])
 }
 
 if (args.Length > 1 || (args.Length == 1 &&
-    args[0] is not ("--collective" or "--coverage" or "--cleanup")))
+    args[0] is not ("--collective" or "--coverage" or "--cleanup" or "--publisher")))
 {
-    Console.Error.WriteLine("Use no arguments for independent checks, --collective, --coverage, or --cleanup.");
+    Console.Error.WriteLine(
+        "Use no arguments for independent checks, --collective, --coverage, --cleanup, or --publisher.");
     return 2;
 }
 var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
@@ -23,7 +24,8 @@ var fixture = new Fixture(root, coverage);
 try
 {
     await fixture.RunAsync(args.Length == 1 && args[0] == "--collective",
-        args.Length == 1 && args[0] == "--cleanup");
+        args.Length == 1 && args[0] == "--cleanup",
+        args.Length == 1 && args[0] == "--publisher");
     return 0;
 }
 catch (Exception error)
@@ -49,8 +51,15 @@ internal sealed class Fixture(string root, bool coverage) : IAsyncDisposable
     private string RoutingFile => Path.Combine(releases, "routes.json");
     public string CurrentCase { get; private set; } = "Setup";
 
-    public async Task RunAsync(bool collective, bool cleanupOnly = false)
+    public async Task RunAsync(bool collective, bool cleanupOnly = false, bool publisherOnly = false)
     {
+        if (publisherOnly)
+        {
+            await RunPublisherChecksAsync();
+            Require(passed == 9);
+            Console.WriteLine($"{passed} publisher checks passed; 0 skipped; 0 failed.");
+            return;
+        }
         await Case("CleanupFailureDetailsAreRetained", async () =>
         {
             var first = new TimeoutException("first cleanup failure");
@@ -355,6 +364,252 @@ internal sealed class Fixture(string root, bool coverage) : IAsyncDisposable
         Require(passed == (collective ? 7 : 24));
         Console.WriteLine($"{passed} local artifact checks passed; 0 skipped; 0 failed.");
     }
+
+    private async Task RunPublisherChecksAsync()
+    {
+        await Case("Publisher_IndependentSectionBuildsOnlyTheSelectedProject", async () =>
+        {
+            foreach (var section in Sections.Append("Gateway"))
+            {
+                var result = await InvokePublisherAsync(new()
+                {
+                    ["Section"] = section,
+                    ["Version"] = "2.3.4",
+                });
+                Require(result.ExitCode == 0);
+                Require(result.Calls.Length == 1);
+                Require(result.Calls[0].SequenceEqual(
+                    PublishArguments(section, "2.3.4", OutputRoot(result))));
+                Require(result.StandardOutput.Trim() == $"RELEASED:{section}/2.3.4");
+                Require(string.IsNullOrWhiteSpace(result.StandardError));
+            }
+        });
+        await Case("Publisher_DefaultsToUniqueReleaseRootsAndVersion", async () =>
+        {
+            var first = await InvokePublisherAsync(new()
+            {
+                ["Section"] = "Finance",
+            }, useDefaultOutputRoot: true);
+            var second = await InvokePublisherAsync(new()
+            {
+                ["Section"] = "Finance",
+            }, useDefaultOutputRoot: true);
+            foreach (var result in new[] { first, second })
+            {
+                Require(result.ExitCode == 0 && result.Calls.Length == 1);
+                Require(result.Calls[0].SequenceEqual(
+                    PublishArguments("Finance", "1.0.0", OutputRoot(result))));
+                var releaseRoot = new DirectoryInfo(OutputRoot(result));
+                Require(Guid.TryParseExact(releaseRoot.Name, "N", out _));
+                Require(releaseRoot.Parent?.FullName ==
+                    Path.Combine(root, "artifacts", "releases"));
+                Require(result.StandardOutput.Trim() == "RELEASED:Finance/1.0.0");
+            }
+            Require(OutputRoot(first) != OutputRoot(second));
+        });
+        await Case("Publisher_AllBuildsTheFourProjectsInOrder", async () =>
+        {
+            var result = await InvokePublisherAsync(new()
+            {
+                ["All"] = true,
+                ["Version"] = "3.4.5",
+            });
+            var sections = new[] { "Admin", "Finance", "Tech", "Gateway" };
+            Require(result.ExitCode == 0);
+            Require(result.Calls.Length == sections.Length);
+            for (var index = 0; index < sections.Length; index++)
+                Require(result.Calls[index].SequenceEqual(
+                    PublishArguments(sections[index], "3.4.5", OutputRoot(result))));
+            Require(result.StandardOutput.Split(
+                Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).SequenceEqual(
+                sections.Select(section => $"RELEASED:{section}/3.4.5")));
+            Require(string.IsNullOrWhiteSpace(result.StandardError));
+        });
+        await Case("Publisher_RejectsReusedDestinationBeforeAnyBuild", async () =>
+        {
+            var outputRoot = Path.Combine(releases, "publisher-output", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Path.Combine(outputRoot, "Tech", "1.2.3"));
+            var result = await InvokePublisherAsync(new()
+            {
+                ["All"] = true,
+                ["Version"] = "1.2.3",
+            }, outputRoot: outputRoot);
+            Require(result.ExitCode != 0 && result.Calls.Length == 0);
+            Require(result.StandardError.Contains(
+                "A local release directory cannot be reused.", StringComparison.Ordinal));
+            Require(string.IsNullOrWhiteSpace(result.StandardOutput));
+        });
+        await Case("Publisher_StopsAfterOfflinePublishFailure", async () =>
+        {
+            var result = await InvokePublisherAsync(new()
+            {
+                ["Section"] = "Finance",
+                ["Version"] = "1.2.3",
+            }, failOnCall: 1);
+            Require(result.ExitCode != 0 && result.Calls.Length == 1);
+            Require(result.Calls[0].SequenceEqual(
+                PublishArguments("Finance", "1.2.3", OutputRoot(result))));
+            Require(result.StandardError.Contains(
+                "Offline publish failed for Finance.", StringComparison.Ordinal));
+            Require(string.IsNullOrWhiteSpace(result.StandardOutput));
+        });
+        await Case("Publisher_AllStopsAfterFirstFailedProject", async () =>
+        {
+            var result = await InvokePublisherAsync(new()
+            {
+                ["All"] = true,
+                ["Version"] = "1.2.3",
+            }, failOnCall: 2);
+            Require(result.ExitCode != 0 && result.Calls.Length == 2);
+            Require(result.Calls[0].SequenceEqual(
+                PublishArguments("Admin", "1.2.3", OutputRoot(result))));
+            Require(result.Calls[1].SequenceEqual(
+                PublishArguments("Finance", "1.2.3", OutputRoot(result))));
+            Require(result.StandardOutput.Trim() == "RELEASED:Admin/1.2.3");
+            Require(result.StandardError.Contains(
+                "Offline publish failed for Finance.", StringComparison.Ordinal));
+        });
+        await Case("Publisher_RejectsInvalidSectionBeforeAnyBuild", async () =>
+        {
+            var result = await InvokePublisherAsync(new()
+            {
+                ["Section"] = "Unknown",
+                ["Version"] = "1.2.3",
+            });
+            Require(result.ExitCode != 0 && result.Calls.Length == 0);
+            Require(result.StandardError.Contains(
+                "Cannot validate argument on parameter 'Section'.", StringComparison.Ordinal));
+        });
+        await Case("Publisher_RejectsInvalidVersionBeforeAnyBuild", async () =>
+        {
+            var result = await InvokePublisherAsync(new()
+            {
+                ["Section"] = "Finance",
+                ["Version"] = "01.2.3",
+            });
+            Require(result.ExitCode != 0 && result.Calls.Length == 0);
+            Require(result.StandardError.Contains(
+                "Cannot validate argument on parameter 'Version'.", StringComparison.Ordinal));
+        });
+        await Case("Publisher_RequiresSectionOrAll", async () =>
+        {
+            var result = await InvokePublisherAsync(new()
+            {
+                ["Version"] = "1.2.3",
+            });
+            Require(result.ExitCode != 0 && result.Calls.Length == 0);
+            Require(result.StandardError.Contains(
+                "Section", StringComparison.Ordinal));
+        });
+    }
+
+    private string[] PublishArguments(string section, string version, string outputRoot) =>
+    [
+        "publish",
+        Path.Combine(root, section, $"{section}.csproj"),
+        "--configuration", "Release",
+        "--output", Path.Combine(outputRoot, section, version),
+        "--nologo",
+        "--disable-build-servers",
+        $"-p:Version={version}",
+        $"-p:RestoreConfigFile={Path.Combine(root, "offline.nuget.config")}",
+        "-p:NuGetAudit=false",
+        "-p:UseAppHost=false",
+    ];
+
+    private async Task<PublisherResult> InvokePublisherAsync(
+        Dictionary<string, object?> parameters, int failOnCall = 0, string? outputRoot = null,
+        bool useDefaultOutputRoot = false)
+    {
+        Directory.CreateDirectory(releases);
+        if (useDefaultOutputRoot)
+            parameters.Remove("OutputRoot");
+        else
+        {
+            outputRoot ??= Path.Combine(releases, "publisher-output", Guid.NewGuid().ToString("N"));
+            parameters["OutputRoot"] = outputRoot;
+        }
+        var wrapper = Path.Combine(releases, "publisher-test-wrapper.ps1");
+        var callLog = Path.Combine(releases, "fake-dotnet-calls.jsonl");
+        if (File.Exists(callLog)) File.Delete(callLog);
+        const string wrapperScript = """
+            $ErrorActionPreference = 'Stop'
+            function dotnet {
+                [System.IO.File]::AppendAllText($env:FAKE_DOTNET_LOG,
+                    ((ConvertTo-Json -InputObject ([string[]]$args) -Compress) + [Environment]::NewLine))
+                $callCount = [System.IO.File]::ReadAllLines($env:FAKE_DOTNET_LOG).Length
+                $global:LASTEXITCODE = if ($callCount -eq [int]$env:FAKE_DOTNET_FAIL_ON_CALL) { 17 } else { 0 }
+            }
+            $parameters = ConvertFrom-Json -InputObject $env:PUBLISHER_ARGUMENTS_JSON -AsHashtable
+            try {
+                & $env:PUBLISHER_SCRIPT @parameters
+                exit 0
+            } catch {
+                [Console]::Error.WriteLine($_.Exception.Message)
+                exit 1
+            }
+            """;
+        await File.WriteAllTextAsync(wrapper, wrapperScript);
+        var info = new ProcessStartInfo("pwsh")
+        {
+            WorkingDirectory = root,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        };
+        info.Environment.Clear();
+        foreach (var name in new[]
+        {
+            "PATH", "PATHEXT", "SystemRoot", "WINDIR", "DOTNET_ROOT", "TEMP", "TMP",
+            "USERPROFILE", "APPDATA", "LOCALAPPDATA", "HOME", "ProgramFiles",
+            "ProgramFiles(x86)", "ProgramData", "ALLUSERSPROFILE",
+        })
+            if (Environment.GetEnvironmentVariable(name) is { } value)
+                info.Environment[name] = value;
+        info.ArgumentList.Add("-NoLogo");
+        info.ArgumentList.Add("-NoProfile");
+        info.ArgumentList.Add("-NonInteractive");
+        info.ArgumentList.Add("-File");
+        info.ArgumentList.Add(wrapper);
+        info.Environment["PUBLISHER_SCRIPT"] = Path.Combine(root, "Publish-Local.ps1");
+        info.Environment["PUBLISHER_ARGUMENTS_JSON"] = JsonSerializer.Serialize(parameters);
+        info.Environment["FAKE_DOTNET_LOG"] = callLog;
+        info.Environment["FAKE_DOTNET_FAIL_ON_CALL"] = failOnCall.ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
+
+        using var process = Process.Start(info) ??
+            throw new InvalidOperationException("Publisher test process failed to start.");
+        var standardOutput = process.StandardOutput.ReadToEndAsync();
+        var standardError = process.StandardError.ReadToEndAsync();
+        try
+        {
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        }
+        catch
+        {
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync();
+            throw;
+        }
+        var calls = File.Exists(callLog)
+            ? File.ReadAllLines(callLog)
+                .Select(line => JsonSerializer.Deserialize<string[]>(line) ?? [])
+                .ToArray()
+            : [];
+        if (outputRoot is null && calls.Length > 0)
+        {
+            var outputIndex = Array.IndexOf(calls[0], "--output");
+            if (outputIndex >= 0 && outputIndex + 1 < calls[0].Length)
+                outputRoot = Path.GetFullPath(Path.Combine(calls[0][outputIndex + 1], "..", ".."));
+        }
+        return new(process.ExitCode, await standardOutput, await standardError, calls, outputRoot);
+    }
+
+    private sealed record PublisherResult(
+        int ExitCode, string StandardOutput, string StandardError, string[][] Calls, string? OutputRoot);
+    private static string OutputRoot(PublisherResult result) =>
+        result.OutputRoot ?? throw new InvalidOperationException("No publisher output root was recorded.");
 
     private Uri Gateway => hosts["Gateway"].Address!;
     private string Artifact(string component, string version) =>
