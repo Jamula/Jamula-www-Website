@@ -360,7 +360,11 @@ harness was inspected before invocation: it binds only IPv4 loopback, denies
 non-local page requests through CDP Fetch interception, uses a failing
 non-local proxy and blocked DNS, and imports no monitor collector. Dependencies
 were restored from the local npm cache with lifecycle scripts disabled.
-No live Jamula host or monitor collection was used.
+The runs did not intentionally target a live Jamula host, and the monitor
+collector was not invoked. CDP instrumentation recorded zero non-local page
+requests in the 30-sample runs. The CDP, proxy and DNS controls do not establish
+independent OS-level egress isolation; no packet capture was performed, so
+actual external network traffic, including traffic to live hosts, is unknown.
 
 With the same five cold contexts per route/device, three-second observation,
 viewports, cache and fresh/off consent conditions described above, desktop
@@ -375,10 +379,11 @@ Reserving the root scrollbar gutter with `scrollbar-gutter: stable` keeps those
 containers anchored without changing consent logic, canonical metadata or
 host policy. In five same-condition post-change desktop samples, CLS was
 `[0, 0.0017893855, 0.0017893855, 0.0017893855, 0]`. All other route/device
-cells were zero before and after; both 30-sample runs recorded zero external
-page requests. The remaining small shift is the analytics privacy link moving
-within its controls when initially hidden buttons become visible; it is not
-the scrollbar-induced page shift and was not changed.
+cells were zero before and after; both 30-sample runs recorded zero non-local
+page requests through CDP instrumentation. Actual external traffic remains
+unknown, as described above. The remaining small shift is the analytics
+privacy link moving within its controls when initially hidden buttons become
+visible; it is not the scrollbar-induced page shift and was not changed.
 
 The focused opt-in regression holds the consent module until after first
 contentful paint, then releases it. Removing only the gutter declaration
@@ -388,8 +393,14 @@ It also checks exposed accessibility landmarks, the error heading, home link,
 named consent region, first-Tab skip link, and empty consent storage/no
 external scripts. This is a semantic smoke check, not a WCAG conformance audit.
 
-Reproduce locally from the repository root with an installed Edge browser
-(`EDGE_PATH` may override its executable):
+The following commands are historical records of the 2026-11-15 investigation,
+not current rerun instructions or authorization. Any separately authorized
+rerun requires independently enforced external egress isolation before
+invocation. Only after that prerequisite is verified, set
+`JAMULA_BROWSER_EGRESS_ISOLATION_ACK=1` before running the browser test; this
+acknowledgement does not enforce or verify isolation. The local measurement
+CLI has no such acknowledgement gate and must also run only with independent
+egress isolation in place. `EDGE_PATH` may override the Edge executable.
 
 ```powershell
 $env:ASTRO_TELEMETRY_DISABLED='1'
