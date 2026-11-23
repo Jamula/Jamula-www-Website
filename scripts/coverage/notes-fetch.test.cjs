@@ -65,7 +65,7 @@ function runFetch({
   redirectDebug = false,
 } = {}) {
   const fixtureRoot = fs.mkdtempSync(
-    path.join(__dirname, ".notes-fetch-"),
+    path.join(os.tmpdir(), "jamula-notes-fetch-"),
   );
   const repoPath = path.join(fixtureRoot, "repo");
   fs.mkdirSync(path.join(repoPath, ".git"), { recursive: true });
