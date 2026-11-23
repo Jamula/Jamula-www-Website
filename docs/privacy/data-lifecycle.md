@@ -207,7 +207,7 @@ records. A later opt-in after stopping requires a clean document reload.
   device collection. Do not rely on `send_page_view: false` to disable
   account-side Enhanced measurement. GA's inherent automatically collected
   session/first-visit/engagement information is not a Jamula conversion and
-  cannot be represented as "only two event names ever reach Google." The
+  cannot be represented as "only two event names ever reach Google."
   The administrator must allow Google's documented 24-hour implementation window
   after any retention-setting change before treating the selected retention as
   effective.
