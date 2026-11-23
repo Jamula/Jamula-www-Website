@@ -62,6 +62,10 @@ internal access, while `Monitor` remains non-public. Run both this command and
 The local Edge-based performance diagnostic at
 `www/scripts/measure-local-performance.mjs` is a runnable first-party source,
 not test support. It remains explicitly unmeasured in `website-browser`:
+the fake CDP replies with canned values and does not execute the embedded
+browser-side JavaScript or its instrumentation branches. c8 host-line counts
+from those tests would not represent coverage of the diagnostic source. Its
+offline lifecycle tests do not measure real Edge behavior.
 the fake CDP replies with canned values and do not execute the embedded
 browser-side JavaScript or its instrumentation branches. c8 host-line counts
 from those tests would not represent coverage of the diagnostic source. The
