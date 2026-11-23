@@ -30,6 +30,12 @@ Refs #
 
 <!-- Confirm main-only CI/CD, worktree/session disposition, and rollback/teardown where applicable. -->
 
+- Integration owner:
+- PR branch writer:
+- Expected integration parent (`main` or, for a dependent PR, parent PR/branch and approved SHA):
+
 ## Approval
 
 <!-- Top-level delivery PRs: record Cyrus approval of the exact head SHA. Any new commit invalidates it. -->
+
+- Cyrus approval: pending / approved at head SHA `<SHA>` / not applicable (not a top-level delivery PR)
