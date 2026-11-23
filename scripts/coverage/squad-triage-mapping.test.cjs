@@ -100,7 +100,7 @@ test("script line mapping excludes YAML metadata and rejects synthetic source mi
   const harness = fs.readFileSync(testPath, "utf8");
   assert.ok(
     harness.includes(
-      "`(async (require, context, core, github) => {\\n${script}\\n})`",
+      `\`(async (require, context, core, github) => {\\n\${script}\\n})\``,
     ),
   );
 });
