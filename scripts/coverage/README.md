@@ -1,9 +1,10 @@
 # First-party coverage inventory and gate
 
 `inventory.json` is the current first-party executable inventory for the
-website's browser code and maintained repository automation/tools. The gate
-matches every inventoried source to exactly one Cobertura report entry, rejects
-missing, duplicate, malformed, or unclassified measurements, and calculates
+website's browser code and maintained repository automation/tools. Each
+measured source is bound to exactly one named Cobertura report; the gate rejects
+missing or invalid bindings, sources reported in a different file, duplicate,
+malformed, or unclassified measurements, and calculates
 line/branch rates from covered and valid counts rather than averaging rounded
 percentages. It fails if any component or the weighted aggregate of measured
 sources is below 90% in either metric. The printed aggregate is measured
@@ -60,9 +61,38 @@ internal access, while `Monitor` remains non-public. Run both this command and
 
 The local Edge-based performance diagnostic at
 `www/scripts/measure-local-performance.mjs` is a runnable first-party source,
-not test support. It is explicitly listed as unmeasured under `website-browser`
-until a line/branch report exists; the inventory completeness test prevents
-reclassifying it as a test-only exclusion.
+not test support. It remains explicitly unmeasured in `website-browser`:
+the fake CDP replies with canned values and do not execute the embedded
+browser-side JavaScript or its instrumentation branches. c8 host-line counts
+from those tests would not represent coverage of the diagnostic source. The
+earlier five-test Edge run had no OS-level egress isolation or packet capture,
+so whether any external requests occurred is unknown; no external navigation
+was intentional.
+
+The opt-in real-browser tests are not offline by proof of Chromium flags.
+An isolated profile, `about:blank`, disabled background networking, proxy,
+host-resolver rules, and page-level interception are not an independently
+enforced egress boundary and do not rule out implicit proxy bypass, literal-IP
+access, or background traffic. Any real-browser run requires independently
+enforced external egress isolation. Before launching Edge or building the 404
+browser fixture, these tests fail closed unless
+`JAMULA_BROWSER_EGRESS_ISOLATION_ACK=1` is set. Set it only after applying that
+independent control; the acknowledgment is a deliberate opt-in, not verification
+or enforcement of isolation. Do not set it when no egress boundary is in place.
+The diagnostic CLI does not enforce this acknowledgment or isolation.
+With isolation independently enforced, run
+`node --test www/tests/measure-local-performance.browser.mjs` to execute the
+exact strings in local Edge through CDP, collect V8 ranges, and validate an
+exact-offset source map. This browser test was not run for this revision.
+
+The prototype is evidence of browser execution, not a gate report:
+`v8-to-istanbul` initializes source lines outside the mapped string range as
+covered. Mapping a browser string to its containing `.mjs` file therefore
+creates false host-line hits, and the host and browser results cannot yet be
+combined into a truthful denominator. Keep this source unmeasured until a
+collector masks host string lines and merges both execution contexts without
+inventing line or branch counts. The existing offline lifecycle tests remain
+separate and do not measure real Edge behavior.
 
 ## Collecting reports
 
@@ -106,6 +136,9 @@ $configReports = "$($reportLine[0])" -replace '^Coverage reports: ', ''
 Copy-Item -LiteralPath (Join-Path $configReports "cobertura-coverage.xml") `
   -Destination "$reports\astro-config\cobertura-coverage.xml" -ErrorAction Stop
 
+node --test www/tests/measure-local-performance.test.mjs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 & .\www\node_modules\.bin\c8.cmd --reporter=cobertura --reports-dir="$reports\automation" `
   --include=".github/scripts/*.cjs" --exclude=".github/scripts/*.test.cjs" `
   node --test .github/scripts/*.test.cjs
@@ -135,6 +168,118 @@ tests stub Git, HTTPS and output writes; no GitHub request or result file is
 created. c8 reports V8 line and branch counts, not independent boolean
 condition coverage. Other Squad templates remain unmeasured.
 
+Run `node --test scripts\coverage\sync-mesh.test.mjs` for offline shell mesh
+behavior tests. The harness pins the audited template content, runs a copy in
+a disposable directory, and intercepts every external command through a
+private PATH. Git, curl and jq are deterministic fakes; only a constrained
+mkdir wrapper invokes the local mkdir executable. Fixtures contain no real
+remote addresses or credentials. The jq fake does not verify actual jq
+semantics, and the harness is not an OS-level network sandbox. No available
+offline collector provides defensible shell line and branch counts, so the
+template stays unmeasured and remains a gate blocker.
+
+The notes-fetch PowerShell template has offline behavior tests:
+`node --test scripts/coverage/notes-fetch.test.cjs`. The harness uses a fake Git
+function and a disposable repository-shaped directory; it does not touch real
+refs/remotes or make network requests. These tests do not collect source
+coverage. Pester 3.4.0's standard `CodeCoverage` output supplies line hits, not
+branch outcomes. PowerShell AST inspection identifies control-flow structure
+but does not show which paths ran. Inserting hit markers or wrapping conditions
+would execute transformed code; no method has been verified here to preserve
+automatic variables, pipeline and scope behavior, exceptions, and the original
+source mapping while accounting for every executable statement and decision
+outcome. Boolean-term counts, AST-node counts, passing behavior tests, and line
+hits are not source coverage or a line-and-branch report. The focused test also
+rejects an inventory mutation that reclassifies this template as measured.
+Keep it explicitly unmeasured until a semantics-preserving collector proves
+complete attribution against the original source.
+The same offline test demonstrates one concrete instrumentation hazard: adding
+`Write-Output` to the `$existing` condition in a temporary copy makes a missing
+refspec truthy, so the script skips the fake Git `config --add` call. The
+uninstrumented source adds it. This rejects that particular probe, not every
+possible instrumentation method; it does not measure source coverage or
+establish a complete denominator. The test only runs with the fake Git fixture.
+These behavior checks do not complete the #109 coverage gate.
+
+The same offline test demonstrates one concrete instrumentation hazard: adding
+`Write-Output` to the `$existing` condition in a temporary copy makes a missing
+refspec truthy, so the script skips the fake Git `config --add` call. The
+uninstrumented source adds it. This rejects that particular probe, not every
+possible instrumentation method; it does not measure source coverage or
+establish a complete denominator. The test only runs with the fake Git fixture.
+
+Two debugger controls run with `node --test scripts/coverage/notes-fetch.test.cjs`.
+On PowerShell 7.7.0, an empty-action breakpoint at the original `$existing`
+condition has one hit for both missing and existing refspecs, despite opposite
+outcomes; for these two scenarios, stdout, stderr, exit status, and fake Git
+calls match the uninstrumented runs. A separate synthetic `-and` fixture places
+a column breakpoint at its right-hand `Test-Path` operand: it hits once whether
+that fake operand runs or is short-circuited. The current template has no
+`-and`/`-or` AST nodes; this fixture tests a limitation, not template coverage.
+These checks do not prove all debugger approaches unsound, but breakpoint hits
+alone cannot establish operand outcomes or a complete denominator, and
+exception paths and every source statement have not been attributed and
+validated. The template remains unmeasured.
+
+On PowerShell 7.7.0, `Set-PSDebug -Trace 1` adds host-visible trace output
+when the original template runs with fake Git; redirecting stream 5 does not
+remove that output. In the tested setup scenario the traced and untraced runs
+have the same exit status, stderr, and fake Git calls, but not the same stdout.
+A separate synthetic `-and` test shows the same traced condition line when its
+right-hand variable is short-circuited and when it is evaluated. This does not
+establish that every tracing or AST-based approach fails, nor does it test all
+error, scope, or side-effect behavior. Tracing is not a source coverage report,
+and notes-fetch remains unmeasured.
+
+The live `.github/workflows/squad-triage.yml` JavaScript block has deterministic
+offline behavioral tests: `node --test scripts/coverage/squad-triage.test.cjs`.
+The tests extract the block directly from the workflow and supply local
+filesystem, GitHub API, and core fakes; they do not call GitHub. The VM filename
+and line offset support diagnostics, not a coverage source map: V8 ranges refer
+to the extracted and wrapped JavaScript, not the original YAML bytes. The
+repository-pinned c8 excludes `.yml` by default; forcing `--extension .yml`
+produces a misleading report attributing execution to YAML metadata and
+misplacing JavaScript branches. Do not use that report as coverage evidence.
+Node's experimental test-coverage report also cannot reliably map this VM
+script back to the original YAML. Neither report measures the Actions event,
+job condition, step execution, or external actions. The gate classifies whole
+source paths, so treating the YAML as measured from the script alone would hide
+those behaviors. It remains an unmeasured blocker; no counts are added to the
+gate. V8 branch ranges are not independent boolean-condition coverage.
+
+`node --test scripts/coverage/squad-triage-mapping.test.cjs` checks a more
+limited mapping experiment. The script's generated lines can be aligned to the
+YAML block without including metadata, and an in-memory exact-source guard
+rejects synthetic candidate strings that differ from the source extracted
+from the unchanged workflow. It does not mutate the workflow text or prove
+that a workflow/source mutation is caught by the mapping or coverage path.
+However, even when the pinned `v8-to-istanbul` converter receives the exact VM
+source, the missing-roster early-return control falsely marks the later
+dispatch condition as covered. Its line report includes blank and comment
+lines, too, so it is not an executable-line denominator. V8's dynamically
+reported ranges also do not independently establish a complete static branch
+denominator. This experiment is diagnostic only: it is not a source-mapped
+coverage report, an Actions integration run, or evidence for the 90% gate.
+
+Run `node --test scripts\coverage\write-note.test.cjs` for offline PowerShell
+note-writer behavior checks. A disposable fixture intercepts Git and sleeps;
+these checks do not produce source-level line or branch coverage, so
+`write-note.ps1` remains unmeasured and the gate remains blocked.
+
+The distributed-mesh PowerShell template has offline behavior checks:
+`node --test scripts/coverage/sync-mesh.test.cjs`. Its disposable PowerShell
+fixture verifies that `git` and `Invoke-WebRequest` resolve to scoped fake
+functions before invoking the tracked source; all paths and generated state
+stay under a temporary directory, and the fixture's `PATH` excludes system
+executables. These checks cover initialization/idempotency and success/failure
+handling for both remote zones, but do not produce source coverage. The
+available Pester 3.4.0 CodeCoverage output has line hits but no branch counts or
+repository-pinned Cobertura export; dotnet-coverage measures CLR code, not
+PowerShell source. AST inspection, behavior assertions, and line hits do not
+establish a complete source line/branch denominator. Keep
+`sync-mesh.ps1` explicitly unmeasured until a semantics-preserving collector
+produces defensible attribution for both metrics.
+
 The Astro collector writes a fresh temporary directory on each run; the copy
 above uses the directory printed by that successful run. Its Cobertura
 `<sources>` root resolves the relative `astro.config.ts` filename to the
@@ -142,15 +287,69 @@ inventoried source. This measures the configuration only, not rendered HTML or
 the seven Astro templates. The collector reports c8/V8 branch counts, which do
 not establish independent coverage of every boolean condition.
 
+An offline Astro 7.4.4 / c8 9.1.0 investigation confirmed that the compiler
+emits inline source maps whose `sources` identify the original `.astro` files.
+That map alone is not sufficient for coverage attribution. With the normal
+`vite.build.sourcemap: false` setting, c8's build report gave the seven
+templates no covered lines or branches. Enabling build sourcemaps in a
+temporary config and using c8's `--exclude-after-remap` option did remap the
+generated V8 data, but reported **1,110/1,110 lines (100%) and 3/3 branches
+(100%)** across the seven templates. Its Cobertura entries mark static HTML and
+CSS source lines as covered. Its only branch entries mapped to the `<BaseLayout>`
+invocations in `404.astro:9`, `index.astro:24`, and `privacy.astro:9`, not to
+the template's conditional expressions. Those mapped numbers therefore are not
+executable-source line/branch coverage and must not enter the inventory or the
+90% gate. The source-map configuration used for the experiment was temporary;
+production source maps remain disabled.
+
+`CoverageGate_KeepsAllAstroTemplatesAsUnmeasuredBlockers` protects the exact
+seven paths and confirms that complete browser and Astro-config reports cannot
+make the website component pass while those templates lack validated
+executable-source measurements. Keep the entries unmeasured until a
+compiler-aware collector can distinguish executable template expressions and
+their branches from emitted markup and styles.
+
+A test-only compiler-AST probe maps one `SiteFooter.astro` `releaseVersion &&
+<span>` expression back to its source location and confirms that an
+instrumented expression preserves its result and render side effects while
+recording both observed short-circuit outcomes. This proves only that one
+expression can be mapped and probed; V8 precise coverage returned the same
+range for the taken and untaken runs. The probe does not measure template source
+lines or establish a complete branch denominator.
+
+The performance diagnostic tests above are correctness checks only, not a
+coverage report. Their fake CDP server returns canned values; it does not
+evaluate the embedded instrumentation or browser-side extraction code. The
+diagnostic therefore remains an unmeasured blocker until its browser logic can
+be measured independently or exercised by a collector that observes its actual
+execution.
+
+The seven unhit V8 branch ranges are: duplicate listen completion (line 14),
+undefined `signalCode` (36), already-exited child at entry (45), exit between
+listener setup and the second check (61), duplicate server-close completion
+(74), path-containment rejection (303–306), and the CLI entry-point path
+(460–465). Uncovered lines are 304–306 and 461–465. These counts include V8's
+line/branch mapping, not independent boolean-condition coverage; the fake CDP
+browser and loopback HTTP tests are not evidence of live Edge or field results.
+
 Collect the .NET application reports from their offline test runners. Test-runner
 source is explicitly excluded in `inventory.json`; application source remains
 in the Cobertura report and is matched by its repository-relative path.
 
-```powershell
-dotnet-coverage collect --output "$reports\monitor.cobertura.xml" --output-format cobertura `
-  dotnet run --project scripts\monitor\JamulaMonitor.csproj --configuration Release -- --self-test
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+> **MONITOR COLLECTION PAUSED:** Do not run the monitor collector or probe live
+> Jamula hosts pending an offline root-cause determination. Earlier DNS and
+> HTTP(S) success messages do not establish that external requests were sent:
+> `Monitor_HttpClientDisposesHandlerExactlyOnce` exercises injected DNS/HTTP
+> fakes. The self-tests now capture fake-run output, and
+> `Monitor_FakeSuccessOutputIsCapturedAndNotPrintedUnlabelled` guards against
+> those success messages reaching the console. This does not establish whether
+> the original collector sent requests. No original network trace is available,
+> so actual network activity remains unknown. The missing
+> `monitor.cobertura.xml` is an explicit coverage-gate blocker. The remaining
+> collectors below do not produce complete per-deployable or aggregate coverage
+> and must not be presented as a complete passing report.
 
+```powershell
 dotnet-coverage collect --output "$reports\mbr-dotnet.cobertura.xml" --output-format cobertura `
   dotnet run --project scripts\mbr\tests\JamulaMbr.Tests.csproj --configuration Release
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -210,6 +409,23 @@ instead of collapsing branch counts. Gateway is expected only in its single
 that module without report merging. This identity rule is specific to these
 declared builds, not a general-purpose Cobertura merge.
 
+Run the publisher's offline behavior checks separately from source coverage:
+
+```powershell
+dotnet run --project scripts\spikes\sidequest-artifacts\Checks\Checks.csproj --configuration Release -- --publisher
+```
+
+The fixture shadows `dotnet` with an in-process PowerShell function that records
+arguments and returns controlled exit codes; it performs no builds or feed
+access. It reports **9 publisher checks passed, 0 skipped, 0 failed** with
+stable names documented in `scripts\spikes\sidequest-artifacts\README.md`.
+These checks do not produce line or branch coverage. The available Pester 3.4
+CodeCoverage feature counts executed PowerShell commands but has no branch
+counts and no repository-pinned Cobertura exporter; `dotnet-coverage` measures
+CLR code, not PowerShell source. The gate therefore retains `Publish-Local.ps1`
+as an explicit unmeasured blocker and does not infer a coverage pass from the
+behavior checks.
+
 The fresh 2026-11-13 local collection ran
 `dotnet-coverage collect --output artifacts\sidequest-coverage\sidequest-artifacts\cobertura-coverage.xml --output-format cobertura dotnet run --project scripts\spikes\sidequest-artifacts\Checks\Checks.csproj --configuration Release -- --coverage`
 and passed **19 checks, 0 skipped, 0 failed**. The report resolved both source
@@ -228,6 +444,15 @@ as 100%. The PowerShell publisher remains unmeasured. Running the gate with
 only this report produced the above spike subtotal and exited **1**, retaining
 the publisher blocker and missing reports for every other component; no
 overall coverage pass is established.
+
+The author reported that a 2026-11-15 local collection used the same collector
+with an isolated report directory and passed **24 checks, 0 skipped, 0 failed**.
+That report was said to resolve both compiled source paths to this checkout and
+measure 93/94 lines (98.94%) and 38/40 branches (95.00%); a gate run with only
+that report was reported to exit **1**, with the publisher and other components
+still blocking. These historical results were not independently reproduced
+during this integration. The reported runtime-source counts exclude
+`Publish-Local.ps1`; they are not publisher coverage or an overall 90% result.
 
 The final command currently exits **1**: missing measurements and
 below-threshold components remain blockers. The printed aggregate is only the
@@ -267,16 +492,18 @@ console-only runner summary as a successful gate.
 ## Current blockers
 
 - The website has seven `.astro` templates with build-time logic that remain
-  unmeasured. The separate configuration and browser reports do not measure
-  those templates; build and generated-site tests are not source coverage.
+  unmeasured. Astro source maps remap static markup and styles to covered lines,
+  and the resulting V8 branch denominator is incomplete; the separate
+  configuration and browser reports do not measure those templates. The
+  one-expression test probe does not provide template source coverage or a
+  complete denominator. Build and generated-site tests are not source coverage.
 - `scripts/monitor/InternalsVisibleTo.cs` has no executable lines for Cobertura
   to measure. The exact-content guard validates only the allowlisted friend
   assembly declaration; it contributes no invented coverage counts. Any other
   content or classification fails closed.
-- The website has seven `.astro` templates with build-time logic and an
-  executable `www/astro.config.ts`. The runtime coverage report measures only
-  `www/public/analytics-consent.js`; separate configuration coverage does not
-  measure the templates.
+- The website also has an executable `www/astro.config.ts`. The runtime
+  coverage report measures only `www/public/analytics-consent.js`; separate
+  configuration coverage does not measure the templates.
 - Workflow YAML contains inline shell/JavaScript and workflow control logic not
   represented by the `.github/scripts/*.cjs` Cobertura report. All tracked
   workflows are named in the inventory.

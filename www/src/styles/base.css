@@ -10,6 +10,7 @@
 
 html {
   font-size: 100%;
+  scrollbar-gutter: stable;
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   background: var(--j-color-bg);
