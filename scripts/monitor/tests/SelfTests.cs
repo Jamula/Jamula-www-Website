@@ -321,7 +321,13 @@ static class SelfTests
     {
         var requests = new List<Uri>();
         bool resolverCalled = false;
-        var successfulRun = await CaptureMonitorRunAsync(() => Monitor.RunAsync(
+        using var unlabelledConsoleOutput = new StringWriter();
+        TextWriter originalConsoleOutput = Console.Out;
+        (int? ExitCode, bool WasCanceled, string Output, string Error) successfulRun;
+        try
+        {
+            Console.SetOut(unlabelledConsoleOutput);
+            successfulRun = await CaptureMonitorRunAsync((output, errorOutput) => Monitor.RunAsync(
                 CancellationToken.None,
                 async (host, addressFamily, _) =>
                 {
@@ -339,27 +345,54 @@ static class SelfTests
                     Uri uri = request.RequestUri!;
                     requests.Add(uri);
                     return DefaultResponse(uri, uri.Host);
-                })));
+                }),
+                output,
+                errorOutput));
+        }
+        finally
+        {
+            Console.SetOut(originalConsoleOutput);
+        }
         assert("Monitor_DnsApprovedAddressRunsOfflineHostChecks",
             successfulRun.ExitCode == 0
             && !successfulRun.WasCanceled
             && resolverCalled
             && Config.ApprovedHosts.All(host => HasAllRequestTypes(requests, host)));
+        assert("Monitor_FakeSuccessOutputIsCapturedAndNotPrintedUnlabelled",
+            successfulRun.Output.Contains(
+                $"DNS OK: {Config.ApexHost} → {Config.ApprovedIp}", StringComparison.Ordinal)
+            && successfulRun.Output.Contains(
+                $"HTTPS OK: https://{Config.ApexHost}/ → HTTP 200", StringComparison.Ordinal)
+            && new[]
+            {
+                "DNS OK:",
+                "HTTPS OK:",
+                "Page content OK:",
+                "Canonical OK:",
+                "HTTP upgrade OK:",
+                "404 experience OK:",
+                "All approved hostname checks passed."
+            }.All(message =>
+                !unlabelledConsoleOutput.ToString().Contains(message, StringComparison.Ordinal)));
 
         ScenarioHttpMessageHandler? ownedHandler = null;
-        int ownedHandlerRun = await Monitor.RunAsync(
+        var ownedHandlerRun = await CaptureMonitorRunAsync((output, errorOutput) => Monitor.RunAsync(
             CancellationToken.None,
             (_, _, _) => Task.FromResult(new[] { IPAddress.Parse(Config.ApprovedIp) }),
             () => ownedHandler = new ScenarioHttpMessageHandler(request =>
             {
                 Uri uri = request.RequestUri!;
                 return DefaultResponse(uri, uri.Host);
-            }));
+            }),
+            output,
+            errorOutput));
         assert("Monitor_HttpClientDisposesHandlerExactlyOnce",
-            ownedHandlerRun == 0 && ownedHandler?.DisposeCount == 1);
+            ownedHandlerRun.ExitCode == 0
+            && !ownedHandlerRun.WasCanceled
+            && ownedHandler?.DisposeCount == 1);
 
         bool socketFailureCreatedHandler = false;
-        int socketFailure = await Monitor.RunAsync(
+        var socketFailure = await CaptureMonitorRunAsync((output, errorOutput) => Monitor.RunAsync(
             CancellationToken.None,
             (_, _, _) => Task.FromException<IPAddress[]>(
                 new SocketException((int)SocketError.HostNotFound)),
@@ -367,48 +400,56 @@ static class SelfTests
             {
                 socketFailureCreatedHandler = true;
                 return CreateUnusedHandler();
-            });
+            },
+            output,
+            errorOutput));
         assert("Monitor_DnsSocketExceptionReturnsFailureBeforeHttp",
-            socketFailure == 1 && !socketFailureCreatedHandler);
+            socketFailure.ExitCode == 1 && !socketFailureCreatedHandler);
 
         bool emptyResponseCreatedHandler = false;
-        int emptyResponse = await Monitor.RunAsync(
+        var emptyResponse = await CaptureMonitorRunAsync((output, errorOutput) => Monitor.RunAsync(
             CancellationToken.None,
             (_, _, _) => Task.FromResult(Array.Empty<IPAddress>()),
             () =>
             {
                 emptyResponseCreatedHandler = true;
                 return CreateUnusedHandler();
-            });
+            },
+            output,
+            errorOutput));
         assert("Monitor_DnsEmptyResponseReturnsFailureBeforeHttp",
-            emptyResponse == 1 && !emptyResponseCreatedHandler);
+            emptyResponse.ExitCode == 1 && !emptyResponseCreatedHandler);
 
         bool ipv6OnlyHandlerCreated = false;
-        int ipv6OnlyResponse = await Monitor.RunAsync(
+        var ipv6OnlyResponse = await CaptureMonitorRunAsync((output, errorOutput) => Monitor.RunAsync(
             CancellationToken.None,
             (_, _, _) => Task.FromResult(new[] { IPAddress.IPv6Loopback }),
             () =>
             {
                 ipv6OnlyHandlerCreated = true;
                 return CreateUnusedHandler();
-            });
+            },
+            output,
+            errorOutput));
         assert("Monitor_DnsIpv6OnlyResponseReturnsFailureBeforeHttp",
-            ipv6OnlyResponse == 1 && !ipv6OnlyHandlerCreated);
+            ipv6OnlyResponse.ExitCode == 1 && !ipv6OnlyHandlerCreated);
 
         bool driftCreatedHandler = false;
-        int drift = await Monitor.RunAsync(
+        var drift = await CaptureMonitorRunAsync((output, errorOutput) => Monitor.RunAsync(
             CancellationToken.None,
             (_, _, _) => Task.FromResult(new[] { IPAddress.Parse("203.0.113.8") }),
             () =>
             {
                 driftCreatedHandler = true;
                 return CreateUnusedHandler();
-            });
+            },
+            output,
+            errorOutput));
         assert("Monitor_DnsDriftReturnsFailureBeforeHttp",
-            drift == 2 && !driftCreatedHandler);
+            drift.ExitCode == 2 && !driftCreatedHandler);
 
         bool multipleAddressHandlerCreated = false;
-        int multipleAddressDrift = await Monitor.RunAsync(
+        var multipleAddressDrift = await CaptureMonitorRunAsync((output, errorOutput) => Monitor.RunAsync(
             CancellationToken.None,
             (_, _, _) => Task.FromResult(new[]
             {
@@ -419,26 +460,30 @@ static class SelfTests
             {
                 multipleAddressHandlerCreated = true;
                 return CreateUnusedHandler();
-            });
+            },
+            output,
+            errorOutput));
         assert("Monitor_DnsMultipleDistinctAddressesAreDrift",
-            multipleAddressDrift == 2 && !multipleAddressHandlerCreated);
+            multipleAddressDrift.ExitCode == 2 && !multipleAddressHandlerCreated);
 
         using var canceledCts = new CancellationTokenSource();
         canceledCts.Cancel();
         bool canceledHandlerCreated = false;
-        var canceledRun = await CaptureMonitorRunAsync(() => Monitor.RunAsync(
+        var canceledRun = await CaptureMonitorRunAsync((output, errorOutput) => Monitor.RunAsync(
                 canceledCts.Token,
                 (_, _, ct) => Task.FromCanceled<IPAddress[]>(ct),
                 () =>
                 {
                     canceledHandlerCreated = true;
                     return CreateUnusedHandler();
-                }));
+                },
+                output,
+                errorOutput));
         assert("Monitor_DnsCancellationPropagatesBeforeHttp",
             canceledRun.WasCanceled && canceledCts.IsCancellationRequested && !canceledHandlerCreated);
 
         bool unexpectedCancellationHandlerCreated = false;
-        var unexpectedCancellationRun = await CaptureMonitorRunAsync(() => Monitor.RunAsync(
+        var unexpectedCancellationRun = await CaptureMonitorRunAsync((output, errorOutput) => Monitor.RunAsync(
                 CancellationToken.None,
                 (_, _, _) => Task.FromException<IPAddress[]>(
                     new OperationCanceledException("unexpected resolver cancellation")),
@@ -446,7 +491,9 @@ static class SelfTests
                 {
                     unexpectedCancellationHandlerCreated = true;
                     return CreateUnusedHandler();
-                }));
+                },
+                output,
+                errorOutput));
         assert("Monitor_UnrequestedDnsCancellationPropagates",
             unexpectedCancellationRun.WasCanceled
             && unexpectedCancellationRun.ExitCode is null
@@ -457,14 +504,16 @@ static class SelfTests
         Exception? observedFailure = null;
         try
         {
-            await Monitor.RunAsync(
+            await CaptureMonitorRunAsync((output, errorOutput) => Monitor.RunAsync(
                 CancellationToken.None,
                 (_, _, _) => Task.FromException<IPAddress[]>(resolverFailure),
                 () =>
                 {
                     unexpectedFailureCreatedHandler = true;
                     return CreateUnusedHandler();
-                });
+                },
+                output,
+                errorOutput));
         }
         catch (InvalidOperationException ex)
         {
@@ -498,7 +547,7 @@ static class SelfTests
             bool handlerObservedCancellation = false;
             bool completedWithinBudget = false;
             ScenarioHttpMessageHandler? handler = null;
-            var run = CaptureMonitorRunAsync(() => Monitor.RunAsync(
+            var run = CaptureMonitorRunAsync((output, errorOutput) => Monitor.RunAsync(
                 cts.Token,
                 (_, _, _) => Task.FromResult(new[] { IPAddress.Parse(Config.ApprovedIp) }),
                 () => handler = new ScenarioHttpMessageHandler(async (request, token) =>
@@ -516,9 +565,11 @@ static class SelfTests
                         return await pendingResponse.Task;
                     }
                     return DefaultResponse(uri, uri.Host);
-                })));
+                }),
+                output,
+                errorOutput));
 
-            (int? ExitCode, bool WasCanceled) result = default;
+            (int? ExitCode, bool WasCanceled, string Output, string Error) result = default;
             try
             {
                 await requestStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -547,16 +598,18 @@ static class SelfTests
         }
     }
 
-    private static async Task<(int? ExitCode, bool WasCanceled)> CaptureMonitorRunAsync(
-        Func<Task<int>> runAsync)
+    private static async Task<(int? ExitCode, bool WasCanceled, string Output, string Error)> CaptureMonitorRunAsync(
+        Func<TextWriter, TextWriter, Task<int>> runAsync)
     {
+        using var output = new StringWriter();
+        using var errorOutput = new StringWriter();
         try
         {
-            return (await runAsync(), false);
+            return (await runAsync(output, errorOutput), false, output.ToString(), errorOutput.ToString());
         }
         catch (OperationCanceledException)
         {
-            return (null, true);
+            return (null, true, output.ToString(), errorOutput.ToString());
         }
     }
 

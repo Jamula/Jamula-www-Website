@@ -97,9 +97,11 @@ changes, issue creation, or decision approval.
 
 ## Initial dry run
 
-The inherited draft reports an MBR collector run for `2026-11` on 2026-11-08
-UTC. It says the snapshot covered `[2026-11-01T00:00:00Z,
-2026-12-01T00:00:00Z)` and was observed at `2026-11-08T22:48:46Z`:
+The prior runbook draft recorded a reported MBR collector run for `2026-11` on
+2026-11-08. It gave the snapshot window as
+`[2026-11-01T00:00:00Z, 2026-12-01T00:00:00Z)` and the observation time as
+`2026-11-08T22:48:46Z`. The draft's source notes are retained here as a
+historical report, not as independently verified measurements:
 
 These details are reported in the inherited runbook draft and were not
 independently verified for this revision: the local snapshot was not inspected
@@ -107,18 +109,35 @@ and the source requests were not rerun. Treat the date, window, observation time
 and source-health statements below as unverified reports, not accepted
 measurements or proof that the review process completed.
 
-| Evidence | Dry-run result |
+| Evidence | Prior draft's reported result |
 | --- | --- |
-| GitHub pull-request and issue sources | The draft reports complete-page source health. This has not been independently verified. These sources can show delivery activity and current backlog, not feature outcomes. |
-| Repository-filtered Actions billing | The draft reports the source available for this repository and month. This has not been independently verified; no monetary or minute value is asserted here. |
-| Website experience and accessibility | No route/device Core Web Vitals or accessibility assessment is evidenced in the reported snapshot. Both are unknown, not zero or conformant. |
-| Tests, AI, security, and controls | No coverage/test-execution evidence, AI quality/safety/tool outcomes, explicit authorization-denial signals, quota/stop-control test, or privacy/retention evidence is shown by the reported snapshot. These remain unknown. |
-| Feature outcomes and Python tooling debt | No adoption/outcome evidence or independently verified #110 retirement progress is provided by the reported snapshot. Delivery activity alone does not establish either. |
-| Releases and prior review actions | Release/deployment incidents and prior action follow-through were not evaluated in the reported dry run; Seven checks the GitHub issue ledger when facilitating the monthly review. |
+| GitHub pull-request and issue sources | Reported complete-page source health; not independently verified here. These sources show delivery activity and current backlog, not feature outcomes. |
+| Repository-filtered Actions billing | Reported available for this repository and month; not independently verified here. No monetary or minute value is asserted. |
+| Website experience and accessibility | No route/device Core Web Vitals or accessibility assessment was evidenced in the reported snapshot; unknown, not zero or conformant. |
+| Tests, AI, security, and controls | No coverage/test-execution evidence, AI quality/safety/tool outcomes, explicit authorization-denial signals, quota/stop-control test, or privacy/retention evidence was shown; unknown. |
+| Feature outcomes and Python tooling debt | No adoption/outcome evidence or independently verified #110 retirement progress was provided; delivery activity alone does not establish either. |
+| Releases and prior review actions | Release/deployment incidents and prior action follow-through were not evaluated in the reported dry run. |
 
-The draft labels this a source-availability dry run, not a completed operations
-review or baseline; the dry-run execution and source evidence remain
-unverified. The local snapshot, if present, stays in the MBR's ignored `.local`
-storage; do not commit or publish it. If a later run cannot produce an exact
-comparable window or an authorized source, retain the gap as unknown rather
-than filling it with an estimate.
+This worktree check was observed at `2026-11-15T22:42:06Z`. In this fresh
+isolated worktree, the repository-local `scripts/mbr/.local` directory and
+`snapshot-2026-11.json` were absent. This establishes only that no snapshot was
+present at that path in this worktree at the time of this check; it does not
+establish whether a snapshot existed in the original environment or invalidate
+the prior reported observations. The MBR collector and source requests were
+not run. No source-health result, measurement window, sample size, or
+comparable-period evidence was independently verified in this worktree check;
+all metrics remain unknown for this check, not zero, pass, baseline, or a
+completed operations review.
+
+The GitHub issue ledger was checked at the observation time: [#115](https://github.com/Jamula/Jamula-www-Website/issues/115)
+remains open. Its required [#109](https://github.com/Jamula/Jamula-www-Website/issues/109)
+coverage/performance baseline and [#111](https://github.com/Jamula/Jamula-www-Website/issues/111)
+route/release contract are also open; [#108](https://github.com/Jamula/Jamula-www-Website/issues/108),
+which blocks #111, remains open. The issue records do not establish complete
+coverage or production telemetry. Do not treat delivery activity as measured
+feature outcomes.
+
+No private account data was refreshed or copied. Keep unverified evidence
+unknown until an authorized run produces exact window and source references;
+keep any resulting local snapshot in the MBR's ignored `.local` storage and do
+not commit or publish it.

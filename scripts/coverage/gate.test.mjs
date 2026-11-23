@@ -536,6 +536,57 @@ test("CoverageGate_AttributesRelativeAstroConfigUsingCoberturaSourceRoot", async
   assert.ok(wrongRoot.errors.some((error) => error.includes("unclassified report source: astro.config.ts")));
 });
 
+test("CoverageGate_KeepsAllAstroTemplatesAsUnmeasuredBlockers", async () => {
+  const manifest = JSON.parse(
+    await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
+  );
+  const website = manifest.components.find(
+    (item) => item.id === "website-browser",
+  );
+  const expectedTemplates = [
+    "www/src/components/AnalyticsConsent.astro",
+    "www/src/components/SiteFooter.astro",
+    "www/src/components/SiteHeader.astro",
+    "www/src/layouts/BaseLayout.astro",
+    "www/src/pages/404.astro",
+    "www/src/pages/index.astro",
+    "www/src/pages/privacy.astro",
+  ];
+  assert.deepEqual(
+    website.unmeasured
+      .filter((source) => source.path.endsWith(".astro"))
+      .map((source) => source.path)
+      .sort(),
+    [...expectedTemplates].sort(),
+  );
+  assert.ok(
+    expectedTemplates.every((source) => !website.sources.includes(source)),
+  );
+
+  const result = evaluateCoverage(
+    inventory([website]),
+    new Map([
+      [
+        "website/cobertura-coverage.xml",
+        classReport("www/public/analytics-consent.js", [1], [[1, 1]]),
+      ],
+      [
+        "astro-config/cobertura-coverage.xml",
+        classReport("www/astro.config.ts", [1], [[1, 1]]),
+      ],
+    ]),
+  );
+  assert.equal(result.passed, false);
+  for (const source of expectedTemplates) {
+    assert.ok(
+      result.errors.some((error) =>
+        error.includes(`unmeasured source: ${source}`),
+      ),
+      source,
+    );
+  }
+});
+
 test("CoverageGate_FailsClosedWhenAstroConfigReportIsMissing", async () => {
   const manifest = JSON.parse(await readFile(new URL("./inventory.json", import.meta.url), "utf8"));
   const website = manifest.components.find((item) => item.id === "website-browser");
@@ -667,6 +718,45 @@ test("CoverageGate_RejectsSwappedSourceReports", () => {
     ),
   );
   assert.deepEqual(swapped.components[0].sources, []);
+});
+
+test("CoverageGate_RejectsInvalidAndMissingSourceReportBindings", () => {
+  const source = "src/app.js";
+  const report = "app.xml";
+  const reportContent = classReport(source, [1], [[1, 1]]);
+  const missing = evaluateCoverage(
+    inventory([component("missing", [source], [report], [], {})]),
+    new Map([[report, reportContent]]),
+    "/checkout/repo",
+  );
+  assert.equal(missing.passed, false);
+  assert.ok(
+    missing.errors.some((error) =>
+      error.includes(`missing source-to-report binding: ${source}`),
+    ),
+  );
+
+  const invalid = evaluateCoverage(
+    inventory([
+      component("invalid", [source], [report], [], {
+        [source]: "undeclared.xml",
+        "src/untracked.js": report,
+      }),
+    ]),
+    new Map([[report, reportContent]]),
+    "/checkout/repo",
+  );
+  assert.equal(invalid.passed, false);
+  assert.ok(
+    invalid.errors.some((error) =>
+      error.includes(`invalid source-to-report binding: ${source}`),
+    ),
+  );
+  assert.ok(
+    invalid.errors.some((error) =>
+      error.includes("invalid source-to-report binding: src/untracked.js"),
+    ),
+  );
 });
 
 test("CoverageGate_KeepsTestOnlyExclusionsExplicitAndUnmeasuredCodeBlocking", () => {
@@ -802,6 +892,8 @@ test("CoverageGate_LeavesFakeCdpPerformanceDiagnosticUnmeasured", async () => {
   assert.ok(diagnostic);
   assert.match(diagnostic.reason, /fake CDP tests/);
   assert.match(diagnostic.reason, /browser-side logic/);
+  assert.match(diagnostic.reason, /v8-to-istanbul initializes lines outside/);
+  assert.match(diagnostic.reason, /no defensible denominator/);
   assert.ok(!manifest.excludedSources.some((item) => item.path === sourcePath));
   const reports = new Map([
     [
@@ -1042,6 +1134,8 @@ test("CoverageGate_MeasuresLinkedHostsAndKeepsPublisherBlocking", async () => {
       source.reason,
       /no compatible line\/branch coverage report exists/i,
     );
+    assert.match(source.reason, /Pester 3\.4.*no branch counts/i);
+    assert.match(source.reason, /behavior checks are not source coverage/i);
     assert.match(source.reason, /blocker/i);
     assert.match(source.reason, /not classified as test-only/i);
   }

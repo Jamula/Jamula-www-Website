@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
+    "@astrojs/compiler-rs": "0.5.2",
     "@typescript/native": "npm:typescript@^7.0.2",
     "c8": "9.1.0",
     "parse5": "^8.1.0",

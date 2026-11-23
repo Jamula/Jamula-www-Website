@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { resolve, sep } from "node:path";
+import { isAbsolute, relative as relativePath, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const DEFAULT_BROWSER_EXIT_TIMEOUT_MS = 5000;
@@ -287,6 +287,7 @@ export async function runMeasurement({
   delay = (milliseconds) => new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds)),
   log = console.log,
 } = {}) {
+  const resolvedRoot = resolve(root);
   const resources = {};
   return runMeasurementLifecycle(async () => {
     const profile = await createProfile();
@@ -299,8 +300,13 @@ export async function runMeasurement({
           : pathname.endsWith("/")
             ? `${pathname}index.html`
             : pathname;
-      const file = resolve(root, `.${sep}${relative.replace(/^\/+/, "")}`);
-      if (!file.startsWith(`${root}${sep}`)) {
+      const file = resolve(resolvedRoot, `.${sep}${relative.replace(/^\/+/, "")}`);
+      const fileRelativePath = relativePath(resolvedRoot, file);
+      if (
+        fileRelativePath === ".." ||
+        fileRelativePath.startsWith(`..${sep}`) ||
+        isAbsolute(fileRelativePath)
+      ) {
         res.writeHead(403).end();
         return;
       }
