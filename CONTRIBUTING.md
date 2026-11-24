@@ -4,6 +4,7 @@
 
 - Start with a GitHub issue that defines scope, owner, acceptance criteria, dependencies, and required reviews.
 - Use an isolated pull-request branch or worktree based on protected `main`.
+- Assign one integration owner and one writer to each PR branch (they may be the same person). Contributors work in isolation and hand off changes; only the owning session writes the delivery branch.
 - `main` is the only persistent production source. Pull-request previews are
   isolated and are never promoted to production.
 
@@ -75,6 +76,9 @@ Third-party and reserved-content paths in `LICENSE_SCOPE.md` require maintainer 
 
 - Link the issue and summarize why the change is needed.
 - Keep one author per artifact; use named reviewers for cross-domain concerns.
+- Prefer one focused PR; use a stack only for real dependencies that make review clearer. Before integrating a dependent PR, verify the approved revision and expected parent; if its base or head changes, revalidate the child and obtain applicable review again. Do not integrate unapproved or rejected work into a parent.
+- The integration owner may routinely sync/rebase and publish their own PR branch. Before rewriting history, fetch and observe the exact remote tip and use `--force-with-lease=refs/heads/<branch>:<observed-sha>`; never overwrite concurrent/unreviewed work or force-update protected refs or another session's branch. Stop for concrete missing authority/permission or an unresolved content decision.
+- Ordinary review comments and non-blocking follow-up are not formal rejections; the owner/original author handles their fixes. A formal rejection retains the existing strict lockout: a different author revises and independent re-review is required.
 - For documentation/governance changes, run `dotnet run --project scripts/validation/JamulaValidation.csproj --configuration Release -- validate-governance .`,
   `node --test .github/scripts/swa-preview.test.cjs`, and
   `dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release`.
@@ -84,4 +88,5 @@ Third-party and reserved-content paths in `LICENSE_SCOPE.md` require maintainer 
 - For changes under `www/`, run `npm ci`, `npm run check`, and `npm run build`
   from `www/`; CI also checks formatting on changed website files.
 - Pass the required review and workflow checks for the files changed.
-- Top-level delivery PRs require Cyrus's approval of the exact head SHA before merge automation is enabled.
+- Request Cyrus's approval only when a stable, published top-level delivery head has independent review, required checks, and mergeability ready. Approval is for the exact head SHA; every new commit invalidates it and requires fresh approval. Keep all required protections intact.
+- Escalate a blocker with one actionable, evidence-backed request for the needed decision or authority, not repeated status pings; continue independent work where possible.

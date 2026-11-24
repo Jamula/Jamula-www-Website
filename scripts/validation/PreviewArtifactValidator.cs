@@ -57,9 +57,10 @@ public static class PreviewArtifactValidator
         {
             var name = entry.FullName;
             var isDirectory = name.EndsWith("/", StringComparison.Ordinal);
-            ValidateEntryPath(name, isDirectory, ref totalPathSegments);
+            ValidateEntryPath(name, isDirectory);
             var relativePath = isDirectory ? name[..^1] : name;
             var collisionKey = CaseFold(relativePath);
+            ValidatePathSegmentBudget(collisionKey, ref totalPathSegments);
             if (!seen.Add(collisionKey))
             {
                 throw new InvalidDataException($"Unsafe or duplicated artifact path: '{name}'");
@@ -172,7 +173,7 @@ public static class PreviewArtifactValidator
         }
     }
 
-    private static void ValidateEntryPath(string name, bool isDirectory, ref int totalPathSegments)
+    private static void ValidateEntryPath(string name, bool isDirectory)
     {
         if (string.IsNullOrEmpty(name) || name.Contains('\\') || name.Contains(':') ||
             name.Any(character => character < 32) || name.StartsWith("/", StringComparison.Ordinal) ||
@@ -195,11 +196,6 @@ public static class PreviewArtifactValidator
                 continue;
             }
 
-            if (++totalPathSegments > MaxPathSegments)
-            {
-                throw new InvalidDataException("The preview artifact exceeds the path segment limit.");
-            }
-
             var segmentLength = index - segmentStart;
             if ((segmentLength == 1 && path[segmentStart] == '.') ||
                 (segmentLength == 2 && path[segmentStart] == '.' && path[segmentStart + 1] == '.'))
@@ -208,6 +204,22 @@ public static class PreviewArtifactValidator
             }
 
             segmentStart = index + 1;
+        }
+    }
+
+    private static void ValidatePathSegmentBudget(string path, ref int totalPathSegments)
+    {
+        for (var index = 0; index <= path.Length; index++)
+        {
+            if (index != path.Length && path[index] != '/')
+            {
+                continue;
+            }
+
+            if (++totalPathSegments > MaxPathSegments)
+            {
+                throw new InvalidDataException("The preview artifact exceeds the path segment limit.");
+            }
         }
     }
 

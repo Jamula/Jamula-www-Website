@@ -3,7 +3,7 @@
 **Decision context:** Refs #3; child #6
 **Owner:** Identity/data engineer
 **Status:** design requirement, not executed evidence or legal advice
-**Updated:** 2026-08-25 Cycle 3; legal applicability remains professionally unresolved
+**Updated:** 2026-11-15; jurisdiction-specific legal applicability remains professionally unresolved
 
 This lifecycle implements the inventory in `data-inventory.md`. It is Jamula's applicable internal global control baseline, not a legal-applicability conclusion. GDPR and UK GDPR/PECR applicability and related representative/DPO, ROPA/DPIA, breach and transfer duties remain `needs counsel` under `docs/legal/jurisdiction-matrix.md`. Jurisdiction-specific bases, notices, clocks, exceptions, appeal rights, transfer mechanisms and professional conclusions remain launch gates.
 
@@ -130,14 +130,15 @@ Only an approved legal owner can open a scoped hold with matter ID, data/subject
 - Approved customer wording states that active access is denied when deletion is accepted, ordinary encrypted personal/customer backup copies expire within 35 days, restore cannot return tombstoned data to service, and narrowly retained authoritative/legal-hold records may remain on an approved basis.
 - Telemetry forbids token/secret, raw file, prompt/response, full contact details, payment credential, sensitive query-string and cross-tenant data. Use allowlisted structured fields and automated redaction tests.
 
-## Future implementation tests
-
-### Public website analytics implementation and activation gate
+## Public website analytics implementation and activation gate
 
 **Owner:** Cyrus/property administrator; implementation owner Spock.
-**Implementation date:** 2026-11-02 UTC. Code is not evidence of deployment or
-account configuration. User authorized this limited analytics purpose; no
-production deployment or merge is authorized by this change.
+**Implementation date:** 2026-11-02 UTC. PR #99 was merged to `main` on
+2026-11-07 at merge commit
+`686133b9cfa3b408e78bffe66ea7461772dfa764`. A merge is not evidence of
+production deployment, account configuration or analytics activation. The latest
+issue record before that merge did not record Cyrus's exact-head approval; no
+later approval evidence is included here, so do not infer it from the merge.
 
 The shared Astro artifact resolves the runtime HTTPS hostname, not the canonical
 metadata: `jamula.com` and `www.jamula.com` use `G-90MTZQ2EXX`;
@@ -177,41 +178,52 @@ made to persist withdrawal by this static-site controller.
 Withdrawal cannot cancel already dispatched requests or delete Google's historical
 records. A later opt-in after stopping requires a clean document reload.
 
-**Required human steps before production activation — all unverified here:**
+**Approval and account evidence (reconciled 2026-11-15 UTC):**
 
-- Obtain Cyrus's approval of the **exact** public notice and consent-control
-  wording in `www/src/pages/privacy.astro` and
-  `www/src/components/AnalyticsConsent.astro`. These are draft implementation
-  wording, not evidence that public-policy copy has been approved.
-- Confirm the two measurement IDs and their properties, corresponding apex/www
-  host coverage and authorized administrator. Do not combine properties or add
-  connected tag destinations, Google Ads links or cross-domain configuration.
-- In **each** web stream, disable **Enhanced measurement entirely**, including
-  history-based pageviews, scrolls, outbound clicks, site search, forms, downloads
-  and video. Do not rely on `send_page_view: false` to disable these account-side
-  events. Disable tag event creation/modifications or other remote settings that
-  add events/destinations or copy sensitive values. GA's inherent automatically
-  collected session/first-visit/engagement information is not a Jamula conversion
-  and cannot be represented as "only two event names ever reach Google."
-- Disable **Google Signals**, user-provided data collection, advertising
-  personalization, unnecessary granular location/device collection and optional
-  account data sharing. Review existing product links, audiences and tag
-  destinations; remove advertising/cross-context uses. Code additionally sets
-  `allow_google_signals` and `allow_ad_personalization_signals` false and all three
-  advertising consent categories denied, but does not prove account state.
-- Set **Data collection and modification → Data retention** to **2 months** for
-  user/event data (shortest currently documented option) and **Reset user data on
-  new activity → Off** for both properties. Capture dated evidence of saved
-  settings; allow Google's documented 24-hour change window. Standard aggregate
-  reports are outside that retention setting; define an administrator-owned
-  periodic review/deletion/export policy rather than promising a two-month cap
-  on every Google-held record.
-- Review Google DPA/terms, controller/processor role, actual processing and
-  transfer/subprocessor facts, served jurisdictions and notice with the
-  appropriate professional owner. Neither code nor this notice settles legal
-  applicability, residency, lawful basis or vendor contractual acceptance.
-- Use an authorized clean browser on **all four HTTPS origins** after the eventual
-  protected-main deployment. Inspect Network/storage before any choice, after
+- Cyrus's exact-copy approval is recorded for the consent banner and privacy
+  notice (approval document SHA256
+  `b1e9e82de580f77d3ec5bf83ad8ba5364cf67518254fa5c4519a8c598702e826`).
+  The storage/retention clarification and the runtime withdrawal warning were
+  also approved as exact wording. These are copy-only approvals, not a legal
+  adequacy conclusion or account, merge, deployment or activation authorization.
+- Cyrus supplied separate IDs for `.com` (`G-90MTZQ2EXX`) and `.net`
+  (`G-7JW27J2XSW`) and owner-confirmed on 2026-11-03 UTC that the following
+  four settings apply to both properties: Enhanced measurement off; Signals and
+  advertising features off; user/event retention set to two months; and reset on
+  new activity off. This is owner confirmation, not independently authenticated
+  administrator evidence or proof of saved settings.
+- Cyrus stated on 2026-11-07 UTC that the actively served/targeted market is USA
+  only. This is owner-provided scope, not evidence of visitor locations,
+  geographic access restrictions or legal applicability. Cyrus's designation
+  as vendor-acceptance authority and privacy/legal reviewer records ownership
+  only; it does not establish completed review, terms acceptance or compliance.
+
+**Still required before production activation:**
+
+- An authorized property administrator must capture dated saved-setting
+  evidence for the four owner-confirmed settings and verify remaining account
+  restrictions: remote event creation/modifications and destinations,
+  user-provided data, product links/audiences, optional data sharing/location/
+  device collection. Do not rely on `send_page_view: false` to disable
+  account-side Enhanced measurement. GA's inherent automatically collected
+  session/first-visit/engagement information is not a Jamula conversion and
+  cannot be represented as "only two event names ever reach Google."
+  The administrator must allow Google's documented 24-hour implementation window
+  after any retention-setting change before treating the selected retention as
+  effective.
+  The administrator must also document aggregate-report review, export and
+  deletion; standard aggregate reports are outside the user/event retention
+  setting.
+- The designated vendor/privacy owners must record the Google contracting
+  entity, service and role, terms/DPA version and actual acceptance status,
+  actual processing regions, subprocessors and onward transfers, and applicable
+  contractual transfer disposition. Record the USA-only market statement's
+  applicability, notice, rights and minors disposition; escalate legal
+  conclusions requiring qualified advice. Mark each item accepted, not
+  applicable with rationale, or blocked. Do not make a blanket compliance
+  claim.
+- After a separately authorized deployment, use an authorized clean browser on
+  **all four HTTPS origins**. Inspect Network/storage before any choice, after
   Reject, on saved rejection, after Accept and after withdrawal/reload. Require
   no Google requests before choice/reject; the correct sole ID after acceptance;
   no destination email/query/referrer/fragment in collected parameters; no new
@@ -228,7 +240,8 @@ then from the repository root run
 `node www/scripts/test_built_site.mjs`. Tests intercept script insertion and
 commands; they do not contact Google, assert its implementation, or configure an
 account. Keep independent review and Cyrus's exact-head approval before any
-future merge; deployment availability is a separate gate.
+future merge; deployment and analytics activation remain separate authorization
+and verification gates.
 
 **Official-source verification, 2026-11-02 UTC:** Google Analytics/Google tag
 documentation below verifies configuration semantics, not Jamula account settings

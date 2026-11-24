@@ -62,6 +62,10 @@ internal access, while `Monitor` remains non-public. Run both this command and
 The local Edge-based performance diagnostic at
 `www/scripts/measure-local-performance.mjs` is a runnable first-party source,
 not test support. It remains explicitly unmeasured in `website-browser`:
+the fake CDP replies with canned values and does not execute the embedded
+browser-side JavaScript or its instrumentation branches. c8 host-line counts
+from those tests would not represent coverage of the diagnostic source. Its
+offline lifecycle tests do not measure real Edge behavior.
 the fake CDP replies with canned values and do not execute the embedded
 browser-side JavaScript or its instrumentation branches. c8 host-line counts
 from those tests would not represent coverage of the diagnostic source. The
@@ -160,6 +164,22 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   node --test scripts/coverage/ralph-triage.test.cjs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 ```
+
+Run the focused offline behavior tests for the notes-fetch PowerShell template
+with `node --test scripts/coverage/notes-fetch.test.cjs`. The test harness
+shadows Git with a fixture-only function and uses a disposable repo-shaped
+directory; it does not collect source coverage. Pester 3.4.0's standard
+`CodeCoverage` output supplies line hits, not branch outcomes. PowerShell AST
+inspection identifies control-flow structure but does not show which paths ran.
+Inserting hit markers or wrapping conditions would execute transformed code;
+no method has been verified here to preserve automatic variables, pipeline and
+scope behavior, exceptions, and the original source mapping while accounting for
+every executable statement and decision outcome. Boolean-term counts, AST-node
+counts, passing behavior tests, and line hits are not source coverage or a
+line-and-branch report. The focused test also
+rejects an inventory mutation that reclassifies this template as measured.
+Keep it explicitly unmeasured until a semantics-preserving collector proves
+complete attribution against the original source.
 
 The Ralph collector explicitly includes the hidden source and clears c8's
 default exclusions. Run from the repository root: Cobertura records that

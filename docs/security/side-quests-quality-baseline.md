@@ -351,6 +351,74 @@ harness, the 404 shift and its fix before any performance conclusion or merge;
 repeat on representative throttled hardware/network conditions and actual
 hosting when separately authorized.
 
+### Desktop 404 scrollbar investigation — 2026-11-15
+
+The observation above was reproduced from source
+`ebead8956fe728566944817c0ebedc49574e3c4a` with Node 26.12.1 and Edge
+158.0.4370.21 on the same local Windows desktop. The existing measurement
+harness was inspected before invocation: it binds only IPv4 loopback, denies
+non-local page requests through CDP Fetch interception, uses a failing
+non-local proxy and blocked DNS, and imports no monitor collector. Dependencies
+were restored from the local npm cache with lifecycle scripts disabled.
+The runs did not intentionally target a live Jamula host, and the monitor
+collector was not invoked. CDP instrumentation recorded zero non-local page
+requests in the 30-sample runs. The CDP, proxy and DNS controls do not establish
+independent OS-level egress isolation; no packet capture was performed, so
+actual external network traffic, including traffic to live hosts, is unknown.
+
+With the same five cold contexts per route/device, three-second observation,
+viewports, cache and fresh/off consent conditions described above, desktop
+`/404.html` CLS was `[0, 0.1937304482, 0.1937304482, 0, 0.1937304482]`.
+Frame and mutation traces established the cause: revealing the consent panel
+made the short page overflow vertically. A classic 15px scrollbar reduced
+the root content width from 1365px to 1350px; the centered header, error
+content, footer and analytics container moved from x=90.5px to x=83px.
+This is not evidence that consent or analytics should be disabled.
+
+Reserving the root scrollbar gutter with `scrollbar-gutter: stable` keeps those
+containers anchored without changing consent logic, canonical metadata or
+host policy. In five same-condition post-change desktop samples, CLS was
+`[0, 0.0017893855, 0.0017893855, 0.0017893855, 0]`. All other route/device
+cells were zero before and after; both 30-sample runs recorded zero non-local
+page requests through CDP instrumentation. Actual external traffic remains
+unknown, as described above. The remaining small shift is the analytics
+privacy link moving within its controls when initially hidden buttons become
+visible; it is not the scrollbar-induced page shift and was not changed.
+
+The focused opt-in regression holds the consent module until after first
+contentful paint, then releases it. Removing only the gutter declaration
+reproduced CLS 0.1937304482 and failed the unchanged-landmark assertion;
+restoring it held desktop x=83px and mobile x=0px before and after reveal.
+It also checks exposed accessibility landmarks, the error heading, home link,
+named consent region, first-Tab skip link, and empty consent storage/no
+external scripts. This is a semantic smoke check, not a WCAG conformance audit.
+
+The following commands are historical records of the 2026-11-15 investigation,
+not current rerun instructions or authorization. Any separately authorized
+rerun requires independently enforced external egress isolation before
+invocation. Only after that prerequisite is verified, set
+`JAMULA_BROWSER_EGRESS_ISOLATION_ACK=1` before running the browser test; this
+acknowledgement does not enforce or verify isolation. The local measurement
+CLI has no such acknowledgement gate and must also run only with independent
+egress isolation in place. `EDGE_PATH` may override the Edge executable.
+
+```powershell
+$env:ASTRO_TELEMETRY_DISABLED='1'
+npm --prefix www run build
+node --test www\tests\404-layout.browser.mjs
+Push-Location www
+node scripts\measure-local-performance.mjs
+Pop-Location
+```
+
+The focused test requires a fresh build and checks local delayed-initialization
+CLS <=0.1 plus exact landmark positions; it does not claim field p75 or budget
+compliance. It is intentionally separate from portable `*.test.mjs` unit tests.
+Browsers without `scrollbar-gutter` support retain existing behavior; classic
+versus overlay scrollbars and other browser engines still need representative
+review. The HTTP-200 `/404.html`, desktop-CPU/mobile-emulation, no-throttling,
+short observation and limited-sample caveats above still apply.
+
 ## Telemetry feasibility and privacy boundary
 
 The existing public-site analytics implementation (`www/public/analytics-consent.js`)
