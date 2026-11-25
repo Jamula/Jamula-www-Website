@@ -27,18 +27,21 @@ demographic targeting profiles.
 
 Jamula.net is the canonical public website for Jamula, Inc. Its purpose is to
 explain what Jamula offers and how its disciplines fit together, so visitors can
-understand whether the services may fit their needs. An accessible contact path
-is a product goal, but the current homepage does not provide one.
+understand whether the services may fit their needs and reach a direct inquiry
+path.
 
-The current homepage describes the AI strategy, custom software, and cloud
-consulting offer. It has no contact form or other contact mechanism. The remaining
-contact journey is tracked as follow-up work, not implemented functionality.
+The current homepage (`www/src/pages/index.astro`) describes the AI strategy,
+custom software, and cloud consulting offer and provides a direct email inquiry
+link (`mailto:spam@jamula.net` with a plain-text address fallback), alongside a
+dedicated [`/privacy/`](www/src/pages/privacy.astro) notice and consent-gated
+analytics controls. There is no server-backed contact form or automated intake
+workflow in Phase 1.
 
 Success for this phase is defined by task completion and qualified contact — a
 visitor understanding the offering and reaching an accessible contact path — not by
 any performance, popularity, or outcome metric. No metric is a customer outcome or
-public claim by itself. The contact outcome is not yet supported by the current
-site.
+public claim by itself. Remaining Phase 1 measurement and SEO baseline gates are
+tracked in `#94` and `#95`.
 
 ## Positioning
 
@@ -65,7 +68,7 @@ claim.
   approved as category-level truth about what Jamula does. It is **not** approved
   final published wording — the exact public copy remains editorial and
   review-gated (Fact Checker, Legal researcher, Responsible AI reviewer, and Cyrus per
-  `docs/content/content-strategy.md` and `docs/content/public-claims-register.md`).
+  `docs/content/content-strategy.md` and `docs/legal/public-claims-register.md`).
 - **Company / public identity:** Jamula, operated by Jamula, Inc.
 - **Domain policy:** `jamula.net` is canonical for indexing. The approved policy
   serves `jamula.net`, `www.jamula.net`, `jamula.com`, and `www.jamula.com`
@@ -93,8 +96,10 @@ claim.
 
 **Present in the repository's current public-site implementation:**
 
-- A static public website that describes Jamula's offering categories. It has no
-  contact form or other contact mechanism.
+- A static public website (`www/`) that describes Jamula's offering categories,
+  renders an accessible `mailto:spam@jamula.net` inquiry link with plain-text
+  fallback, and provides `/privacy/` with consent-gated GA4 controls (no
+  server-backed contact form).
 - The approved Jamula icon/brand asset is integrated (see Brand Commitments).
 
 **Durable constraints future work must preserve:**
@@ -158,7 +163,7 @@ claim.
 
 Every environmental, ethical, social, accessibility, customer, AI, and performance
 claim is blocked until it has a complete, verified entry in
-`docs/content/public-claims-register.md` and passes its required reviews and owner
+`docs/legal/public-claims-register.md` and passes its required reviews and owner
 approval.
 
 ## Product Principles

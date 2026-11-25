@@ -1,20 +1,20 @@
 # Repository License Scope
 
+Copyright 2026 Jamula, Inc.
+
 This repository contains Jamula-authored software, third-party material, and business content with different terms.
 
 ## Apache-2.0
 
-Unless a path is identified below or carries its own notice, Jamula-authored source code, configuration, infrastructure, tests, and technical documentation are licensed under the root Apache License 2.0.
+Unless a path is identified below or carries its own notice, Jamula-authored source code, build/deployment scripts, `.NET` and Node.js utilities (`www/`, `scripts/`, `.github/scripts/`, Jamula-authored workflows and skills), configuration, tests, and technical engineering documentation are licensed under the root [Apache License 2.0](LICENSE).
 
 ## Third-party material
 
-Third-party files remain under their original licenses. See `THIRD_PARTY_NOTICES.md` and `docs/legal/license-inventory.md`.
+Third-party files remain under their original licenses. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and [`docs/legal/license-inventory.md`](docs/legal/license-inventory.md).
 
-- The current Squad-generated or adapted integration files remain under their
-  original MIT terms; the earlier 0.12.0 integration is retained only in
-  repository history. See `THIRD_PARTY_NOTICES.md` for current paths and source
-  history.
+- Squad-generated or adapted integration files (currently pinned at `@bradygaster/squad-cli@2.0.0` in `.mcp.json`, including Squad templates, workflows, agent definitions, and Squad-originated skills under `.squad/` and `.github/`) remain under their original MIT terms; earlier `0.12.0` and `1.1.0` states are retained in repository history. See `THIRD_PARTY_NOTICES.md` for current paths and source history.
 - `.github/skills/cloud-solution-architect/` remains subject to Microsoft's MIT license.
+- Website npm packages in `www/package.json` / `www/package-lock.json` are governed by their respective upstream open-source licenses; `.NET 10` utilities under `scripts/` use the .NET Base Class Library with no third-party NuGet packages.
 
 ## Reserved Jamula content
 
