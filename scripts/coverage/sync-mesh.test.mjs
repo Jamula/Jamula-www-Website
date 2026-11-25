@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 const source = new URL("../../.squad/templates/skills/distributed-mesh/sync-mesh.sh", import.meta.url);
-const auditedHash = "36c5ed6bbd387f63a685ab5ee8eba5e2ef8df49572c84c269eef338f738c0ae7";
+const auditedHash = "c8b8a75d4311686f6814bd18cafca04224cf705e713abed2f62c1478b280fe01";
 const bash = process.platform === "win32" ? "C:\\Program Files\\Git\\bin\\bash.exe" : "/bin/bash";
 
 const commands = {
@@ -31,9 +31,14 @@ case "$*" in
     [ "\${FAKE_GIT_FAIL:-0}" = 0 ] ;;
   *) echo "unexpected git invocation" >&2; exit 97 ;;
 esac`,
-  curl: `printf 'curl' >> commands.log; printf ' <%s>' "$@" >> commands.log; echo >> commands.log
-case "$*" in
-  '--silent --fail fixture-contract -o work/cache/opaque/SUMMARY.md'|'--silent --fail --header Authorization: Bearer test-token fixture-contract -o work/cache/opaque/SUMMARY.md') ;;
+  curl: `IFS= read -r stdin_header
+! IFS= read -r _
+printf 'curl' >> commands.log; printf ' <%s>' "$@" >> commands.log
+if [ -n "$stdin_header" ]; then printf ' stdin:<%s>' "$stdin_header" >> commands.log; fi
+echo >> commands.log
+case "$*|$stdin_header" in
+  '--silent --fail --url fixture-contract -o work/cache/opaque/SUMMARY.md|') ;;
+  '--silent --fail --header @- --url fixture-contract -o work/cache/opaque/SUMMARY.md|Authorization: Bearer test-token') ;;
   *) echo "unexpected curl invocation" >&2; exit 97 ;;
 esac
 [ "\${FAKE_CURL_FAIL:-0}" = 0 ] || exit 22
@@ -48,6 +53,13 @@ echo work/cache`,
 read -r value
 [ "$value" = team-two ] || exit 97
 echo TEAM_TWO`,
+  printenv: `[ "$#" = 1 ] || exit 97
+[ "$1" = TEAM_TWO_TOKEN ] || exit 97
+if [ "\${TEAM_TWO_TOKEN+set}" = set ]; then
+  printf '%s\\n' "$TEAM_TWO_TOKEN"
+else
+  exit 1
+fi`,
   date: `[ "$#" = 0 ] || exit 97
 echo fixture-date`,
 };
@@ -80,13 +92,13 @@ function fixture(t, { spaceInPath = false } = {}) {
 PATH="$1"
 export PATH
 [ "$PATH" = "$1" ] || exit 95
-for name in jq git curl mkdir dirname tr date; do
+for name in jq git curl mkdir dirname tr printenv date; do
   [ "$(command -v "$name")" = "$1/$name" ] || exit 96
 done
 shift
 source ./sync-mesh.sh "$@"`;
     const result = spawnSync(bash, ["--noprofile", "--norc", "-c", preflight, "offline-test", shellBin, ...args], {
-      cwd: root, env, encoding: "utf8", timeout: 10000,
+      cwd: root, env, encoding: "utf8", timeout: 30000, windowsHide: true,
     });
     assert.ifError(result.error);
     assert.notEqual(result.status, 95, "PATH isolation failed");
@@ -129,7 +141,7 @@ test("MeshSync_TrustedCloneAndOpaqueFetch_UseFixtureCommands", (t) => {
   assert.equal(f.read("work/cache/opaque/SUMMARY.md"), "published contract\n");
   assert.equal(f.read("commands.log"),
     "git <clone> <--quiet> <--depth> <1> <--branch> <stable> <fixture-repo> <work/cache/trusted>\n" +
-    "curl <--silent> <--fail> <fixture-contract> <-o> <work/cache/opaque/SUMMARY.md>\n");
+    "curl <--silent> <--fail> <--url> <fixture-contract> <-o> <work/cache/opaque/SUMMARY.md>\n");
   assert.match(result.stdout, /Mesh sync complete/);
 });
 
@@ -140,7 +152,7 @@ test("MeshSync_PathWithSpaces_UsesFixtureCommandsOffline", (t) => {
   assert.equal(result.status, 0, result.stderr);
   assert.equal(f.read("commands.log"),
     "git <clone> <--quiet> <--depth> <1> <--branch> <stable> <fixture-repo> <work/cache/trusted>\n" +
-    "curl <--silent> <--fail> <fixture-contract> <-o> <work/cache/opaque/SUMMARY.md>\n");
+    "curl <--silent> <--fail> <--url> <fixture-contract> <-o> <work/cache/opaque/SUMMARY.md>\n");
   assert.equal(f.read("work/cache/opaque/SUMMARY.md"), "published contract\n");
 });
 
@@ -151,7 +163,7 @@ test("MeshSync_TrustedPullAndBearerFetch_UseExistingCheckoutAndToken", (t) => {
   assert.equal(result.status, 0, result.stderr);
   assert.equal(f.read("commands.log"),
     "git <-C> <work/cache/trusted> <pull> <--rebase> <--quiet>\n" +
-    "curl <--silent> <--fail> <--header> <Authorization: Bearer test-token> <fixture-contract> <-o> <work/cache/opaque/SUMMARY.md>\n");
+    "curl <--silent> <--fail> <--header> <@-> <--url> <fixture-contract> <-o> <work/cache/opaque/SUMMARY.md> stdin:<Authorization: Bearer test-token>\n");
   assert.equal(f.read("work/cache/opaque/SUMMARY.md"), "published contract\n");
 });
 
@@ -162,7 +174,7 @@ test("MeshSync_CloneAndFetchFailure_WarnsAndWritesUnavailableSummary", (t) => {
   assert.match(result.stdout, /team-one: clone failed \(unavailable\)/);
   assert.equal(f.read("commands.log"),
     "git <clone> <--quiet> <--depth> <1> <--branch> <stable> <fixture-repo> <work/cache/trusted>\n" +
-    "curl <--silent> <--fail> <fixture-contract> <-o> <work/cache/opaque/SUMMARY.md>\n");
+    "curl <--silent> <--fail> <--url> <fixture-contract> <-o> <work/cache/opaque/SUMMARY.md>\n");
   assert.equal(f.read("work/cache/opaque/SUMMARY.md"), "# team-two — unavailable (fixture-date)\n");
 });
 
@@ -174,6 +186,6 @@ test("MeshSync_PullFailureAndMissingBearerToken_UsesStaleAndNoHeader", (t) => {
   assert.match(result.stdout, /team-one: pull failed \(using stale\)/);
   assert.equal(f.read("commands.log"),
     "git <-C> <work/cache/trusted> <pull> <--rebase> <--quiet>\n" +
-    "curl <--silent> <--fail> <fixture-contract> <-o> <work/cache/opaque/SUMMARY.md>\n");
+    "curl <--silent> <--fail> <--url> <fixture-contract> <-o> <work/cache/opaque/SUMMARY.md>\n");
   assert.equal(f.read("work/cache/opaque/SUMMARY.md"), "published contract\n");
 });

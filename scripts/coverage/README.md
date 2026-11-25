@@ -191,9 +191,9 @@ condition coverage. Other Squad templates remain unmeasured.
 Run `node --test scripts\coverage\sync-mesh.test.mjs` for offline shell mesh
 behavior tests. The harness pins the audited template content, runs a copy in
 a disposable directory, and intercepts every external command through a
-private PATH. Git, curl and jq are deterministic fakes; only a constrained
-mkdir wrapper invokes the local mkdir executable. Fixtures contain no real
-remote addresses or credentials. The jq fake does not verify actual jq
+private PATH. Git, curl, jq, and printenv are deterministic fakes; only a
+constrained mkdir wrapper invokes the local mkdir executable. Fixtures contain
+no real remote addresses or credentials. The jq fake does not verify actual jq
 semantics, and the harness is not an OS-level network sandbox. No available
 offline collector provides defensible shell line and branch counts, so the
 template stays unmeasured and remains a gate blocker.
@@ -505,10 +505,13 @@ The measured-only aggregate was 2,307/2,393 lines (96.41%) and
 gate failed because sources remain unmeasured. These results apply to this run
 and are not full first-party coverage.
 
-On CI, use the same commands with the pinned Node/npm/.NET versions from the
-existing workflows, and retain every report plus `summary.json` as artifacts for
-the exact source revision. Do not treat a failed collector, empty report, or
-console-only runner summary as a successful gate.
+On CI, `.github/workflows/required-pr-validation.yml` runs `npm --prefix www ci`
+and `node --test scripts/coverage/*.test.*` unconditionally on every pull
+request to enforce inventory classification and offline Squad template behavior
+checks. For full coverage evaluation, use the commands above with the pinned
+Node/npm/.NET versions from the existing workflows, and retain every report plus
+`summary.json` as artifacts for the exact source revision. Do not treat a failed
+collector, empty report, or console-only runner summary as a successful gate.
 
 ## Current blockers
 
