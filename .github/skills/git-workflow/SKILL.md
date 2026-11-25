@@ -64,10 +64,11 @@ There are **no** `dev`, `preview`, or `insiders` branches in this repository, an
    ```
 
 5. **Sync/rebase safely when updating an already-published PR branch:**
-   For normal additive follow-up commits without history rewrites, commit and `git push`. Before rebasing or rewriting history on an already-published branch (`origin/squad/{issue-number}-{slug}`), fetch and observe the exact remote tip and push with an explicit lease—never force-update `main` or another session's branch:
+   For normal additive follow-up commits without history rewrites, commit and `git push`. Before rebasing or rewriting history on an already-published branch (`origin/squad/{issue-number}-{slug}`), fetch, observe the exact remote tip, verify that the observed remote tip is already an ancestor of local `HEAD` (stopping to reconcile if the remote has commits missing locally), and push with an explicit lease—never force-update `main`, concurrent/unreviewed work, or another session's branch:
    ```bash
    git fetch origin
    OBSERVED_SHA="$(git rev-parse origin/squad/{issue-number}-{slug})"
+   git merge-base --is-ancestor "$OBSERVED_SHA" HEAD || { echo "Remote has commits not in HEAD; reconcile before rebasing." >&2; exit 1; }
    git rebase origin/main
    git push --force-with-lease="refs/heads/squad/{issue-number}-{slug}:${OBSERVED_SHA}" origin "HEAD:squad/{issue-number}-{slug}"
    ```
@@ -116,7 +117,7 @@ Prefer one focused PR targeting `main`. Stack a child PR only when a real techni
 
 - ❌ Creating or targeting `dev`, `preview`, or `insiders` branches (protected `main` is the only persistent branch)
 - ❌ Expecting PR merges to auto-deploy production or promoting PR preview URLs via DNS
-- ❌ Running `git push --force` without an exact observed-SHA `--force-with-lease`, or force-updating `main` / another session's branch
+- ❌ Running `git push --force`, rebasing without checking `git merge-base --is-ancestor "$OBSERVED_SHA" HEAD`, omitting an exact observed-SHA `--force-with-lease`, or force-updating `main` / concurrent work / another session's branch
 - ❌ Editing files in the main repository checkout or a peer agent's worktree
 - ❌ Introducing Python scripts/workflows where `.NET 10` LTS or Node.js satisfies the requirement
 - ❌ Treating a merged PR or prior-commit approval as valid after pushing a new commit SHA
