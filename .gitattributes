@@ -5,3 +5,8 @@
 .squad/orchestration-log/** merge=union
 .squad/rai/audit-trail.md merge=union
 .squad/fact-checker/audit-trail.md merge=union
+
+# Squad verifies the exact bytes of the casting registry and history.
+.squad/casting/registry.json text eol=lf
+.squad/casting/history.json text eol=lf
+.squad/casting/*.json text eol=lf
