@@ -38,11 +38,14 @@ public commitments.
   - [`scripts/validation/`](scripts/validation/) — `.NET 10` repository governance,
     preview-archive, and preview-site validator (`JamulaValidation`).
   - [`scripts/monitor/`](scripts/monitor/) — zero-dependency `.NET 10` scheduled
-    HTTPS, HSTS, canonical, and 404 drift monitor (`JamulaMonitor`).
+    apex DNS A-record, HTTP-to-HTTPS same-host upgrade, HTTPS 200 content,
+    canonical link, and 404 drift monitor (`JamulaMonitor`).
   - [`scripts/mbr/`](scripts/mbr/) — local loopback `.NET 10` Monthly Business
     Review dashboard (`JamulaMbr`).
   - [`scripts/coverage/`](scripts/coverage/) — Cobertura inventory and `>=90%`
-    line/branch coverage gate for measured first-party deployables.
+    line/branch coverage gate across every first-party deployable and the
+    overall aggregate, with unmeasured first-party sources tracked as blockers
+    ([`scripts/coverage/README.md`](scripts/coverage/README.md)).
   - [`scripts/spikes/`](scripts/spikes/) — local loopback mechanism spikes
     (`scripts/spikes/sidequest-artifacts/` and `scripts/spikes/sidequest-routing/`)
     for side-quest evaluation; never deployed to production.
@@ -78,21 +81,24 @@ verification, retries, and partial-deployment recovery.
 
 ## Local development
 
-CI pins `.NET 10.0` LTS (`dotnet-version: 10.0.x`), Node.js `26.13.0`, and npm
-`12.2.1`. From the repository root:
+CI uses `global.json`-pinned `.NET 10.0` SDKs
+([`scripts/validation/global.json`](scripts/validation/global.json) and
+[`scripts/monitor/global.json`](scripts/monitor/global.json) via
+`actions/setup-dotnet`), Node.js `26.13.0`, and npm `12.2.1`. From the
+repository root:
 
 ```sh
 npm --prefix www ci
 npm --prefix www run dev
 ```
 
-Run website formatting checks, `astro check` + production static build, generated-HTML/contrast checks, and unit tests:
+Run website formatting checks, `astro check` + production static build, generated-HTML/contrast checks, and website regression suites:
 
 ```sh
 npm --prefix www run format:check
 npm --prefix www run build
 node www/scripts/test_built_site.mjs
-node --test www/tests/analytics-consent.test.mjs
+node --test "www/tests/*.test.mjs"
 ```
 
 ## Governance, security, licensing, and sponsorship

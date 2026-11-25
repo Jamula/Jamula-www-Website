@@ -6,19 +6,19 @@
 - Use an isolated pull-request branch or worktree based on protected `main`.
 - Assign one integration owner and one writer to each PR branch (they may be the same person). Contributors work in isolation and hand off changes; only the owning session writes the delivery branch.
 - `main` is the only persistent production source. Pull-request previews are isolated and are never promoted to production.
-- Prefer currently supported `.NET LTS` (`.NET 10.0` with `<Nullable>enable</Nullable>`, `<ImplicitUsings>enable</ImplicitUsings>`, `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, and minimal/zero unnecessary third-party NuGet dependencies) and `Node.js` (`26.13.0` / npm `12.2.1` in CI). Python repository utilities have been retired ([#110](https://github.com/Jamula/Jamula-www-Website/issues/110)); do not introduce new Python tooling.
-- Maintain at least `90%` line and `90%` branch coverage per measured first-party deployable and overall (`scripts/coverage/inventory.json`), prioritizing deterministic offline happy-path and failure-path tests.
+- Prefer currently supported `.NET LTS` (`.NET 10.0` with `<Nullable>enable</Nullable>`, `<ImplicitUsings>enable</ImplicitUsings>`, `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, and minimal/zero unnecessary third-party NuGet dependencies) and `Node.js` (`26.13.0` / npm `12.2.1` in CI). Tracked `.py` scripts have been replaced by `.NET` and Node.js utilities while full retirement acceptance remains open in [#110](https://github.com/Jamula/Jamula-www-Website/issues/110); do not introduce new Python tooling.
+- Every first-party deployable and the overall aggregate must meet at least `90%` line and `90%` branch coverage ([#109](https://github.com/Jamula/Jamula-www-Website/issues/109), `scripts/coverage/inventory.json`), and unmeasured first-party sources remain tracked blockers in [`scripts/coverage/README.md`](scripts/coverage/README.md); prioritize deterministic offline happy-path and failure-path tests.
 
 ## Website validation
 
-From the repository root, install dependencies, check formatting, run `astro check` + static build, and test the generated output and consent behavior:
+From the repository root, install dependencies, check formatting, run `astro check` + static build, and run the generated-output and website regression suites:
 
 ```sh
 npm --prefix www ci
 npm --prefix www run format:check
 npm --prefix www run build
 node www/scripts/test_built_site.mjs
-node --test www/tests/analytics-consent.test.mjs
+node --test "www/tests/*.test.mjs"
 ```
 
 The generated-site checks cover metadata, canonical routes, internal links and fragments, sitemap/robots output, semantic landmarks, documented light/dark color-token contrast pairs, and the approved homepage Organization data. They are regression checks, not a complete WCAG conformance evaluation.
@@ -69,7 +69,7 @@ Optional GitHub Sponsors support configured in `.github/FUNDING.yml` (`@cyrusjam
 
 ## Security and privacy
 
-- Never read or commit `.env`, `.env.local`, `.env.production`, or other secret-bearing `.env.*` files; use `.env.example` placeholders and documented configuration schemas only.
+- Never read or commit `.env`, `.env.local`, `.env.production`, or other secret-bearing `.env.*` files; use committed `.env.example` templates (when present) and documented configuration schemas only.
 - Never commit credentials, tokens, private keys, connection strings, personal data, or machine-local secrets.
 - Follow [`SECURITY.md`](SECURITY.md) and use GitHub Private Vulnerability Reporting for security issues. Do not put sensitive vulnerability details in a public issue or pull request.
 
@@ -90,7 +90,7 @@ Optional GitHub Sponsors support configured in `.github/FUNDING.yml` (`@cyrusjam
   - `dotnet run --project scripts/monitor/JamulaMonitor.csproj --configuration Release -- --self-test`
   - `dotnet run --project scripts/mbr/tests/JamulaMbr.Tests.csproj --configuration Release`
   - `node --test scripts/mbr/tests/ui.test.mjs`
-- For changes under `www/`, run `npm --prefix www ci`, `npm --prefix www run format:check`, `npm --prefix www run build`, `node www/scripts/test_built_site.mjs`, and `node --test www/tests/analytics-consent.test.mjs`.
-- Pass all required review and workflow checks (`Required PR Validation` and `Repository Governance Validation`) for the files changed.
+- For changes under `www/`, run `npm --prefix www ci`, `npm --prefix www run format:check`, `npm --prefix www run build`, `node www/scripts/test_built_site.mjs`, and `node --test "www/tests/*.test.mjs"`.
+- Pass all required review and workflow checks (`Required PR Validation` and `Governance Validation`) for the files changed.
 - Request Cyrus's approval only when a stable, published top-level delivery head has independent review, required checks, and mergeability ready. Approval is for the exact head SHA; every new commit invalidates it and requires fresh approval. Keep all required protections intact.
 - Escalate a blocker with one actionable, evidence-backed request for the needed decision or authority, not repeated status pings; continue independent work where possible.

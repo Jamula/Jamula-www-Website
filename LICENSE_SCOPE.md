@@ -6,7 +6,7 @@ This repository contains Jamula-authored software, third-party material, and bus
 
 ## Apache-2.0
 
-Unless a path is identified below or carries its own notice, Jamula-authored source code, build/deployment scripts, `.NET` and Node.js utilities (`www/`, `scripts/`, `.github/scripts/`, Jamula-authored workflows and skills), configuration, tests, and technical engineering documentation are licensed under the root [Apache License 2.0](LICENSE).
+Unless a path is identified below or carries its own notice, Jamula-authored website code (framework and template code in `www/`, excluding the reserved brand assets and marketing copy listed below), build/deployment scripts, `.NET` and Node.js utilities (`scripts/`, `.github/scripts/`, and Jamula-authored workflows and skills), configuration, tests, and technical engineering documentation are licensed under the root [Apache License 2.0](LICENSE).
 
 ## Third-party material
 
