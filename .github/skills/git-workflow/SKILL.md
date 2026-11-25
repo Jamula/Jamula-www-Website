@@ -15,7 +15,7 @@ There are **no** `dev`, `preview`, or `insiders` branches in this repository, an
 | Surface | Source / Trigger | Production Impact |
 |---------|------------------|-------------------|
 | `main` | Only persistent branch; all PRs target `main` | Merging to `main` **never** auto-deploys to production |
-| Production release | Manual, owner-authorized `workflow_dispatch` of `.github/workflows/azure-static-web-apps.yml` on `refs/heads/main` (`change_type=material` or `change_type=fix`), gated by `swa-deployment` | Deploys `jamula.net`, `www.jamula.net`, `jamula.com`, and `www.jamula.com` and publishes immutable `vMAJOR.MINOR.PATCH` GitHub Release |
+| Production release | Manual, owner-authorized `workflow_dispatch` of `.github/workflows/azure-static-web-apps.yml` on `refs/heads/main` (`change_type=material` or `change_type=fix`), gated by `swa-deployment` | Deploys `jamula.net`, `www.jamula.net`, `jamula.com`, and `www.jamula.com`. `change_type=material` creates tag `v$RELEASE_VERSION` (`vMAJOR.MINOR.PATCH`) and a new immutable GitHub Release; `change_type=fix` reuses the latest immutable release without creating a new tag/release and records the verified deployment SHA against it |
 | Pull-request preview | Secretless `prepare` + `build` jobs on PRs, followed by trusted `workflow_run` in `.github/workflows/azure-static-web-apps-preview.yml` | Ephemeral, isolated preview environment; **never** promoted by DNS or swapped into production |
 
 ## Branch Naming & Ownership
@@ -39,34 +39,37 @@ There are **no** `dev`, `preview`, or `insiders` branches in this repository, an
    npm --prefix www run format:check
    npm --prefix www run build
    node www/scripts/test_built_site.mjs
-   node --test www/tests/analytics-consent.test.mjs
+   node --test "www/tests/*.test.mjs"
 
-   # Governance & .NET 10 validation checks (when touching docs, workflows, or scripts/)
+   # Governance, .NET 10, & workflow script checks (when touching docs, .github/, or scripts/)
    dotnet run --project scripts/validation/JamulaValidation.csproj --configuration Release -- validate-governance .
    dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release
+   dotnet run --project scripts/validation.cli.tests/JamulaValidation.Cli.Tests.csproj --configuration Release
+   node --test ".github/scripts/*.test.cjs"
    git diff --check
    ```
 
-3. **Commit with issue reference and required trailer:**
+3. **Commit with issue reference and publish the new branch:**
    ```bash
    git add -- path/to/intentionally-changed-file
    git diff --cached --stat
    git commit -m "feat: concise summary (#{issue-number})"
+   git push -u origin squad/{issue-number}-{slug}
    ```
 
-4. **Sync/rebase safely when updating your own PR branch:**
-   Before rewriting branch history, fetch and observe the exact remote tip and push with an explicit lease—never force-update `main` or another session's branch:
+4. **Open a pull request targeting `main`:**
+   Follow [`.github/PULL_REQUEST_TEMPLATE.md`](../../../.github/PULL_REQUEST_TEMPLATE.md) in full (preserving all headings, checklists, and exact validation commands with pass/fail outcomes):
+   ```bash
+   gh pr create --base main --title "{description}" --body-file pr-body.md
+   ```
+
+5. **Sync/rebase safely when updating an already-published PR branch:**
+   For normal additive follow-up commits without history rewrites, commit and `git push`. Before rebasing or rewriting history on an already-published branch (`origin/squad/{issue-number}-{slug}`), fetch and observe the exact remote tip and push with an explicit lease—never force-update `main` or another session's branch:
    ```bash
    git fetch origin
    OBSERVED_SHA="$(git rev-parse origin/squad/{issue-number}-{slug})"
    git rebase origin/main
    git push --force-with-lease="refs/heads/squad/{issue-number}-{slug}:${OBSERVED_SHA}" origin "HEAD:squad/{issue-number}-{slug}"
-   ```
-
-5. **Open a pull request targeting `main`:**
-   Follow [`.github/PULL_REQUEST_TEMPLATE.md`](../../../.github/PULL_REQUEST_TEMPLATE.md) in full (preserving all headings, checklists, and exact validation commands with pass/fail outcomes):
-   ```bash
-   gh pr create --base main --title "{description}" --body-file pr-body.md
    ```
 
 6. **Review, exact-SHA approval, and cleanup:**
