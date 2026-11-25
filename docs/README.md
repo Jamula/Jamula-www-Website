@@ -8,9 +8,13 @@ source date before relying on it.
 
 ## Current project state
 
-- The repository contains a static Astro site under `www/`; local commands are
-  in the root [README](../README.md).
-- The current deployment workflow builds the website from the repository. The
+- The repository contains a static Astro site under `www/` implementing the
+  [Woven Plane design system](../DESIGN.md); local development and release
+  commands are in the root [README](../README.md).
+- The production deployment workflow
+  ([`.github/workflows/azure-static-web-apps.yml`](../.github/workflows/azure-static-web-apps.yml))
+  builds from protected `main` and deploys only via authorized manual
+  `workflow_dispatch` (zero GitHub Releases have been dispatched yet). The
   approved domain policy directly serves all four Jamula.net/.com apex and www
   hostnames over HTTPS; `jamula.net` is canonical for indexing, and HTTP upgrades
   on the same hostname. This is configuration and policy documentation, not
@@ -19,14 +23,29 @@ source date before relying on it.
   site must incur zero incremental paid operating-service spend; existing domain
   renewals and CI allowances are separate. Free-tier quotas and absence of an
   SLA remain constraints, not guarantees.
-- The homepage currently has no contact mechanism. The remaining homepage
-  title, contact path, built-site accessibility/SEO/link/contrast regression
-  checks, and four-host monitoring are tracked in open issues
-  [#89](https://github.com/Jamula/Jamula-www-Website/issues/89),
-  [#86](https://github.com/Jamula/Jamula-www-Website/issues/86),
-  [#87](https://github.com/Jamula/Jamula-www-Website/issues/87), and
-  [#88](https://github.com/Jamula/Jamula-www-Website/issues/88), respectively
-  (state checked 2026-11-01; check GitHub for current status).
+- On `main`, the homepage ([`www/src/pages/index.astro`](../www/src/pages/index.astro))
+  renders the baseline capability narrative, `Organization` structured data, and
+  an accessible `mailto:spam@jamula.net` inquiry link with plain-text fallback,
+  alongside a scoped analytics privacy notice at
+  [`/privacy/`](../www/src/pages/privacy.astro) and consent-gated GA4 controls
+  (closing prior implementation issues
+  [#86](https://github.com/Jamula/Jamula-www-Website/issues/86)–[#89](https://github.com/Jamula/Jamula-www-Website/issues/89)).
+  Open work as of `2026-11-25T08:29:40.046-08:00` is tracked across four
+  canonical GitHub milestones (check GitHub for current status):
+  - `M01 - Phase 1: Public website` —
+    [#94](https://github.com/Jamula/Jamula-www-Website/issues/94) (Search Console
+    indexing/performance baseline) and
+    [#95](https://github.com/Jamula/Jamula-www-Website/issues/95) (analytics
+    vendor/DPA disposition and post-release four-origin verification).
+  - `M02 - Side-quests: Foundation` —
+    [#108](https://github.com/Jamula/Jamula-www-Website/issues/108)–[#111](https://github.com/Jamula/Jamula-www-Website/issues/111).
+  - `M03 - Side-quests: Features` —
+    [#112](https://github.com/Jamula/Jamula-www-Website/issues/112)–[#114](https://github.com/Jamula/Jamula-www-Website/issues/114)
+    and
+    [#116](https://github.com/Jamula/Jamula-www-Website/issues/116)–[#117](https://github.com/Jamula/Jamula-www-Website/issues/117).
+  - `M04 - Side-quests: Operations & Release` —
+    [#115](https://github.com/Jamula/Jamula-www-Website/issues/115) and
+    [#118](https://github.com/Jamula/Jamula-www-Website/issues/118)–[#120](https://github.com/Jamula/Jamula-www-Website/issues/120).
 - Platform-evaluation PR [#10](https://github.com/Jamula/Jamula-www-Website/pull/10)
   and bootstrap PR [#2](https://github.com/Jamula/Jamula-www-Website/pull/2)
   are merged. Their historical drafts, review findings, and approval records
@@ -56,7 +75,9 @@ source date before relying on it.
 - [Side-quest operations review](operations/side-quest-operations-review.md) —
   monthly evidence review using the existing MBR, with data-quality and privacy rules
 - [Public claims register](content/public-claims-register.md) —
-  owner/reviewer approval is required before publication
+  distinguishes baseline factual, inquiry, and scoped privacy copy in `main`
+  source from candidate claims still awaiting formal register verification and
+  owner approval
 - [License and provenance inventory](legal/license-inventory.md) and
   [repository license scope](../LICENSE_SCOPE.md)
 

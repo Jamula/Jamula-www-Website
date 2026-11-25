@@ -1,6 +1,6 @@
 # Squad Team
 
-> u-cyrusjamula-ubiquitous-spork
+> Jamula-www-Website (`Jamula/Jamula-www-Website`)
 
 ## Coordinator
 
@@ -53,5 +53,14 @@
 
 ## Project Context
 
-- **Project:** u-cyrusjamula-ubiquitous-spork
+- **Project:** Jamula-www-Website (`Jamula/Jamula-www-Website`)
 - **Created:** 2026-11-01
+
+## Issue Source
+
+- **Repository:** Jamula/Jamula-www-Website
+- **Connected:** 2026-11-01
+- **Platform:** GitHub
+- **Filters:**
+  - Milestones: `M01 - Phase 1: Public website`, `M02 - Side-quests: Foundation`, `M03 - Side-quests: Features`, `M04 - Side-quests: Operations & Release`
+  - Labels: `squad`, `squad:{member}` (when routed through automated label triage)
