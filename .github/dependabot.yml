@@ -22,12 +22,3 @@ updates:
       npm-dependencies:
         patterns:
           - "*"
-
-  - package-ecosystem: "nuget"
-    directory: "/scripts/monitor"
-    schedule:
-      interval: "weekly"
-    groups:
-      nuget-dependencies:
-        patterns:
-          - "*"
