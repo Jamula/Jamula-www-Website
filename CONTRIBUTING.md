@@ -2,7 +2,7 @@
 
 ## Work tracking and toolchain
 
-- Start with a GitHub issue in the appropriate milestone (`Phase 1: Public website` or the `Side-quests` milestones) that defines scope, owner, acceptance criteria, dependencies, and required reviews.
+- Start with a GitHub issue in the appropriate milestone (`M01 - Phase 1: Public website` or the `M02`-`M04` `Side-quests` milestones) that defines scope, owner, acceptance criteria, dependencies, and required reviews.
 - Use an isolated pull-request branch or worktree based on protected `main`.
 - Assign one integration owner and one writer to each PR branch (they may be the same person). Contributors work in isolation and hand off changes; only the owning session writes the delivery branch.
 - `main` is the only persistent production source. Pull-request previews are isolated and are never promoted to production.
@@ -63,7 +63,7 @@ Do not submit:
 - code copied from another project without preserving its license and attribution;
 - work owned by an employer, customer, or other party unless you have documented authority to contribute it.
 
-Third-party and reserved-content paths in `LICENSE_SCOPE.md` require maintainer review; update `THIRD_PARTY_NOTICES.md` and `docs/legal/license-inventory.md` whenever third-party packages or vendored assets change. Contributions do not grant rights to Jamula or third-party trademarks. Public company, customer, compliance, accessibility, or performance claims require dated source verification and owner approval (`docs/decisions/approvals.md` and `docs/legal/public-claims-register.md`).
+Third-party and reserved-content paths in `LICENSE_SCOPE.md` require maintainer review; update `THIRD_PARTY_NOTICES.md` and `docs/legal/license-inventory.md` whenever third-party packages or vendored assets change. Contributions do not grant rights to Jamula or third-party trademarks. Public company, customer, compliance, accessibility, or performance claims require dated source verification and owner approval (`docs/decisions/approvals.md` and `docs/content/public-claims-register.md`).
 
 Optional GitHub Sponsors support configured in `.github/FUNDING.yml` (`@cyrusjamula`) applies only to open-source stewardship of Apache-2.0 repository materials and never creates a commercial engagement, priority merge right, or SLA with Jamula, Inc.
 
@@ -88,7 +88,7 @@ Optional GitHub Sponsors support configured in `.github/FUNDING.yml` (`@cyrusjam
 - When modifying tracked executable sources or `#109` coverage harnesses (`scripts/coverage/`), run `npm --prefix www ci` and the relevant offline tests documented in [`scripts/coverage/README.md`](scripts/coverage/README.md) (such as `node --test scripts/coverage/gate.test.mjs`).
 - For monitor or MBR changes, also run:
   - `dotnet run --project scripts/monitor/JamulaMonitor.csproj --configuration Release -- --self-test`
-  - `dotnet run --project scripts/mbr.tests/JamulaMbr.Tests.csproj --configuration Release`
+  - `dotnet run --project scripts/mbr/tests/JamulaMbr.Tests.csproj --configuration Release`
   - `node --test scripts/mbr/tests/ui.test.mjs`
 - For changes under `www/`, run `npm --prefix www ci`, `npm --prefix www run format:check`, `npm --prefix www run build`, `node www/scripts/test_built_site.mjs`, and `node --test www/tests/analytics-consent.test.mjs`.
 - Pass all required review and workflow checks (`Required PR Validation` and `Repository Governance Validation`) for the files changed.

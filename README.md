@@ -44,8 +44,8 @@ public commitments.
   - [`scripts/coverage/`](scripts/coverage/) — Cobertura inventory and `>=90%`
     line/branch coverage gate for measured first-party deployables.
   - [`scripts/spikes/`](scripts/spikes/) — local loopback mechanism spikes
-    (`JamulaSideQuestSpikes`) for side-quest evaluation; never deployed to
-    production.
+    (`scripts/spikes/sidequest-artifacts/` and `scripts/spikes/sidequest-routing/`)
+    for side-quest evaluation; never deployed to production.
 
 Repository workflow configuration documents the intended deployment boundary; it
 does not by itself prove live DNS, TLS, secret, or account-side configuration.

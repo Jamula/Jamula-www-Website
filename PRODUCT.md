@@ -68,7 +68,7 @@ claim.
   approved as category-level truth about what Jamula does. It is **not** approved
   final published wording — the exact public copy remains editorial and
   review-gated (Fact Checker, Legal researcher, Responsible AI reviewer, and Cyrus per
-  `docs/content/content-strategy.md` and `docs/legal/public-claims-register.md`).
+  `docs/content/content-strategy.md` and `docs/content/public-claims-register.md`).
 - **Company / public identity:** Jamula, operated by Jamula, Inc.
 - **Domain policy:** `jamula.net` is canonical for indexing. The approved policy
   serves `jamula.net`, `www.jamula.net`, `jamula.com`, and `www.jamula.com`
@@ -163,7 +163,7 @@ claim.
 
 Every environmental, ethical, social, accessibility, customer, AI, and performance
 claim is blocked until it has a complete, verified entry in
-`docs/legal/public-claims-register.md` and passes its required reviews and owner
+`docs/content/public-claims-register.md` and passes its required reviews and owner
 approval.
 
 ## Product Principles
