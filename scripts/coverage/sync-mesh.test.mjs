@@ -32,7 +32,11 @@ case "$*" in
   *) echo "unexpected git invocation" >&2; exit 97 ;;
 esac`,
   curl: `IFS= read -r stdin_header
-! IFS= read -r _
+extra_stdin=""
+if IFS= read -r extra_stdin || [ -n "$extra_stdin" ]; then
+  echo "unexpected extra curl stdin" >&2
+  exit 97
+fi
 printf 'curl' >> commands.log; printf ' <%s>' "$@" >> commands.log
 if [ -n "$stdin_header" ]; then printf ' stdin:<%s>' "$stdin_header" >> commands.log; fi
 echo >> commands.log
@@ -188,4 +192,22 @@ test("MeshSync_PullFailureAndMissingBearerToken_UsesStaleAndNoHeader", (t) => {
     "git <-C> <work/cache/trusted> <pull> <--rebase> <--quiet>\n" +
     "curl <--silent> <--fail> <--url> <fixture-contract> <-o> <work/cache/opaque/SUMMARY.md>\n");
   assert.equal(f.read("work/cache/opaque/SUMMARY.md"), "published contract\n");
+});
+
+test("MeshSync_ExtraCurlStdinLines_FailClosed", (t) => {
+  const f = fixture(t);
+  const result = f.run([], { FAKE_AUTH: "bearer", TEAM_TWO_TOKEN: "test-token\nX-Injected: header" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(f.read("commands.log"),
+    "git <clone> <--quiet> <--depth> <1> <--branch> <stable> <fixture-repo> <work/cache/trusted>\n");
+  assert.equal(f.read("work/cache/opaque/SUMMARY.md"), "# team-two — unavailable (fixture-date)\n");
+
+  const direct = spawnSync(
+    bash,
+    ["--noprofile", "--norc", "./bin/curl", "--silent", "--fail", "--header", "@-", "--url", "fixture-contract", "-o", "work/cache/opaque/SUMMARY.md"],
+    { cwd: f.root, input: "Authorization: Bearer test-token\nunterminated-extra", encoding: "utf8", timeout: 30000, windowsHide: true },
+  );
+  assert.ifError(direct.error);
+  assert.equal(direct.status, 97);
+  assert.match(direct.stderr, /unexpected extra curl stdin/);
 });

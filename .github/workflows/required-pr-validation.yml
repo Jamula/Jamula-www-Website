@@ -84,7 +84,7 @@ jobs:
 
       - name: Test coverage gate and Squad templates
         working-directory: .
-        run: node --test scripts/coverage/*.test.*
+        run: node --test "scripts/coverage/*.test.*"
 
       - name: Check website formatting
         if: steps.changes.outputs.website == 'true'

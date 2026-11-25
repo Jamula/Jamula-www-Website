@@ -1366,6 +1366,6 @@ test("CoverageGate_RequiredPrValidationRunsCoverageTestsUnconditionally", async 
   assert.match(runCoverageTests.text, /^\s+working-directory: \.$/m);
   assert.match(
     runCoverageTests.text,
-    /^\s+run: node --test scripts\/coverage\/\*\.test\.\*$/m,
+    /^\s+run: node --test "scripts\/coverage\/\*\.test\.\*"$/m,
   );
 });

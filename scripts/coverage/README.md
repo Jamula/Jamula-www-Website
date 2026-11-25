@@ -506,7 +506,7 @@ gate failed because sources remain unmeasured. These results apply to this run
 and are not full first-party coverage.
 
 On CI, `.github/workflows/required-pr-validation.yml` runs `npm --prefix www ci`
-and `node --test scripts/coverage/*.test.*` unconditionally on every pull
+and `node --test "scripts/coverage/*.test.*"` unconditionally on every pull
 request to enforce inventory classification and offline Squad template behavior
 checks. For full coverage evaluation, use the commands above with the pinned
 Node/npm/.NET versions from the existing workflows, and retain every report plus
