@@ -1,24 +1,24 @@
 # Contributing
 
-## Work tracking
+## Work tracking and toolchain
 
-- Start with a GitHub issue that defines scope, owner, acceptance criteria, dependencies, and required reviews.
+- Start with a GitHub issue in the appropriate milestone (`M01 - Phase 1: Public website` or the `M02`-`M04` `Side-quests` milestones) that defines scope, owner, acceptance criteria, dependencies, and required reviews.
 - Use an isolated pull-request branch or worktree based on protected `main`.
 - Assign one integration owner and one writer to each PR branch (they may be the same person). Contributors work in isolation and hand off changes; only the owning session writes the delivery branch.
-- `main` is the only persistent production source. Pull-request previews are
-  isolated and are never promoted to production.
+- `main` is the only persistent production source. Pull-request previews are isolated and are never promoted to production.
+- Prefer currently supported `.NET LTS` (`.NET 10.0` with `<Nullable>enable</Nullable>`, `<ImplicitUsings>enable</ImplicitUsings>`, `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, and minimal/zero unnecessary third-party NuGet dependencies) and `Node.js` (`26.13.0` / npm `12.2.1` in CI). Tracked `.py` scripts have been replaced by `.NET` and Node.js utilities while full retirement acceptance remains open in [#110](https://github.com/Jamula/Jamula-www-Website/issues/110); do not introduce new Python tooling.
+- Every first-party deployable and the overall aggregate must meet at least `90%` line and `90%` branch coverage ([#109](https://github.com/Jamula/Jamula-www-Website/issues/109), `scripts/coverage/inventory.json`), and unmeasured first-party sources remain tracked blockers in [`scripts/coverage/README.md`](scripts/coverage/README.md); prioritize deterministic offline happy-path and failure-path tests.
 
 ## Website validation
 
-From the repository root, build the Astro site and test the generated output:
+From the repository root, install dependencies, check formatting, run `astro check` + static build, and run the generated-output and website regression suites:
 
 ```sh
-cd www
-npm ci
-npm run build
-cd ..
+npm --prefix www ci
+npm --prefix www run format:check
+npm --prefix www run build
 node www/scripts/test_built_site.mjs
-node --test www/tests/*.test.mjs
+node --test "www/tests/*.test.mjs"
 ```
 
 The generated-site checks cover metadata, canonical routes, internal links and fragments, sitemap/robots output, semantic landmarks, documented light/dark color-token contrast pairs, and the approved homepage Organization data. They are regression checks, not a complete WCAG conformance evaluation.
@@ -63,30 +63,34 @@ Do not submit:
 - code copied from another project without preserving its license and attribution;
 - work owned by an employer, customer, or other party unless you have documented authority to contribute it.
 
-Third-party and reserved-content paths in `LICENSE_SCOPE.md` require maintainer review. Contributions do not grant rights to Jamula or third-party trademarks.
+Third-party and reserved-content paths in `LICENSE_SCOPE.md` require maintainer review; update `THIRD_PARTY_NOTICES.md` and `docs/legal/license-inventory.md` whenever third-party packages or vendored assets change. Contributions do not grant rights to Jamula or third-party trademarks. Public company, customer, compliance, accessibility, or performance claims require dated source verification and owner approval (`docs/decisions/approvals.md` and `docs/content/public-claims-register.md`).
+
+Optional GitHub Sponsors support configured in `.github/FUNDING.yml` (`@cyrusjamula`) applies only to open-source stewardship of Apache-2.0 repository materials and never creates a commercial engagement, priority merge right, or SLA with Jamula, Inc.
 
 ## Security and privacy
 
+- Never read or commit `.env`, `.env.local`, `.env.production`, or other secret-bearing `.env.*` files; use committed `.env.example` templates (when present) and documented configuration schemas only.
 - Never commit credentials, tokens, private keys, connection strings, personal data, or machine-local secrets.
-- Use placeholders and documented configuration schemas.
-- Follow [`SECURITY.md`](SECURITY.md) for vulnerability reporting. Do not put
-  sensitive vulnerability details in a public issue.
+- Follow [`SECURITY.md`](SECURITY.md) and use GitHub Private Vulnerability Reporting for security issues. Do not put sensitive vulnerability details in a public issue or pull request.
 
 ## Pull requests
 
-- Link the issue and summarize why the change is needed.
+- Follow [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md): link the issue, summarize why the change is needed, complete the security/privacy/accessibility/licensing checklist, and record exact validation commands with pass/fail results.
 - Keep one author per artifact; use named reviewers for cross-domain concerns.
 - Prefer one focused PR; use a stack only for real dependencies that make review clearer. Before integrating a dependent PR, verify the approved revision and expected parent; if its base or head changes, revalidate the child and obtain applicable review again. Do not integrate unapproved or rejected work into a parent.
 - The integration owner may routinely sync/rebase and publish their own PR branch. Before rewriting history, fetch and observe the exact remote tip and use `--force-with-lease=refs/heads/<branch>:<observed-sha>`; never overwrite concurrent/unreviewed work or force-update protected refs or another session's branch. Stop for concrete missing authority/permission or an unresolved content decision.
 - Ordinary review comments and non-blocking follow-up are not formal rejections; the owner/original author handles their fixes. A formal rejection retains the existing strict lockout: a different author revises and independent re-review is required.
-- For documentation/governance changes, run `dotnet run --project scripts/validation/JamulaValidation.csproj --configuration Release -- validate-governance .`,
-  `node --test .github/scripts/swa-preview.test.cjs`, and
-  `dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release`.
-- For live preview verification changes, also run
-  `node --test .github/scripts/verify-preview.test.cjs`. The live verifier uses
-  Node.js; the .NET checks cover archive validation.
-- For changes under `www/`, run `npm ci`, `npm run check`, and `npm run build`
-  from `www/`; CI also checks formatting on changed website files.
-- Pass the required review and workflow checks for the files changed.
+- For governance, workflow, and validation changes, run:
+  - `dotnet run --project scripts/validation/JamulaValidation.csproj --configuration Release -- validate-governance .`
+  - `dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release`
+  - `dotnet run --project scripts/validation.cli.tests/JamulaValidation.Cli.Tests.csproj --configuration Release`
+  - `node --test .github/scripts/swa-preview.test.cjs .github/scripts/verify-preview.test.cjs .github/scripts/release.test.cjs`
+- When modifying tracked executable sources or `#109` coverage harnesses (`scripts/coverage/`), run `npm --prefix www ci` and `node --test "scripts/coverage/*.test.*"` (enforced on every PR by `Required PR Validation`), plus any component-specific collectors documented in [`scripts/coverage/README.md`](scripts/coverage/README.md).
+- For monitor or MBR changes, also run:
+  - `dotnet run --project scripts/monitor/JamulaMonitor.csproj --configuration Release -- --self-test`
+  - `dotnet run --project scripts/mbr/tests/JamulaMbr.Tests.csproj --configuration Release`
+  - `node --test scripts/mbr/tests/ui.test.mjs`
+- For changes under `www/`, run `npm --prefix www ci`, `npm --prefix www run format:check`, `npm --prefix www run build`, `node www/scripts/test_built_site.mjs`, and `node --test "www/tests/*.test.mjs"`.
+- Pass all required review and workflow checks (`Required PR Validation` and `Governance Validation`) for the files changed.
 - Request Cyrus's approval only when a stable, published top-level delivery head has independent review, required checks, and mergeability ready. Approval is for the exact head SHA; every new commit invalidates it and requires fresh approval. Keep all required protections intact.
 - Escalate a blocker with one actionable, evidence-backed request for the needed decision or authority, not repeated status pings; continue independent work where possible.

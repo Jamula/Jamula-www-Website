@@ -4,15 +4,19 @@
 
 The current tree includes Squad-generated and Jamula-configured integration
 files. The repository history records the integration being reintroduced in
-[#82](https://github.com/Jamula/Jamula-www-Website/pull/82) and upgraded to
+[#82](https://github.com/Jamula/Jamula-www-Website/pull/82), updated to
 `@bradygaster/squad-cli@1.1.0` in
-[#77](https://github.com/Jamula/Jamula-www-Website/pull/77); `.mcp.json` pins
-that package version. Current generated or adapted paths include `.squad/`,
-`.github/agents/squad.agent.md`, `.github/workflows/squad-*.yml`,
+[#77](https://github.com/Jamula/Jamula-www-Website/pull/77), and upgraded to
+`@bradygaster/squad-cli@2.0.0` in
+[#174](https://github.com/Jamula/Jamula-www-Website/pull/174); `.mcp.json`
+currently pins `@bradygaster/squad-cli@2.0.0`. Current generated or adapted
+paths include `.squad/`, `.github/agents/squad.agent.md`, Squad-generated skill
+directories under `.github/skills/`, `.github/workflows/squad-*.yml`,
 `.github/workflows/sync-squad-labels.yml`, `.mcp.json`, `.gitattributes`, and
 `.vscode/settings.json`. The content is not all unmodified upstream material:
-team configuration, charters, project instructions, routing, workflow
-hardening, and privacy/security examples include Jamula-specific changes.
+team configuration, charters, Jamula domain skills, project instructions,
+routing, workflow hardening, and privacy/security examples include
+Jamula-specific changes.
 
 The Squad source project is https://github.com/bradygaster/squad and its
 generated material is distributed under MIT. Preserve its notices and the
