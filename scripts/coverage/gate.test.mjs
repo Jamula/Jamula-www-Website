@@ -1333,3 +1333,39 @@ test("CoverageGate_CLIReportsUsageAndWritesFailClosedSummary", async () => {
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("CoverageGate_RequiredPrValidationRunsCoverageTestsUnconditionally", async () => {
+  const workflow = (
+    await readFile(
+      new URL("../../.github/workflows/required-pr-validation.yml", import.meta.url),
+      "utf8",
+    )
+  ).replace(/\r\n/g, "\n");
+  const steps = workflow.split("\n      - name: ");
+  const findStep = (name) => {
+    const matches = steps.filter((step) => step.startsWith(`${name}\n`));
+    assert.equal(matches.length, 1, `${name} must exist once`);
+    return { index: steps.indexOf(matches[0]), text: matches[0] };
+  };
+
+  const setupNode = findStep("Set up Node.js");
+  const installNpm = findStep("Install verified npm");
+  const installDeps = findStep("Install website dependencies");
+  const runCoverageTests = findStep("Test coverage gate and Squad templates");
+
+  assert.doesNotMatch(steps[0], /^\s+if:/m);
+  assert.ok(setupNode.index < installNpm.index);
+  assert.ok(installNpm.index < installDeps.index);
+  assert.ok(installDeps.index < runCoverageTests.index);
+
+  for (const step of [setupNode, installNpm, installDeps, runCoverageTests]) {
+    assert.doesNotMatch(step.text, /^\s+if:/m);
+  }
+  assert.match(installDeps.text, /^\s+working-directory: \.$/m);
+  assert.match(installDeps.text, /^\s+run: npm --prefix www ci$/m);
+  assert.match(runCoverageTests.text, /^\s+working-directory: \.$/m);
+  assert.match(
+    runCoverageTests.text,
+    /^\s+run: node --test "scripts\/coverage\/\*\.test\.\*"$/m,
+  );
+});

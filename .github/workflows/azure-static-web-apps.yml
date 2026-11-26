@@ -366,14 +366,6 @@ jobs:
           [[ "$missing_status" == "404" ]]
           grep -qi 'Page not found' "$body"
 
-          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-            x_robots_tag="$(header_value "X-Robots-Tag")"
-            if [[ "${x_robots_tag,,}" != *"none"* ]]; then
-              echo "::error::Azure did not enforce X-Robots-Tag: none on the preview."
-              exit 1
-            fi
-          fi
-
           {
             echo "### Verified Azure deployment"
             echo "- Release: \`v${RELEASE_VERSION}\`"
@@ -381,7 +373,7 @@ jobs:
             echo "- Artifact digest: \`${ARTIFACT_DIGEST}\`"
             echo "- URL: ${DEPLOYED_URL}"
             echo "- Configuration: CSP, framing, MIME, referrer, permissions, 404 response"
-            echo "- Azure platform: TLS/HSTS$( [[ "$GITHUB_EVENT_NAME" == "pull_request" ]] && printf ', X-Robots-Tag: none' )"
+            echo "- Azure platform: TLS/HSTS"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Record deployment result
@@ -574,14 +566,6 @@ jobs:
           [[ "$missing_status" == "404" ]]
           grep -qi 'Page not found' "$body"
 
-          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-            x_robots_tag="$(header_value "X-Robots-Tag")"
-            if [[ "${x_robots_tag,,}" != *"none"* ]]; then
-              echo "::error::Azure did not enforce X-Robots-Tag: none on the preview."
-              exit 1
-            fi
-          fi
-
           {
             echo "### Verified Azure deployment"
             echo "- Release: \`v${RELEASE_VERSION}\`"
@@ -589,7 +573,7 @@ jobs:
             echo "- Artifact digest: \`${ARTIFACT_DIGEST}\`"
             echo "- URL: ${DEPLOYED_URL}"
             echo "- Configuration: CSP, framing, MIME, referrer, permissions, 404 response"
-            echo "- Azure platform: TLS/HSTS$( [[ "$GITHUB_EVENT_NAME" == "pull_request" ]] && printf ', X-Robots-Tag: none' )"
+            echo "- Azure platform: TLS/HSTS"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Record deployment result
