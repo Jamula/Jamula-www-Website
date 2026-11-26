@@ -85,7 +85,7 @@ Optional GitHub Sponsors support configured in `.github/FUNDING.yml` (`@cyrusjam
   - `dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release`
   - `dotnet run --project scripts/validation.cli.tests/JamulaValidation.Cli.Tests.csproj --configuration Release`
   - `node --test .github/scripts/swa-preview.test.cjs .github/scripts/verify-preview.test.cjs .github/scripts/release.test.cjs`
-- When modifying tracked executable sources or `#109` coverage harnesses (`scripts/coverage/`), run `npm --prefix www ci` and the relevant offline tests documented in [`scripts/coverage/README.md`](scripts/coverage/README.md) (such as `node --test scripts/coverage/gate.test.mjs`).
+- When modifying tracked executable sources or `#109` coverage harnesses (`scripts/coverage/`), run `npm --prefix www ci` and `node --test "scripts/coverage/*.test.*"` (enforced on every PR by `Required PR Validation`), plus any component-specific collectors documented in [`scripts/coverage/README.md`](scripts/coverage/README.md).
 - For monitor or MBR changes, also run:
   - `dotnet run --project scripts/monitor/JamulaMonitor.csproj --configuration Release -- --self-test`
   - `dotnet run --project scripts/mbr/tests/JamulaMbr.Tests.csproj --configuration Release`

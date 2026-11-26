@@ -35,8 +35,9 @@ public commitments.
   platform side-quests are tracked separately in
   [#108](https://github.com/Jamula/Jamula-www-Website/issues/108)–[#120](https://github.com/Jamula/Jamula-www-Website/issues/120).
 - **Operational and governance tooling (`scripts/`):**
-  - [`scripts/validation/`](scripts/validation/) — `.NET 10` repository governance,
-    preview-archive, and preview-site validator (`JamulaValidation`).
+  - [`scripts/validation/`](scripts/validation/) — `.NET 10` repository governance
+    and preview-archive validator (`JamulaValidation`; live preview HTTP
+    verification runs via `.github/scripts/verify-preview.cjs`).
   - [`scripts/monitor/`](scripts/monitor/) — zero-dependency `.NET 10` scheduled
     apex DNS A-record, HTTP-to-HTTPS same-host upgrade, HTTPS 200 content,
     canonical link, and 404 drift monitor (`JamulaMonitor`).
@@ -131,9 +132,9 @@ dotnet run --project scripts/validation.cli.tests/JamulaValidation.Cli.Tests.csp
 node --test .github/scripts/swa-preview.test.cjs .github/scripts/verify-preview.test.cjs .github/scripts/release.test.cjs
 ```
 
-For `#109` coverage-inventory checks (requires `npm --prefix www ci` first; see
-[`scripts/coverage/README.md`](scripts/coverage/README.md)):
+For `#109` coverage-inventory and template checks (requires `npm --prefix www ci`
+first; see [`scripts/coverage/README.md`](scripts/coverage/README.md)):
 
 ```sh
-node --test scripts/coverage/gate.test.mjs
+node --test "scripts/coverage/*.test.*"
 ```
