@@ -59,9 +59,6 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
-# Python validation artifacts
-__pycache__/
-*.py[cod]
 
 # Node / Astro website (www/)
 www/node_modules/

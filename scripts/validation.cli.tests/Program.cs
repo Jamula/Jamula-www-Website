@@ -4,13 +4,12 @@ using System.IO.Compression;
 var tests = new (string Name, Func<Task> Run)[]
 {
     ("Cli_InvalidArguments_ReturnUsage", InvalidArgumentsReturnUsage),
+    ("Cli_GovernanceDefaultRoot_ValidFixtureSucceeds", GovernanceDefaultRootValidFixtureSucceeds),
+    ("Cli_GovernanceExplicitRoot_ValidFixtureSucceeds", GovernanceExplicitRootValidFixtureSucceeds),
     ("Cli_GovernanceDefaultRoot_UsesWorkingDirectory", GovernanceDefaultRootUsesWorkingDirectory),
     ("Cli_GovernanceExplicitRoot_UsesArgument", GovernanceExplicitRootUsesArgument),
     ("Cli_ArtifactValidArchive_ExtractsAndSucceeds", ArtifactValidArchiveExtractsAndSucceeds),
-    ("Cli_ArtifactMissingArchive_ReturnsError", ArtifactMissingArchiveReturnsError),
-    ("Cli_VerifySiteInvalidUrl_ReturnsError", VerifySiteInvalidUrlReturnsError),
-    ("Cli_VerifySiteDefaultConfig_UsesDefaultPath", VerifySiteDefaultConfigUsesDefaultPath),
-    ("Cli_VerifySiteExplicitConfig_UsesArgument", VerifySiteExplicitConfigUsesArgument)
+    ("Cli_ArtifactMissingArchive_ReturnsError", ArtifactMissingArchiveReturnsError)
 };
 
 await Task.WhenAll(tests.Select(async test =>
@@ -36,15 +35,38 @@ static async Task InvalidArgumentsReturnUsage()
         [], ["unknown"], ["validate-governance", "root", "extra"],
         ["validate-artifact"], ["validate-artifact", "one", "two"],
         ["validate-artifact", "one", "two", "three", "extra"],
-        ["verify-site"], ["verify-site", "one", "two", "extra"]
+        ["verify-site"], ["verify-site", "https://ashy-beach-033c7d01e-1.7.azurestaticapps.net/"],
+        ["verify-site", "https://ashy-beach-033c7d01e-1.7.azurestaticapps.net/", "config.json", "extra"]
     ];
     foreach (var args in cases)
     {
         var result = await RunCli(fixture.Root, args);
         Equal(2, result.ExitCode);
         Equal("", result.Output);
-        Equal("Usage: validate-governance [ROOT] | validate-artifact ARCHIVE DESTINATION TRUSTED_CONFIG | verify-site HTTPS_PREVIEW_URL [CONFIG]", result.Error.TrimEnd());
+        Equal("Usage: validate-governance [ROOT] | validate-artifact ARCHIVE DESTINATION TRUSTED_CONFIG", result.Error.TrimEnd());
     }
+}
+
+static async Task GovernanceDefaultRootValidFixtureSucceeds()
+{
+    using var fixture = new Fixture();
+    PopulateValidGovernanceRoot(fixture.Root);
+    var result = await RunCli(fixture.Root, "validate-governance");
+    Equal(0, result.ExitCode);
+    Equal("Governance validation passed.", result.Output.TrimEnd());
+    Equal("", result.Error);
+}
+
+static async Task GovernanceExplicitRootValidFixtureSucceeds()
+{
+    using var fixture = new Fixture();
+    var target = Path.Combine(fixture.Root, "target");
+    Directory.CreateDirectory(target);
+    PopulateValidGovernanceRoot(target);
+    var result = await RunCli(fixture.Root, "validate-governance", target);
+    Equal(0, result.ExitCode);
+    Equal("Governance validation passed.", result.Output.TrimEnd());
+    Equal("", result.Error);
 }
 
 static async Task GovernanceDefaultRootUsesWorkingDirectory()
@@ -115,32 +137,68 @@ static async Task ArtifactMissingArchiveReturnsError()
     Equal(false, Directory.Exists(destination));
 }
 
-static async Task VerifySiteInvalidUrlReturnsError()
+static void PopulateValidGovernanceRoot(string root)
 {
-    using var fixture = new Fixture();
-    var result = await RunCli(fixture.Root, "verify-site", "https://example.invalid/");
-    Equal(1, result.ExitCode);
-    Equal("", result.Output);
-    Contains("Only an isolated Jamula PR preview URL may be verified.", result.Error);
-}
+    static void Write(string baseDir, string relative, string content)
+    {
+        var path = Path.Combine(baseDir, relative.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, content);
+    }
 
-static async Task VerifySiteDefaultConfigUsesDefaultPath()
-{
-    using var fixture = new Fixture();
-    var result = await RunCli(fixture.Root, "verify-site", "https://ashy-beach-033c7d01e-1.7.azurestaticapps.net/");
-    Equal(1, result.ExitCode);
-    Equal("", result.Output);
-    Contains(Path.Combine(fixture.Root, "www", "public", "staticwebapp.config.json"), result.Error);
-}
+    foreach (var required in new[]
+    {
+        "LICENSE", "LICENSE_SCOPE.md", "TRADEMARKS.md", "CONTRIBUTING.md", "THIRD_PARTY_NOTICES.md",
+        "docs/README.md", "docs/planning/evaluation-plan.md", "docs/legal/license-inventory.md",
+        ".github/skills/cloud-solution-architect/references/source.md"
+    })
+    {
+        Write(root, required, "fixture");
+    }
 
-static async Task VerifySiteExplicitConfigUsesArgument()
-{
-    using var fixture = new Fixture();
-    var config = Path.Combine(fixture.Root, "missing-explicit-config.json");
-    var result = await RunCli(fixture.Root, "verify-site", "https://ashy-beach-033c7d01e-1.7.azurestaticapps.net/", config);
-    Equal(1, result.ExitCode);
-    Equal("", result.Output);
-    Contains(config, result.Error);
+    Write(root, ".github/skills/cloud-solution-architect/SKILL.md", "See [source](./references/source.md).");
+    Write(root, ".gitignore", ".env.*\n!.env.example\n");
+    Write(root, ".github/workflows/azure-static-web-apps.yml", """
+        on:
+          workflow_dispatch:
+        jobs:
+          prepare:
+            steps: []
+          build:
+            steps: []
+          deploy:
+            if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+            environment: swa-deployment
+          deploy-com:
+            if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+            environment: swa-deployment
+            token: SWA_COM_DEPLOYMENT_TOKEN
+          publish:
+            needs: [prepare, build, deploy, deploy-com]
+        token: SWA_NET_DEPLOYMENT_TOKEN
+        """.Replace("\r\n", "\n", StringComparison.Ordinal));
+    Write(root, ".github/workflows/azure-static-web-apps-preview.yml", """
+        on:
+          workflow_run:
+        jobs:
+          preview:
+            environment: swa-deployment
+            ref: ${{ github.workflow_sha }}
+            token: SWA_NET_DEPLOYMENT_TOKEN
+            steps:
+              - run: trusted tools
+        """.Replace("\r\n", "\n", StringComparison.Ordinal));
+
+    using var git = new Process
+    {
+        StartInfo = new ProcessStartInfo { FileName = "git", WorkingDirectory = root, UseShellExecute = false }
+    };
+    git.StartInfo.ArgumentList.Add("init");
+    git.StartInfo.ArgumentList.Add("-q");
+    git.Start();
+    git.WaitForExit();
+    if (git.ExitCode != 0)
+        throw new InvalidOperationException("Temporary git fixture initialization failed.");
 }
 
 static async Task<CliResult> RunCli(string workingDirectory, params string[] args)

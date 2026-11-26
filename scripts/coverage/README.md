@@ -409,11 +409,12 @@ assembly/class/line identities twice. Either runner or collector failing stops
 the command sequence before the gate; a partial report is not valid evidence.
 Do not merge separately exported Cobertura reports with `dotnet-coverage merge`
 18.12.0: a local check reduced branch denominators from 160 to 138 for
-`PreviewArtifactValidator.cs` and from 78 to 74 for `PreviewSiteVerifier.cs`.
+`PreviewArtifactValidator.cs`.
 Merging native `.coverage` inputs then exporting also lost the branch evidence.
 The shared-session Cobertura export preserves the original denominators.
-The CLI tests exercise offline dispatch/error paths, not successful live
-verification; the remaining production paths stay in the denominator.
+Live preview HTTP verification is owned by `.github/scripts/verify-preview.cjs`
+(`github-automation` component); `validation-tool` covers offline governance
+and preview-artifact validation only.
 
 The side-quest spike report is collected from the actual published child
 processes, not inferred from the `Checks` runner's own coverage. `--coverage`
@@ -538,13 +539,17 @@ console-only runner summary as a successful gate.
 - `.squad/templates/` contains first-party Node, PowerShell, shell, and 11
   runnable workflow templates. Only `ralph-triage.js` is measured; all other
   executable templates remain unmeasured blockers.
-- The migrated validation utility is measured separately from its offline test
-  runner. Its current test file is locked to the existing #110 review and is
-  not modified by this coverage work. Combining both runners measured
-  374/391 lines (95.65%) and 279/302 branches (92.38%) locally, passing this
-  component only. `Program.cs` still has 8/24 uncovered lines, and
-  `PreviewSiteVerifier.cs` has 11/78 uncovered branches; the component result
-  is not comprehensive behavior coverage or an overall first-party pass.
+- The validation utility (`GovernanceValidator.cs`,
+  `PreviewArtifactValidator.cs`, and `Program.cs`) is measured separately from
+  its offline unit and CLI test runners (`PreviewSiteVerifier.cs` and its
+  `verify-site` subcommand were retired in favor of
+  `.github/scripts/verify-preview.cjs`). Combining both runners measured
+  313/320 lines (97.81%) and 241/254 branches (94.88%) locally, with every
+  `validation-tool` source above 90% line and branch coverage (`Program.cs`
+  19/19 lines and 12/12 branches; `GovernanceValidator.cs` 108/109 lines and
+  65/66 branches; `PreviewArtifactValidator.cs` 186/192 lines and 164/176
+  branches); the component result is not an overall first-party pass while
+  unmeasured blockers remain.
 
 The inventory and gate are measurement infrastructure, not proof that #109 is
 accepted. Resolve every unmeasured path and threshold failure before claiming a

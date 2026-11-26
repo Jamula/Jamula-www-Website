@@ -143,13 +143,11 @@
       "sources": [
         "scripts/validation/GovernanceValidator.cs",
         "scripts/validation/PreviewArtifactValidator.cs",
-        "scripts/validation/PreviewSiteVerifier.cs",
         "scripts/validation/Program.cs"
       ],
       "sourceReports": {
         "scripts/validation/GovernanceValidator.cs": "validation.cobertura.xml",
         "scripts/validation/PreviewArtifactValidator.cs": "validation.cobertura.xml",
-        "scripts/validation/PreviewSiteVerifier.cs": "validation.cobertura.xml",
         "scripts/validation/Program.cs": "validation.cobertura.xml"
       }
     },
