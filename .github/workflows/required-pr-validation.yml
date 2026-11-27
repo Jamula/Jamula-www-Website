@@ -39,6 +39,7 @@ jobs:
         run: |
           website_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)www/')"
           monitor_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)scripts/monitor/')"
+          dotnet_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)scripts/validation/' ':(top)scripts/validation.tests/' ':(top)scripts/validation.cli.tests/' ':(top)scripts/mbr/' ':(top)scripts/mcp/')"
           if [[ -n "$website_files" ]]; then
             echo "website=true" >> "$GITHUB_OUTPUT"
             echo "Website validation required."
@@ -51,7 +52,14 @@ jobs:
             echo "Monitor validation required."
           else
             echo "monitor=false" >> "$GITHUB_OUTPUT"
-            echo "No monitor changes; .NET validation is not required."
+            echo "No monitor changes; monitor self-test is not required."
+          fi
+          if [[ -n "$dotnet_files" ]]; then
+            echo "dotnet_tools=true" >> "$GITHUB_OUTPUT"
+            echo "Additional .NET 11 tooling validation required."
+          else
+            echo "dotnet_tools=false" >> "$GITHUB_OUTPUT"
+            echo "No additional .NET 11 tooling changes."
           fi
 
       - name: Set up Node.js
@@ -154,13 +162,13 @@ jobs:
           tests/*.test.mjs
 
       - name: Set up .NET SDK
-        if: steps.changes.outputs.monitor == 'true'
+        if: steps.changes.outputs.monitor == 'true' || steps.changes.outputs.dotnet_tools == 'true'
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: scripts/monitor/global.json
 
       - name: Verify .NET SDK
-        if: steps.changes.outputs.monitor == 'true'
+        if: steps.changes.outputs.monitor == 'true' || steps.changes.outputs.dotnet_tools == 'true'
         working-directory: scripts/monitor
         run: dotnet --version
 
@@ -173,3 +181,12 @@ jobs:
         if: steps.changes.outputs.monitor == 'true'
         working-directory: scripts/monitor
         run: dotnet run --project JamulaMonitor.csproj --configuration Release --no-build -- --self-test
+
+      - name: Validate .NET 11 governance, MBR, and MCP suites
+        if: steps.changes.outputs.dotnet_tools == 'true'
+        working-directory: .
+        run: |
+          dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release
+          dotnet run --project scripts/validation.cli.tests/JamulaValidation.Cli.Tests.csproj --configuration Release
+          dotnet run --project scripts/mbr/tests/JamulaMbr.Tests.csproj --configuration Release
+          dotnet run --project scripts/mcp/tests/JamulaMcp.Tests.csproj --configuration Release

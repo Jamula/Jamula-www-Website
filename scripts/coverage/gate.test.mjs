@@ -527,7 +527,7 @@ test("CoverageGate_AttributesRelativeAstroConfigUsingCoberturaSourceRoot", async
     [2, 3, 1, 2],
   );
   assert.equal(result.components[0].passed, false);
-  assert.equal(result.components[0].unmeasured.filter((item) => item.path.endsWith(".astro")).length, 7);
+  assert.equal(result.components[0].unmeasured.filter((item) => item.path.endsWith(".astro")).length, 9);
   assert.ok(!result.errors.some((error) => error.includes("unclassified report source")));
 
   reports.set("astro-config/cobertura-coverage.xml", configReport.replace(`${repositoryRoot}www`, `${repositoryRoot}other/www`));
@@ -551,6 +551,8 @@ test("CoverageGate_KeepsAllAstroTemplatesAsUnmeasuredBlockers", async () => {
     "www/src/pages/404.astro",
     "www/src/pages/index.astro",
     "www/src/pages/privacy.astro",
+    "www/src/pages/tech/[slug].astro",
+    "www/src/pages/tech/index.astro",
   ];
   assert.deepEqual(
     website.unmeasured
@@ -1084,100 +1086,90 @@ test("CoverageGate_RejectsAmbiguousLinkedSourceInstances", () => {
   );
 });
 
-test("CoverageGate_MeasuresLinkedHostsAndKeepsPublisherBlocking", async () => {
+test("CoverageGate_InventoryClassifiesMcpServerAndSupportsAsymmetricThresholds", async () => {
   const manifest = JSON.parse(
     await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
   );
-  const component = manifest.components.find(
-    (item) => item.id === "sidequest-artifacts-local-runtime",
+  const componentEntry = manifest.components.find(
+    (item) => item.id === "mcp-server",
   );
-  const runtimePaths = [
-    "scripts/spikes/sidequest-artifacts/Publish-Local.ps1",
-  ];
   const measuredPaths = [
-    "scripts/spikes/sidequest-artifacts/SectionHost.cs",
-    "scripts/spikes/sidequest-artifacts/Gateway/Program.cs",
-  ];
-  const supportPaths = [
-    "scripts/spikes/sidequest-artifacts/Checks/Program.cs",
-    "scripts/spikes/sidequest-artifacts/Checks/Child.cs",
+    "scripts/mcp/GroundedAdvisor.cs",
+    "scripts/mcp/JamulaMcpTools.cs",
+    "scripts/mcp/McpTelemetry.cs",
+    "scripts/mcp/Program.cs",
+    "scripts/mcp/PublicCorpus.cs",
   ];
 
-  assert.ok(
-    component,
-    "local runnable spike sources need their own classification",
+  assert.ok(componentEntry, "mcp-server component must be classified");
+  assert.equal(
+    manifest.components.some(
+      (item) => item.id === "sidequest-artifacts-local-runtime",
+    ),
+    false,
+    "retired sidequest spike component must not remain in inventory",
   );
   assert.deepEqual(
-    component.sources.slice().sort(),
+    componentEntry.sources.slice().sort(),
     [...measuredPaths].sort(),
   );
-  assert.deepEqual(component.reports, [
-    "sidequest-artifacts/cobertura-coverage.xml",
-  ]);
-  assert.deepEqual(component.compiledSources, [
-    {
-      path: "scripts/spikes/sidequest-artifacts/SectionHost.cs",
-      modules: ["Admin", "Finance", "Tech"],
-      requireNoBranches: true,
-    },
-    {
-      path: "scripts/spikes/sidequest-artifacts/Gateway/Program.cs",
-      modules: ["Gateway"],
-    },
-  ]);
-  assert.deepEqual(
-    component.unmeasured.map((source) => source.path).sort(),
-    [...runtimePaths].sort(),
+  assert.deepEqual(componentEntry.reports, ["mcp.cobertura.xml"]);
+  assert.ok(
+    manifest.excludedSources.some(
+      (source) => source.path === "scripts/mcp/tests/Program.cs",
+    ),
+    "MCP test runner must be classified as excluded test source",
   );
-  for (const source of component.unmeasured) {
-    assert.match(
-      source.reason,
-      /no compatible line\/branch coverage report exists/i,
-    );
-    assert.match(source.reason, /Pester 3\.4.*no branch counts/i);
-    assert.match(source.reason, /behavior checks are not source coverage/i);
-    assert.match(source.reason, /blocker/i);
-    assert.match(source.reason, /not classified as test-only/i);
-  }
-  for (const path of supportPaths) {
-    const exclusion = manifest.excludedSources.find(
-      (source) => source.path === path,
-    );
-    assert.ok(exclusion, `${path} must remain explicitly classified`);
-    assert.match(exclusion.reason, /offline spike-check/i);
-    assert.match(exclusion.reason, /test support/i);
-    assert.ok(
-      !component.unmeasured.some((source) => source.path === path),
-      `${path} is support code, not a runtime coverage blocker`,
-    );
-  }
-  assert.equal(manifest.thresholdPercent, 90);
 
-  const result = evaluateCoverage(
-    { ...manifest, components: [component] },
+  const missingResult = evaluateCoverage(
+    { ...manifest, components: [componentEntry] },
     new Map(),
   );
-  assert.equal(result.passed, false);
-  assert.deepEqual(
-    result.components[0].unmeasured.map((source) => source.path).sort(),
-    [...runtimePaths].sort(),
+  assert.equal(missingResult.passed, false);
+  for (const source of measuredPaths) {
+    assert.ok(
+      missingResult.errors.some((error) =>
+        error.includes(`missing source measurement: ${source}`),
+      ),
+      `${source} must require a Cobertura report`,
+    );
+  }
+
+  // Verify asymmetric 95% line / 90% branch threshold evaluation
+  const asymmetricInventory = {
+    schemaVersion: 2,
+    lineThresholdPercent: 95,
+    branchThresholdPercent: 90,
+    components: [component("app", ["src/app.cs"], ["app.xml"])],
+    excludedSources: [],
+  };
+  const pass95And90 = evaluateCoverage(
+    asymmetricInventory,
+    new Map([
+      [
+        "app.xml",
+        classReport("src/app.cs", Array(19).fill(1).concat([0]), [[9, 10]]),
+      ],
+    ]),
   );
-  for (const path of runtimePaths) {
-    assert.ok(
-      result.errors.some((error) =>
-        error.includes(`unmeasured source: ${path}`),
-      ),
-      `${path} must block the gate until measured`,
-    );
-  }
-  for (const path of measuredPaths) {
-    assert.ok(
-      result.errors.some((error) =>
-        error.includes(`missing source measurement: ${path}`),
-      ),
-      `${path} must have a fresh process-execution report`,
-    );
-  }
+  assert.equal(pass95And90.passed, true);
+  assert.equal(pass95And90.lineThresholdPercent, 95);
+  assert.equal(pass95And90.branchThresholdPercent, 90);
+
+  const fail94Lines = evaluateCoverage(
+    asymmetricInventory,
+    new Map([
+      [
+        "app.xml",
+        classReport("src/app.cs", Array(18).fill(1).concat([0, 0]), [[9, 10]]),
+      ],
+    ]),
+  );
+  assert.equal(fail94Lines.passed, false);
+  assert.match(
+    fail94Lines.errors.join("\n"),
+    />=95% line and >=90% branch coverage/,
+  );
 });
 
 test("CoverageGate_RepositoryMonitorMetadataUsesGuardedClassification", async () => {

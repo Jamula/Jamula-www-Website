@@ -285,7 +285,7 @@ function percentage(covered, valid) {
   return valid > 0 ? Number(((covered / valid) * 100).toFixed(2)) : null;
 }
 
-function summarize(counts, thresholdPercent) {
+function summarize(counts, lineThresholdPercent, branchThresholdPercent = lineThresholdPercent) {
   const linePercent = percentage(counts.linesCovered, counts.linesValid);
   const branchPercent = percentage(
     counts.branchesCovered,
@@ -298,8 +298,8 @@ function summarize(counts, thresholdPercent) {
     passed:
       linePercent !== null &&
       branchPercent !== null &&
-      counts.linesCovered * 100 >= counts.linesValid * thresholdPercent &&
-      counts.branchesCovered * 100 >= counts.branchesValid * thresholdPercent,
+      counts.linesCovered * 100 >= counts.linesValid * lineThresholdPercent &&
+      counts.branchesCovered * 100 >= counts.branchesValid * branchThresholdPercent,
   };
 }
 
@@ -312,10 +312,16 @@ export function evaluateCoverage(
   const root = sourcePath(rootPath);
   if (!root.absolute) throw new Error("Repository root must be an absolute path.");
   const errors = [];
+  const lineThresholdPercent =
+    inventory?.lineThresholdPercent ?? inventory?.thresholdPercent;
+  const branchThresholdPercent =
+    inventory?.branchThresholdPercent ?? inventory?.thresholdPercent;
   if (
     inventory?.schemaVersion !== 2 ||
-    !Number.isFinite(inventory.thresholdPercent) ||
-    inventory.thresholdPercent <= 0 ||
+    !Number.isFinite(lineThresholdPercent) ||
+    lineThresholdPercent <= 0 ||
+    !Number.isFinite(branchThresholdPercent) ||
+    branchThresholdPercent <= 0 ||
     !Array.isArray(inventory.components) ||
     !Array.isArray(inventory.excludedSources)
   ) {
@@ -580,10 +586,16 @@ export function evaluateCoverage(
       );
     }
 
-    const summary = summarize(componentCounts, inventory.thresholdPercent);
+    const summary = summarize(
+      componentCounts,
+      lineThresholdPercent,
+      branchThresholdPercent,
+    );
     if (!summary.passed) {
       componentErrors.push(
-        `component requires >=${inventory.thresholdPercent}% line and branch coverage.`,
+        lineThresholdPercent === branchThresholdPercent
+          ? `component requires >=${lineThresholdPercent}% line and branch coverage.`
+          : `component requires >=${lineThresholdPercent}% line and >=${branchThresholdPercent}% branch coverage.`,
       );
     }
     errors.push(
@@ -603,14 +615,22 @@ export function evaluateCoverage(
     });
   }
 
-  const aggregate = summarize(aggregateCounts, inventory.thresholdPercent);
+  const aggregate = summarize(
+    aggregateCounts,
+    lineThresholdPercent,
+    branchThresholdPercent,
+  );
   if (!aggregate.passed) {
     errors.push(
-      `aggregate requires >=${inventory.thresholdPercent}% line and branch coverage.`,
+      lineThresholdPercent === branchThresholdPercent
+        ? `aggregate requires >=${lineThresholdPercent}% line and branch coverage.`
+        : `aggregate requires >=${lineThresholdPercent}% line and >=${branchThresholdPercent}% branch coverage.`,
     );
   }
   return {
-    thresholdPercent: inventory.thresholdPercent,
+    thresholdPercent: lineThresholdPercent,
+    lineThresholdPercent,
+    branchThresholdPercent,
     passed: errors.length === 0,
     components,
     aggregate,

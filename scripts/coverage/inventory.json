@@ -43,6 +43,26 @@
           "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
         },
         {
+          "path": "www/src/pages/tech/[slug].astro",
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
+        },
+        {
+          "path": "www/src/pages/tech/index.astro",
+          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
+        },
+        {
+          "path": "www/src/content.config.ts",
+          "reason": "Build-time Astro Content Layer schema evaluated during static compilation; validated by astro check and tech-and-llms.test.mjs."
+        },
+        {
+          "path": "www/src/pages/llms-full.txt.ts",
+          "reason": "Build-time static Astro endpoint evaluated during static compilation; output verified by tech-and-llms.test.mjs."
+        },
+        {
+          "path": "www/src/pages/llms.txt.ts",
+          "reason": "Build-time static Astro endpoint evaluated during static compilation; output verified by tech-and-llms.test.mjs."
+        },
+        {
           "path": "www/scripts/measure-local-performance.mjs",
           "reason": "The fake CDP tests do not execute the embedded browser-side logic; c8 host-line counts would not measure it. The Edge V8 prototype requires independently enforced external egress isolation; its acknowledgment check does not enforce or verify isolation. It maps each evaluated string to its exact source slice, but v8-to-istanbul initializes lines outside that mapped slice as covered; host and browser records cannot be combined without false line counts, so the diagnostic has no defensible denominator."
         }
@@ -160,33 +180,22 @@
       }
     },
     {
-      "id": "sidequest-artifacts-local-runtime",
-      "reports": ["sidequest-artifacts/cobertura-coverage.xml"],
+      "id": "mcp-server",
+      "reports": ["mcp.cobertura.xml"],
       "sources": [
-        "scripts/spikes/sidequest-artifacts/SectionHost.cs",
-        "scripts/spikes/sidequest-artifacts/Gateway/Program.cs"
+        "scripts/mcp/GroundedAdvisor.cs",
+        "scripts/mcp/JamulaMcpTools.cs",
+        "scripts/mcp/McpTelemetry.cs",
+        "scripts/mcp/Program.cs",
+        "scripts/mcp/PublicCorpus.cs"
       ],
       "sourceReports": {
-        "scripts/spikes/sidequest-artifacts/SectionHost.cs": "sidequest-artifacts/cobertura-coverage.xml",
-        "scripts/spikes/sidequest-artifacts/Gateway/Program.cs": "sidequest-artifacts/cobertura-coverage.xml"
-      },
-      "compiledSources": [
-        {
-          "path": "scripts/spikes/sidequest-artifacts/SectionHost.cs",
-          "modules": ["Admin", "Finance", "Tech"],
-          "requireNoBranches": true
-        },
-        {
-          "path": "scripts/spikes/sidequest-artifacts/Gateway/Program.cs",
-          "modules": ["Gateway"]
-        }
-      ],
-      "unmeasured": [
-        {
-          "path": "scripts/spikes/sidequest-artifacts/Publish-Local.ps1",
-          "reason": "Runnable local publisher; offline --publisher behavior checks are not source coverage. Available Pester 3.4 command coverage has no branch counts or repository-pinned Cobertura export, and dotnet-coverage measures CLR code rather than PowerShell source. No compatible line/branch coverage report exists; kept as a blocker, not classified as test-only."
-        }
-      ]
+        "scripts/mcp/GroundedAdvisor.cs": "mcp.cobertura.xml",
+        "scripts/mcp/JamulaMcpTools.cs": "mcp.cobertura.xml",
+        "scripts/mcp/McpTelemetry.cs": "mcp.cobertura.xml",
+        "scripts/mcp/Program.cs": "mcp.cobertura.xml",
+        "scripts/mcp/PublicCorpus.cs": "mcp.cobertura.xml"
+      }
     },
     {
       "id": "squad-maintenance-templates",
@@ -333,20 +342,12 @@
       "reason": "Test-only source; its assertions are not monitor behavior."
     },
     {
-      "path": "scripts/spikes/sidequest-artifacts/Checks/Program.cs",
-      "reason": "Offline spike-check runner and assertions; test support, not a publisher, host, or gateway."
-    },
-    {
-      "path": "scripts/spikes/sidequest-artifacts/Checks/Child.cs",
-      "reason": "Offline spike-check child-process lifecycle fixture; test support, not a publisher, host, or gateway."
+      "path": "scripts/mcp/tests/Program.cs",
+      "reason": "Offline MCP fixture runner and assertions, not MCP server behavior."
     },
     {
       "path": "scripts/mbr/tests/ui.test.mjs",
       "reason": "Test-only source; its assertions are not product behavior."
-    },
-    {
-      "path": "scripts/spikes/sidequest-routing/Program.cs",
-      "reason": "Disposable mechanism experiment, not a maintained deployable or utility."
     },
     {
       "path": "scripts/validation.tests/Program.cs",
@@ -398,6 +399,10 @@
     },
     {
       "path": "www/tests/analytics-consent.test.mjs",
+      "reason": "Test-only source; its assertions are not product behavior."
+    },
+    {
+      "path": "www/tests/tech-and-llms.test.mjs",
       "reason": "Test-only source; its assertions are not product behavior."
     }
   ]

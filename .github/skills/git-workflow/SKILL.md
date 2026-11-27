@@ -26,7 +26,7 @@ There are **no** `dev`, `preview`, or `insiders` branches in this repository, an
 
 ## Workflow for Issue Work
 
-1. **Start from a milestoned GitHub issue** (`M01 - Phase 1: Public website`, `M02 - Side-quests: Foundation`, `M03 - Side-quests: Features`, or `M04 - Side-quests: Operations & Release`) and branch from `origin/main`:
+1. **Start from a milestoned GitHub issue** (`M01`–`M05` with `[Mxx.yy]` sub-milestone prefix) and branch from `origin/main`:
    ```bash
    git fetch origin main
    git checkout -b squad/{issue-number}-{slug} origin/main
@@ -41,10 +41,11 @@ There are **no** `dev`, `preview`, or `insiders` branches in this repository, an
    node www/scripts/test_built_site.mjs
    node --test "www/tests/*.test.mjs"
 
-   # Governance, .NET 10, & workflow script checks (when touching docs, .github/, or scripts/)
+   # Governance, .NET 11, MCP, & workflow script checks (when touching docs, .github/, or scripts/)
    dotnet run --project scripts/validation/JamulaValidation.csproj --configuration Release -- validate-governance .
    dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release
    dotnet run --project scripts/validation.cli.tests/JamulaValidation.Cli.Tests.csproj --configuration Release
+   dotnet run --project scripts/mcp/tests/JamulaMcp.Tests.csproj --configuration Release
    node --test ".github/scripts/*.test.cjs"
    git diff --check
    ```
@@ -119,5 +120,5 @@ Prefer one focused PR targeting `main`. Stack a child PR only when a real techni
 - ❌ Expecting PR merges to auto-deploy production or promoting PR preview URLs via DNS
 - ❌ Running `git push --force`, rebasing without checking `git merge-base --is-ancestor "$OBSERVED_SHA" HEAD`, omitting an exact observed-SHA `--force-with-lease`, or force-updating `main` / concurrent work / another session's branch
 - ❌ Editing files in the main repository checkout or a peer agent's worktree
-- ❌ Introducing Python scripts/workflows where `.NET 10` LTS or Node.js satisfies the requirement
+- ❌ Introducing Python scripts/workflows where `.NET 11` or Node.js satisfies the requirement
 - ❌ Treating a merged PR or prior-commit approval as valid after pushing a new commit SHA

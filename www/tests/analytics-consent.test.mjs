@@ -296,9 +296,12 @@ test("configuration excludes advertising linker and sensitive URLs from all requ
   assert.doesNotMatch(JSON.stringify(commands), /private|example|secret|mailto|spam@|user_id/);
 });
 
-test("privacy and arbitrary not-found paths use fixed safe page values", async (t) => {
+test("privacy, tech, and arbitrary not-found paths use fixed safe page values", async (t) => {
   for (const [label, path, safePath, title] of [
     ["privacy", "/privacy/", "/privacy/", "Website analytics privacy"],
+    ["tech index", "/tech/", "/tech/", "Technical notes"],
+    ["tech note", "/tech/evidence-gated-static-delivery/", "/tech/", "Technical note"],
+    ["tech unsafe slug", "/tech/private@example.test", "/404", "Page not found"],
     ["unknown", "/private@example.test?secret=value", "/404", "Page not found"],
   ]) {
     await t.test(label, () => {

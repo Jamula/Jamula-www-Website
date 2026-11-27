@@ -124,7 +124,11 @@ export function initializeAnalytics(win = window, doc = document) {
         ? { path: "/", title: "Jamula home" }
         : ["/privacy", "/privacy/"].includes(win.location.pathname)
           ? { path: "/privacy/", title: "Website analytics privacy" }
-          : { path: "/404", title: "Page not found" };
+          : ["/tech", "/tech/"].includes(win.location.pathname)
+            ? { path: "/tech/", title: "Technical notes" }
+            : /^\/tech\/[a-z0-9-]+(?:\/)?$/.test(win.location.pathname)
+              ? { path: "/tech/", title: "Technical note" }
+              : { path: "/404", title: "Page not found" };
     win.gtag("consent", "default", {
       analytics_storage: "granted",
       ad_storage: "denied",

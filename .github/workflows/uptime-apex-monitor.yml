@@ -33,7 +33,7 @@ jobs:
   check:
     name: Apex DNS and approved hostname health
     runs-on: ubuntu-latest
-    # .NET 10 LTS is supported through Nov 2028; install the SDK from global.json.
+    # .NET 11 STS; install the SDK from global.json.
     # All dotnet steps run from scripts/monitor/ so global.json is on the discovery path.
     timeout-minutes: 5
     steps:

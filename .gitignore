@@ -64,6 +64,7 @@ nunit-*.xml
 www/node_modules/
 www/dist/
 www/.astro/
+.impeccable/hook.cache.json
 # Squad: ignore runtime state (logs, inbox, sessions)
 # Note: .squad/casting/* is identity and MUST be committed to main, not ignored
 .squad/orchestration-log/
