@@ -9,12 +9,26 @@ test("static /llms.txt and /llms-full.txt expose canonical pages and published t
   const llmsFull = await readFile(distUrl("llms-full.txt"), "utf8");
 
   assert.match(llms, /^# Jamula\n/m);
-  assert.match(llms, /https:\/\/jamula\.net\/tech\//);
-  assert.match(llms, /https:\/\/jamula\.net\/tech\/evidence-gated-static-delivery\//);
-  assert.match(llms, /https:\/\/jamula\.net\/llms-full\.txt/);
+  assert.ok(
+    llms.includes("\n- [Technical notes](https://jamula.net/tech/): "),
+    "llms.txt must link the canonical /tech/ index"
+  );
+  assert.ok(
+    llms.includes(
+      "\n- [Evidence-gated static delivery and zero-inference-cost MCP](https://jamula.net/tech/evidence-gated-static-delivery/): "
+    ),
+    "llms.txt must link the published technical note"
+  );
+  assert.ok(
+    llms.includes("\n- [Full text index](https://jamula.net/llms-full.txt): "),
+    "llms.txt must link /llms-full.txt"
+  );
 
   assert.match(llmsFull, /^# Jamula — Full Public Reference\n/m);
-  assert.match(llmsFull, /URL: https:\/\/jamula\.net\/tech\/evidence-gated-static-delivery\//);
+  assert.ok(
+    llmsFull.includes("\nURL: https://jamula.net/tech/evidence-gated-static-delivery/\n"),
+    "llms-full.txt must include the exact canonical article URL line"
+  );
   assert.match(llmsFull, /caller-brings-model/i);
   assert.doesNotMatch(llmsFull, /<script\b/i);
 });

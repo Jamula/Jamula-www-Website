@@ -189,4 +189,5 @@ jobs:
           dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release
           dotnet run --project scripts/validation.cli.tests/JamulaValidation.Cli.Tests.csproj --configuration Release
           dotnet run --project scripts/mbr/tests/JamulaMbr.Tests.csproj --configuration Release
+          node --test scripts/mbr/tests/ui.test.mjs
           dotnet run --project scripts/mcp/tests/JamulaMcp.Tests.csproj --configuration Release

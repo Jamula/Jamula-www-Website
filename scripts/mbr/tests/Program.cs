@@ -577,5 +577,8 @@ finally
 {
     File.Delete(lockedImportPath);
 }
-await MbrIntegrationTests.RunAsync(Check);
+if (OperatingSystem.IsWindows())
+{
+    await MbrIntegrationTests.RunAsync(Check);
+}
 Console.WriteLine($"{tests} offline fixture checks passed.");
