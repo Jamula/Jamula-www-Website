@@ -215,8 +215,15 @@ await RunAsync("McpHost_ServesReadyEndpointSecurityHeadersAndStreamableHttpMcpTo
 {
     Check(await McpHost.RunMainAsync(["--verify-corpus", realTechDir]) == 0, "CLI verify-corpus must exit 0");
     Check(await McpHost.RunMainAsync(["--unknown"]) == 2, "CLI invalid args must exit 2");
+    Check(await McpHost.RunMainAsync(["--port", "99999"]) == 2, "CLI out-of-range port must exit 2");
     Check(Directory.Exists(McpHost.ResolveDefaultCorpusDirectory(repoRoot)), "ResolveDefaultCorpusDirectory from repo root");
-    Check(Directory.Exists(McpHost.ResolveDefaultCorpusDirectory(Path.Combine(repoRoot, "scripts", "mcp"))), "ResolveDefaultCorpusDirectory from project dir");
+    Check(Directory.Exists(McpHost.ResolveDefaultCorpusDirectory(Path.Join(repoRoot, "scripts", "mcp"))), "ResolveDefaultCorpusDirectory from project dir");
+
+    using var startupLog = new StringWriter();
+    using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+    var runResult = await McpHost.RunMainAsync(["--port", "0"], cts.Token, startupLog);
+    Check(runResult == 0 && startupLog.ToString().Contains("MCP endpoint listening on http://127.0.0.1:", StringComparison.Ordinal),
+        "RunMainAsync must announce bound /mcp endpoint before waiting for shutdown");
 
     await using var app = McpHost.BuildLoopbackApp(realTechDir, port: 0);
     await app.StartAsync();

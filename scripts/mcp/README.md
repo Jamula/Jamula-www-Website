@@ -22,9 +22,10 @@ own Azure tenant in `M05`), `GroundedAdvisor` demonstrates the vendor-neutral
 without calling the model, and grounded responses record content-free
 `gen_ai.client.token.usage` counters without logging prompts or completions.
 
-## Verify offline
+## Run or verify offline
 
 ```powershell
+dotnet run --project scripts\mcp\JamulaMcp.csproj --configuration Release -- --port 5180
 dotnet run --project scripts\mcp\JamulaMcp.csproj --configuration Release -- --verify-corpus www\src\content\tech
 dotnet run --project scripts\mcp\tests\JamulaMcp.Tests.csproj --configuration Release
 ```
