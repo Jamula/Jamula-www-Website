@@ -158,19 +158,7 @@ public sealed class PublicCorpus
 
         var frontmatter = normalized[4..closingIndex];
         var body = normalized[(closingIndex + 5)..].Trim();
-        var fields = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var line in frontmatter.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            var colon = line.IndexOf(':', StringComparison.Ordinal);
-            if (colon <= 0)
-            {
-                throw new InvalidDataException($"Corpus entry '{slug}' contains malformed frontmatter line.");
-            }
-
-            var key = line[..colon].Trim();
-            var value = line[(colon + 1)..].Trim().Trim('"');
-            fields[key] = value;
-        }
+        var fields = ParseFrontmatterFields(slug, frontmatter);
 
         if (!fields.TryGetValue("title", out var title) || string.IsNullOrWhiteSpace(title) ||
             !fields.TryGetValue("publishedDate", out var date) || !Regex.IsMatch(date, @"^\d{4}-\d{2}-\d{2}$") ||
@@ -187,6 +175,74 @@ public sealed class PublicCorpus
             PublishedDate: date,
             Summary: summary,
             Body: body);
+    }
+
+    private static Dictionary<string, string> ParseFrontmatterFields(string slug, string frontmatter)
+    {
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+        string? activeBlockKey = null;
+        var activeBlockJoin = " ";
+        var blockLines = new List<string>();
+
+        void FlushBlock()
+        {
+            if (activeBlockKey is not null)
+            {
+                fields[activeBlockKey] = string.Join(activeBlockJoin, blockLines).Trim();
+                activeBlockKey = null;
+                blockLines.Clear();
+            }
+        }
+
+        foreach (var rawLine in frontmatter.Split('\n'))
+        {
+            if (string.IsNullOrWhiteSpace(rawLine) || rawLine.TrimStart().StartsWith('#'))
+            {
+                continue;
+            }
+
+            if (activeBlockKey is not null && (rawLine.StartsWith("  ", StringComparison.Ordinal) || rawLine.StartsWith('\t')))
+            {
+                blockLines.Add(rawLine.Trim());
+                continue;
+            }
+
+            FlushBlock();
+            var colon = rawLine.IndexOf(':', StringComparison.Ordinal);
+            if (colon <= 0)
+            {
+                throw new InvalidDataException($"Corpus entry '{slug}' contains malformed frontmatter line.");
+            }
+
+            var key = rawLine[..colon].Trim();
+            var rawValue = rawLine[(colon + 1)..].Trim();
+            if (rawValue is ">" or ">-" or "|" or "|-")
+            {
+                activeBlockKey = key;
+                activeBlockJoin = rawValue.StartsWith('|') ? "\n" : " ";
+                continue;
+            }
+
+            fields[key] = UnquoteYamlScalar(rawValue);
+        }
+
+        FlushBlock();
+        return fields;
+    }
+
+    private static string UnquoteYamlScalar(string rawValue)
+    {
+        if (rawValue.Length >= 2 && rawValue[0] == '\'' && rawValue[^1] == '\'')
+        {
+            return rawValue[1..^1].Replace("''", "'", StringComparison.Ordinal);
+        }
+
+        if (rawValue.Length >= 2 && rawValue[0] == '"' && rawValue[^1] == '"')
+        {
+            return rawValue[1..^1].Replace("\\\"", "\"", StringComparison.Ordinal);
+        }
+
+        return rawValue;
     }
 
     private static HashSet<string> Tokenize(string text) =>

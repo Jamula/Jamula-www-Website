@@ -111,8 +111,12 @@ Run("PublicCorpus_RejectsInvalidDirectoriesMalformedFrontmatterAndUnsafeQueries"
         var longBody = string.Join(' ', Enumerable.Repeat("architecture", 80)) + " targetkeyword " + string.Join(' ', Enumerable.Repeat("verification", 80));
         File.WriteAllText(
             Path.Combine(tempDir, "long-note.md"),
-            $"---\ntitle: \"Long Note\"\npublishedDate: \"2026-11-26\"\nsummary: \"Detailed note\"\n---\n{longBody}");
+            $"---\n# YAML comment line\ntitle: 'Long''s Note'\npublishedDate: '2026-11-26'\nsummary: >-\n  Detailed folded\n  summary text\n---\n{longBody}");
         var valid = PublicCorpus.LoadFromDirectory(tempDir);
+        var parsedNote = valid.ListTechNotes().Single(n => n.Id == "long-note");
+        Check(parsedNote.Title == "Long's Note", "expected single-quoted title unescaping");
+        Check(parsedNote.PublishedDate == "2026-11-26", "expected single-quoted date");
+        Check(parsedNote.Summary == "Detailed folded summary text", "expected folded YAML summary");
         var excerptMatch = valid.Search("targetkeyword", 1);
         Check(excerptMatch.Count == 1 && excerptMatch[0].Excerpt.EndsWith("...", StringComparison.Ordinal), "expected truncated excerpt");
         Check(valid.Search("!", 1).Count == 0, "expected single-punctuation query to produce zero tokens");
@@ -220,8 +224,12 @@ await RunAsync("McpHost_ServesReadyEndpointSecurityHeadersAndStreamableHttpMcpTo
     Check(Directory.Exists(McpHost.ResolveDefaultCorpusDirectory(Path.Join(repoRoot, "scripts", "mcp"))), "ResolveDefaultCorpusDirectory from project dir");
 
     using var startupLog = new StringWriter();
-    using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
-    var runResult = await McpHost.RunMainAsync(["--port", "0"], cts.Token, startupLog);
+    using var cts = new CancellationTokenSource();
+    var runResult = await McpHost.RunMainAsync(
+        ["--port", "0"],
+        cts.Token,
+        startupLog,
+        onStarted: _ => cts.Cancel());
     Check(runResult == 0 && startupLog.ToString().Contains("MCP endpoint listening on http://127.0.0.1:", StringComparison.Ordinal),
         "RunMainAsync must announce bound /mcp endpoint before waiting for shutdown");
 
@@ -238,20 +246,68 @@ await RunAsync("McpHost_ServesReadyEndpointSecurityHeadersAndStreamableHttpMcpTo
         Check(health.Headers.TryGetValues("X-Content-Type-Options", out var nosniff) && nosniff.Contains("nosniff"), "expected nosniff header");
         Check(health.Headers.Contains("Content-Security-Policy"), "expected CSP header");
 
-        using var initRequest = new HttpRequestMessage(HttpMethod.Post, "/mcp")
+        async Task<(HttpStatusCode Status, string Body, string? SessionId)> PostMcpAsync(string jsonRpc, string? sessionId = null)
         {
-            Content = new StringContent(
-                """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test-client","version":"1.0.0"}}}""",
-                Encoding.UTF8,
-                "application/json")
-        };
-        initRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        initRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+            using var req = new HttpRequestMessage(HttpMethod.Post, "/mcp")
+            {
+                Content = new StringContent(jsonRpc, Encoding.UTF8, "application/json")
+            };
+            req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+            if (!string.IsNullOrEmpty(sessionId))
+            {
+                req.Headers.Add("Mcp-Session-Id", sessionId);
+            }
 
-        using var initResponse = await http.SendAsync(initRequest);
-        Check(initResponse.StatusCode == HttpStatusCode.OK, $"expected MCP initialize 200, got {(int)initResponse.StatusCode}");
-        var initBody = await initResponse.Content.ReadAsStringAsync();
-        Check(initBody.Contains("jamula-public-mcp", StringComparison.Ordinal), "expected jamula-public-mcp server info");
+            using var resp = await http.SendAsync(req);
+            var sid = resp.Headers.TryGetValues("Mcp-Session-Id", out var values) ? values.FirstOrDefault() : sessionId;
+            return (resp.StatusCode, await resp.Content.ReadAsStringAsync(), sid);
+        }
+
+        var init = await PostMcpAsync(
+            """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test-client","version":"1.0.0"}}}""");
+        Check(init.Status == HttpStatusCode.OK, $"expected MCP initialize 200, got {(int)init.Status}");
+        Check(init.Body.Contains("jamula-public-mcp", StringComparison.Ordinal), "expected jamula-public-mcp server info");
+
+        var initialized = await PostMcpAsync(
+            """{"jsonrpc":"2.0","method":"notifications/initialized"}""",
+            init.SessionId);
+        Check(initialized.Status is HttpStatusCode.Accepted or HttpStatusCode.OK, "expected notifications/initialized 202/200");
+
+        var toolsList = await PostMcpAsync(
+            """{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}""",
+            init.SessionId);
+        Check(toolsList.Status == HttpStatusCode.OK, "expected tools/list 200");
+        Check(toolsList.Body.Contains("get_jamula_overview", StringComparison.Ordinal) &&
+              toolsList.Body.Contains("list_tech_notes", StringComparison.Ordinal) &&
+              toolsList.Body.Contains("search_public_corpus", StringComparison.Ordinal),
+            "tools/list must advertise all three registered tools");
+
+        var callOverview = await PostMcpAsync(
+            """{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_jamula_overview","arguments":{}}}""",
+            init.SessionId);
+        Check(callOverview.Status == HttpStatusCode.OK && callOverview.Body.Contains("AI Strategy", StringComparison.Ordinal),
+            "tools/call get_jamula_overview must return overview payload");
+
+        var callList = await PostMcpAsync(
+            """{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"list_tech_notes","arguments":{}}}""",
+            init.SessionId);
+        Check(callList.Status == HttpStatusCode.OK && callList.Body.Contains("evidence-gated-static-delivery", StringComparison.Ordinal),
+            "tools/call list_tech_notes must return published notes");
+
+        var callSearch = await PostMcpAsync(
+            """{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"search_public_corpus","arguments":{"query":"secretless preview","maxResults":2}}}""",
+            init.SessionId);
+        Check(callSearch.Status == HttpStatusCode.OK && callSearch.Body.Contains("matchCount", StringComparison.Ordinal),
+            "tools/call search_public_corpus must bind arguments and return matches");
+
+        var callInvalid = await PostMcpAsync(
+            """{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"search_public_corpus","arguments":{"query":"jamula","maxResults":99}}}""",
+            init.SessionId);
+        Check(callInvalid.Status == HttpStatusCode.OK &&
+              (callInvalid.Body.Contains("\"isError\":true", StringComparison.Ordinal) ||
+               callInvalid.Body.Contains("\"error\"", StringComparison.Ordinal)),
+            "tools/call with out-of-range maxResults must surface an MCP error response");
     }
     finally
     {

@@ -8,7 +8,11 @@ return await McpHost.RunMainAsync(args);
 
 public static class McpHost
 {
-    public static async Task<int> RunMainAsync(string[] args, CancellationToken cancellationToken = default, TextWriter? output = null)
+    public static async Task<int> RunMainAsync(
+        string[] args,
+        CancellationToken cancellationToken = default,
+        TextWriter? output = null,
+        Action<string>? onStarted = null)
     {
         var writer = output ?? Console.Out;
         if (args.Length == 2 && args[0] == "--verify-corpus")
@@ -36,10 +40,12 @@ public static class McpHost
 
         var defaultCorpusDir = ResolveDefaultCorpusDirectory(Directory.GetCurrentDirectory());
         await using var app = BuildLoopbackApp(defaultCorpusDir, port);
-        await app.StartAsync(cancellationToken);
+        await app.StartAsync(CancellationToken.None);
         var boundAddress = app.Services.GetRequiredService<IServer>()
             .Features.Get<IServerAddressesFeature>()!.Addresses.Single().TrimEnd('/');
-        writer.WriteLine($"MCP endpoint listening on {boundAddress}/mcp");
+        var endpoint = $"{boundAddress}/mcp";
+        writer.WriteLine($"MCP endpoint listening on {endpoint}");
+        onStarted?.Invoke(endpoint);
         await app.WaitForShutdownAsync(cancellationToken);
         return 0;
     }
