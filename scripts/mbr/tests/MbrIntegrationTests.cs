@@ -777,7 +777,7 @@ internal static class MbrIntegrationTests
         start.Environment["Logging__LogLevel__Default"] = "Information";
         var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start MBR web fixture.");
         IDisposable? tree = null;
-        var startupTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var startupTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         try
         {
             // Attach before any HTTP request can start a provider; descendants inherit job or environment membership.
@@ -811,25 +811,20 @@ internal static class MbrIntegrationTests
             });
             throw;
         }
-        finally
-        {
-            startupTimeout.Dispose();
-        }
     }
 
     private sealed class LocalApp(Process process, Uri address, IDisposable tree) : IDisposable
     {
+        private readonly Process _process = process;
+        private readonly IDisposable _tree = tree;
         public Uri Address { get; } = address;
 
         public void Dispose()
         {
-            try
-            {
-                tree.Dispose();
-                if (!process.WaitForExit(15000))
-                    throw new TimeoutException("MBR web fixture exit could not be confirmed.");
-            }
-            finally { process.Dispose(); }
+            using var ownedProcess = _process;
+            _tree.Dispose();
+            if (!ownedProcess.WaitForExit(15000))
+                throw new TimeoutException("MBR web fixture exit could not be confirmed.");
         }
     }
 
@@ -845,17 +840,20 @@ internal static class MbrIntegrationTests
                 if (!process.HasExited)
                 {
                     try { process.Kill(entireProcessTree: true); }
-                    catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException && process.WaitForExit(100)) { }
+                    catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException && process.WaitForExit(100))
+                    {
+                        _ = ex.Message;
+                    }
                 }
 
                 WaitForRemaining(process, deadline);
                 TrackKnownDescendants(process.Id, fixtureRoot, treeId, descendants);
-                foreach (var descendant in descendants.Values)
+                foreach (var descendant in descendants.Values.Where(candidate => !candidate.HasExited))
                 {
-                    if (!descendant.HasExited)
+                    try { descendant.Kill(entireProcessTree: true); }
+                    catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException)
                     {
-                        try { descendant.Kill(entireProcessTree: true); }
-                        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException) { }
+                        _ = ex.Message;
                     }
                 }
 
@@ -896,11 +894,12 @@ internal static class MbrIntegrationTests
             try { entries = Directory.EnumerateDirectories(procRoot); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return found; }
 
-            foreach (var procEntry in entries)
-            {
-                if (!int.TryParse(Path.GetFileName(procEntry), CultureInfo.InvariantCulture, out var pid) || pid <= 0)
-                    continue;
+            var pidEntries = entries
+                .Select(entry => (Entry: entry, Valid: int.TryParse(Path.GetFileName(entry), CultureInfo.InvariantCulture, out var parsed) && parsed > 0, Pid: parsed))
+                .Where(item => item.Valid);
 
+            foreach (var (procEntry, _, pid) in pidEntries)
+            {
                 if (TryReadParentPid(procEntry, out var ppid))
                 {
                     if (!childrenByParent.TryGetValue(ppid, out var list))
@@ -922,9 +921,8 @@ internal static class MbrIntegrationTests
             {
                 var current = queue.Dequeue();
                 if (!childrenByParent.TryGetValue(current, out var children)) continue;
-                foreach (var child in children)
+                foreach (var child in children.Where(visited.Add))
                 {
-                    if (!visited.Add(child)) continue;
                     if (child != Environment.ProcessId) found.Add(child);
                     queue.Enqueue(child);
                 }
@@ -939,16 +937,18 @@ internal static class MbrIntegrationTests
             if (!Directory.Exists(fixtureRoot)) return found;
             try
             {
-                foreach (var marker in Directory.GetFiles(fixtureRoot, "gh-started-*"))
+                var parsedPids = Directory.GetFiles(fixtureRoot, "gh-started-*")
+                    .Select(marker => int.TryParse(Path.GetFileName(marker)["gh-started-".Length..], CultureInfo.InvariantCulture, out var pid) ? pid : 0)
+                    .Where(pid => pid > 0 && pid != Environment.ProcessId);
+                foreach (var pid in parsedPids)
                 {
-                    if (int.TryParse(Path.GetFileName(marker)["gh-started-".Length..],
-                        CultureInfo.InvariantCulture, out var pid) && pid > 0 && pid != Environment.ProcessId)
-                    {
-                        found.Add(pid);
-                    }
+                    found.Add(pid);
                 }
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return found;
+            }
             return found;
         }
 
@@ -979,12 +979,8 @@ internal static class MbrIntegrationTests
             try
             {
                 var environ = File.ReadAllText(Path.Combine(procEntry, "environ"));
-                foreach (var part in environ.Split('\0', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    if (string.Equals(part, expectedEntry, StringComparison.Ordinal))
-                        return true;
-                }
-                return false;
+                return environ.Split('\0', StringSplitOptions.RemoveEmptyEntries)
+                    .Any(part => string.Equals(part, expectedEntry, StringComparison.Ordinal));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -1001,12 +997,8 @@ internal static class MbrIntegrationTests
                 candidate = Process.GetProcessById(pid);
                 _ = candidate.SafeHandle;
                 descendants[pid] = candidate;
-                candidate = null;
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
-            {
-            }
-            finally
             {
                 candidate?.Dispose();
             }
