@@ -406,6 +406,136 @@ await RunAsync("McpHost_ServesReadyEndpointSecurityHeadersAndStreamableHttpMcpTo
     }
 });
 
+await RunAsync("McpHost_SupportsCurrentStatelessProtocolAndRejectsInvalidMetadata", async () =>
+{
+    long toolInvocations = 0;
+    using var meterListener = new MeterListener
+    {
+        InstrumentPublished = (instrument, listener) =>
+        {
+            if (instrument.Meter.Name == McpTelemetry.InstrumentationName)
+            {
+                listener.EnableMeasurementEvents(instrument);
+            }
+        }
+    };
+    meterListener.SetMeasurementEventCallback<long>((instrument, measurement, _, _) =>
+    {
+        if (instrument.Name == "jamula.mcp.tool.invocations")
+        {
+            Interlocked.Add(ref toolInvocations, measurement);
+        }
+    });
+    meterListener.Start();
+
+    await using var app = McpHost.BuildLoopbackApp(realTechDir, port: 0);
+    await app.StartAsync();
+    try
+    {
+        var address = app.Services.GetRequiredService<IServer>()
+            .Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+        using var http = new HttpClient { BaseAddress = new Uri(address) };
+        var metadata = new Dictionary<string, object>
+        {
+            ["io.modelcontextprotocol/protocolVersion"] = "2026-07-28",
+            ["io.modelcontextprotocol/clientInfo"] = new { name = "current-protocol-test", version = "1.0.0" },
+            ["io.modelcontextprotocol/clientCapabilities"] = new { }
+        };
+
+        async Task<(HttpStatusCode Status, string Body, bool HasSession)> PostAsync(
+            int id, string method, string? toolName = null, object? arguments = null,
+            string? headerName = null, string? headerMethod = null,
+            string protocolVersion = "2026-07-28", string? metadataVersion = null)
+        {
+            var requestMetadata = new Dictionary<string, object>(metadata)
+            {
+                ["io.modelcontextprotocol/protocolVersion"] = metadataVersion ?? protocolVersion
+            };
+            var parameters = new Dictionary<string, object> { ["_meta"] = requestMetadata };
+            if (toolName is not null)
+            {
+                parameters["name"] = toolName;
+                parameters["arguments"] = arguments ?? new { };
+            }
+
+            var payload = JsonSerializer.Serialize(new { jsonrpc = "2.0", id, method, @params = parameters });
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json")
+            };
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+            request.Headers.Add("MCP-Protocol-Version", protocolVersion);
+            request.Headers.Add("Mcp-Method", headerMethod ?? method);
+            if ((headerName ?? toolName) is { } name)
+            {
+                request.Headers.Add("Mcp-Name", name);
+            }
+
+            using var response = await http.SendAsync(request);
+            return (response.StatusCode, await response.Content.ReadAsStringAsync(),
+                response.Headers.Contains("Mcp-Session-Id"));
+        }
+
+        var discovery = await PostAsync(1, "server/discover");
+        Check(discovery.Status == HttpStatusCode.OK &&
+              discovery.Body.Contains("jamula-public-mcp", StringComparison.Ordinal) &&
+              discovery.Body.Contains("2026-07-28", StringComparison.Ordinal) &&
+              !discovery.HasSession,
+            "current protocol discovery must report the server and version without a session");
+
+        var tools = await PostAsync(2, "tools/list");
+        Check(tools.Status == HttpStatusCode.OK &&
+              tools.Body.Contains("search_public_corpus", StringComparison.Ordinal) &&
+              !tools.HasSession,
+            "current protocol must list tools without an initialization handshake");
+
+        var search = await PostAsync(3, "tools/call", "search_public_corpus",
+            new { query = "secretless preview", maxResults = 2 });
+        Check(search.Status == HttpStatusCode.OK &&
+              search.Body.Contains("matchCount", StringComparison.Ordinal) &&
+              search.Body.Contains("evidence-gated-static-delivery", StringComparison.Ordinal) &&
+              !search.HasSession,
+            "current protocol must invoke a public tool without a session");
+
+        var invocationsBeforeRejections = Interlocked.Read(ref toolInvocations);
+        Check(invocationsBeforeRejections == 1, "the valid search must be observed by the tool counter");
+        var mismatchedName = await PostAsync(4, "tools/call", "get_jamula_overview",
+            headerName: "list_tech_notes");
+        using var mismatchedNameJson = JsonDocument.Parse(mismatchedName.Body);
+        Check(mismatchedName.Status == HttpStatusCode.BadRequest &&
+              mismatchedNameJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "mismatched Mcp-Name must be rejected before the tool executes");
+
+        var mismatchedMethod = await PostAsync(5, "tools/call", "get_jamula_overview",
+            headerMethod: "tools/list");
+        using var mismatchedMethodJson = JsonDocument.Parse(mismatchedMethod.Body);
+        Check(mismatchedMethod.Status == HttpStatusCode.BadRequest &&
+              mismatchedMethodJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "mismatched Mcp-Method must be rejected before the tool executes");
+
+        var mismatchedVersion = await PostAsync(6, "tools/call", "get_jamula_overview",
+            metadataVersion: "2025-11-25");
+        using var mismatchedVersionJson = JsonDocument.Parse(mismatchedVersion.Body);
+        Check(mismatchedVersion.Status == HttpStatusCode.BadRequest &&
+              mismatchedVersionJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "mismatched protocol version must be rejected before the tool executes");
+
+        var unsupportedVersion = await PostAsync(7, "server/discover", protocolVersion: "1900-01-01");
+        using var unsupportedVersionJson = JsonDocument.Parse(unsupportedVersion.Body);
+        Check(unsupportedVersion.Status == HttpStatusCode.BadRequest &&
+              unsupportedVersionJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32022 &&
+              unsupportedVersion.Body.Contains("2026-07-28", StringComparison.Ordinal),
+            "unsupported protocol version must return supported versions");
+        Check(Interlocked.Read(ref toolInvocations) == invocationsBeforeRejections,
+            "invalid protocol requests must not invoke a tool");
+    }
+    finally
+    {
+        await app.StopAsync();
+    }
+});
+
 await RunAsync("McpHost_RejectsUntrustedHostOriginAndFetchSiteBeforeDispatch", async () =>
 {
     const string expected = "127.0.0.1:5180";

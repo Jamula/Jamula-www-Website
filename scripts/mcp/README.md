@@ -1,28 +1,38 @@
-# Jamula Read-Only Public MCP Server (`.NET 11`)
+# Jamula read-only MCP server for the public corpus (`.NET 11`)
 
-Zero-inference-cost Model Context Protocol (`MCP`) server and vendor-neutral
+A local Model Context Protocol (`MCP`) server and vendor-neutral
 `Microsoft.Extensions.AI` (`IChatClient`) seam targeting `.NET 11` (`net11.0`).
 
-## Why caller-brings-model MCP eliminates inference spend
+## Scope and cost boundary
 
-External MCP clients (GitHub Copilot, Claude, Cursor) supply their own LLM
-tokens. `JamulaMcp` binds strictly to `127.0.0.1`, rejects unexpected `Host`,
+`JamulaMcp` binds strictly to `127.0.0.1`, rejects unexpected `Host`,
 `Origin`, and `Sec-Fetch-Site` headers with `403 Forbidden` before endpoint
 dispatch, and serves read-only, path-confined tools over
-Jamula's approved public corpus (`www/src/content/tech/*.md` plus baseline
+Jamula's intended public corpus (`www/src/content/tech/*.md` plus baseline
 company overview) with content-suppressed `.NET 11` OpenTelemetry (`ActivitySource`
-and `Meter`) instrumentation:
+and `Meter`) instrumentation. This is a local endpoint, not a publicly hosted
+service; public hosting and a hard zero-spend boundary have not been qualified.
+See the [current hosting assessment](../../docs/architecture/side-quests-feasibility.md).
+
+The server loads every Markdown file in the tech directory; it has no draft or
+owner-approval filter. Inclusion in the local corpus does not approve publication.
+Its registered tools are:
 
 - `get_jamula_overview` — baseline capabilities, canonical URLs, and inquiry path.
-- `list_tech_notes` — published technical notes from `www/src/content/tech/`.
+- `list_tech_notes` — technical notes loaded from `www/src/content/tech/`.
 - `search_public_corpus` — deterministic ranked keyword search with bounded
   excerpts and canonical citation URLs.
 
-When server-side inference is later authorized (for example inside a client's
-own Azure tenant in `M05`), `GroundedAdvisor` demonstrates the vendor-neutral
+The registered tools make no model calls. An MCP client may bring its own model
+and incur inference charges; hosting, network, telemetry, and other infrastructure
+may also incur costs. No total-cost or free-operation guarantee is implied.
+
+If server-side inference is later authorized (for example inside a client's
+own Azure tenant in `M05`), `GroundedAdvisor` demonstrates the separate vendor-neutral
 `Microsoft.Extensions.AI.IChatClient` pattern: ungrounded questions short-circuit
 without calling the model, and grounded responses record content-free
 `gen_ai.client.token.usage` counters without logging prompts or completions.
+`GroundedAdvisor` is not exposed as an MCP tool.
 
 ## Run or verify offline
 

@@ -1,5 +1,78 @@
 # Side-quests feasibility assessment
 
+## Current M03.01 public MCP assessment (2026-11-28 UTC)
+
+The owner retargeted [#108](https://github.com/Jamula/Jamula-www-Website/issues/108#issuecomment-7215088685)
+and [#116](https://github.com/Jamula/Jamula-www-Website/issues/116#issuecomment-7215089515)
+to a read-only public-corpus MCP server whose caller brings any model. The current
+`scripts/mcp` implementation is a **loopback-only local server**, not a public
+service. It binds `127.0.0.1`, requires the exact loopback Host, checks browser
+Origin and Fetch-Site, and exposes `/mcp`; those local protections are not evidence
+that an internet-facing deployment is safe. Its optional `GroundedAdvisor` model
+client seam is not exposed as an MCP tool. Server inference is not used by the
+registered tools; caller inference and infrastructure can still cost money.
+
+**Status: no hosting option is selected or qualified.** The earlier CMS/portal
+assessment below is historical evidence, not the current M03 requirements or
+approval to deploy. A public endpoint, zero-spend guarantee, production
+readiness, and exact-copy approval for related public MCP wording are not
+established here.
+
+### Common workload and decision gates
+
+The candidate must serve Streamable HTTP MCP at `/mcp` with discovery and
+read-only public-corpus tools, preserving the SDK's protocol validation. The
+[2026-07-28 MCP transport specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http)
+describes stateless operation and mirrored-header validation; the
+[C# SDK versioning guidance](https://csharp.sdk.modelcontextprotocol.io/v2/versioning.html)
+documents protocol support. Current corpus limits include 256 KiB per source
+file, a 512-character search query, and 1-10 results; they are not an HTTP
+request-size, traffic, or spend limit. No representative traffic, concurrency,
+CPU duration, response size, bandwidth, retention, or model usage has been measured.
+
+For comparison only, use the same **1,000 requests/day** and **100,000
+requests/day** planning scenarios for each candidate, with a 30-day month
+(30,000 and 3,000,000 requests). These are not forecasts, authorized load tests,
+or approved capacity targets. The higher scenario reaches Cloudflare Workers'
+published Free daily account limit and, assuming external billable requests,
+exceeds Container Apps Consumption's published 2,000,000-request monthly
+subscription grant before considering any other usage.
+The hourly burst and CPU/memory distribution must be specified and measured
+before comparing candidates. Monthly, one-year, and three-year total costs
+remain **unknown** for both scenarios, including caller model, network, logging,
+other services, taxes, and usage outside a shared grant.
+
+Qualification requires an owner-authorized, isolated, disposable, secretless
+candidate; account-specific evidence of **no paid overflow**, fail-closed abuse
+and quota enforcement, bounded request/body sizes, privacy-safe telemetry,
+rollback, and preserved website availability. A free allowance, billing alert,
+or ordinary rate limit alone is not a hard spend cap. Public access, DNS,
+credentials, purchases, and production changes require their separate approvals.
+
+### Candidate evidence
+
+Vendor documentation was checked on 2026-11-28 UTC; limits and runtime support
+must be rechecked for the account, region, and release used in a future test.
+
+| Candidate | Verified documentation | Missing evidence / disposition |
+| --- | --- | --- |
+| Azure Static Web Apps managed Functions | [API overview](https://learn.microsoft.com/en-us/azure/static-web-apps/apis-overview) documents the `/api` prefix and 45-second maximum. [Managed runtimes](https://learn.microsoft.com/en-us/azure/static-web-apps/languages-runtimes) list .NET 10 isolated, not .NET 11. | The current ASP.NET Core/.NET 11 MCP host is not a demonstrated managed Function; an adapter, direct `/mcp` routing, streaming, protocol behavior, abuse controls, and zero-spend enforcement are unproven. |
+| Cloudflare Workers Free | [Limits](https://developers.cloudflare.com/workers/platform/limits/) describe 100,000 requests/day and 10 ms CPU per invocation on Free, with fail-open versus fail-closed behavior. [Routes](https://developers.cloudflare.com/workers/configuration/routing/routes/) require an active zone and proxied DNS. [WebAssembly](https://developers.cloudflare.com/workers/runtime-apis/webassembly/) documents experimental partial WASI support. | Compatibility of the current .NET 11 ASP.NET host, Streamable HTTP, `/mcp`, quota isolation, and fail-closed behavior is unproven. [Spending limits](https://developers.cloudflare.com/workers/platform/spend-management/) are not exact bill caps and do not cover every product. Do not change DNS or create a Worker without authorization. |
+| Azure Container Apps Consumption | [Billing](https://learn.microsoft.com/en-us/azure/container-apps/billing) documents subscription-shared monthly grants of 180,000 vCPU-seconds, 360,000 GiB-seconds, and 2,000,000 external HTTP requests; excess is billed. [Static Web Apps integration](https://learn.microsoft.com/en-us/azure/static-web-apps/apis-container-apps) requires Standard, forwards the `/api` path, and does not link to PR environments. | No direct `/mcp` integration, supported adapter, account-specific hard zero-spend control, or isolated secretless PR preview is demonstrated. A shared grant is not a cap; Standard integration also conflicts with an unproven zero-spend objective. |
+
+Next, establish an authorized account and hard spend/abuse controls, then test
+one reversible candidate against the same workload and current MCP protocol.
+Record observed behavior and costs, including failed cases, before making an
+exact-artifact-reviewed decision. Until then [#108](https://github.com/Jamula/Jamula-www-Website/issues/108),
+[#115](https://github.com/Jamula/Jamula-www-Website/issues/115),
+[#116](https://github.com/Jamula/Jamula-www-Website/issues/116), and
+[#120](https://github.com/Jamula/Jamula-www-Website/issues/120) remain open.
+
+## Historical CMS and portal assessment (2026-11-15)
+
+All remaining sections record the earlier scope and date, not the retargeted
+M03 public MCP requirements or the current issue dispositions.
+
 **Evidence date:** 2026-11-15
 **Status:** Documented research and local mechanism evidence; no platform or inference provider selected; independent review pending
 **Scope:** Issue #108, the approved Enable side-quests milestone
@@ -46,7 +119,7 @@ separate offline artifact/process experiment is described below. Neither
 experiment tests a public Azure routing mechanism or substitutes for a
 separately authorized public deployment experiment.
 
-The offline [artifact/process experiment](../../scripts/spikes/sidequest-artifacts/README.md)
+The offline [artifact/process experiment](https://github.com/Jamula/Jamula-www-Website/blob/ebead8956fe728566944817c0ebedc49574e3c4a/scripts/spikes/sidequest-artifacts/README.md)
 is local release-mechanism evidence requiring independent Data review, not an
 approved hosting topology or a collective deployment of the public website.
 On 2026-11-15, its default command passed 24 checks and its explicit collective
@@ -127,7 +200,7 @@ weakening the approved constraints.
 ### Local mechanism experiment
 
 The local spike at
-[`scripts/spikes/sidequest-routing`](../../scripts/spikes/sidequest-routing/README.md)
+[`scripts/spikes/sidequest-routing`](https://github.com/Jamula/Jamula-www-Website/blob/ebead8956fe728566944817c0ebedc49574e3c4a/scripts/spikes/sidequest-routing/README.md)
 ran with:
 
 ```powershell
@@ -145,7 +218,7 @@ storage/cache, inference, or production quota.
 ### Offline independent artifact/process experiment
 
 The separate fixture at
-[`scripts/spikes/sidequest-artifacts`](../../scripts/spikes/sidequest-artifacts/README.md)
+[`scripts/spikes/sidequest-artifacts`](https://github.com/Jamula/Jamula-www-Website/blob/ebead8956fe728566944817c0ebedc49574e3c4a/scripts/spikes/sidequest-artifacts/README.md)
 publishes each synthetic .NET section and gateway to separate local release
 directories, runs them in distinct loopback-only OS processes, and replaces
 Finance without restarting Admin, Tech, or the gateway.

@@ -40,7 +40,7 @@ substituting zero.
 | Website experience | Core Web Vitals by production route and the source's documented device cohorts; include samples and collection window. |
 | Accessibility | WCAG 2.2 AA evidence for the reviewed routes, including automated checks and applicable keyboard, screen-reader, zoom/reflow, contrast, reduced-motion, form-error, authentication, and embedded-flow checks. State route/scope, method, date, findings, and limitations; an automated scan alone is not a conformance claim. |
 | Feature outcomes | Feature-level adoption and outcome measures with their definitions and denominators. PRs and closed issues are delivery activity, not proof of adoption or customer outcome. |
-| Test quality | Line and branch coverage separately for every deployable and overall, plus test count, duration, parallelism, retries, and observed flakiness from the same CI evidence. The target is at least 90% for both line and branch coverage at each level. Identify the exact commit and report covered/total counts; calculate overall coverage from summed counts, not an average of percentages. Missing per-deployable or overall evidence is unknown, not a pass. |
+| Test quality | Line and branch coverage separately for every first-party executable component and overall, plus test count, duration, parallelism, retries, and observed flakiness from the same CI evidence. The current [#109](https://github.com/Jamula/Jamula-www-Website/issues/109) title targets at least 95% line and 90% branch coverage at each level; its older body and checklist still say 90% for both and must be reconciled. The issue remains open, so a passed gate is not established. Identify the exact commit and report covered/total counts; calculate overall coverage from summed counts, not an average of percentages. Missing component or overall evidence is unknown, not a pass. |
 | AI operations | Repository-attributed usage and input/output/cache tokens separately; latency with its statistic and sample size; attributed cost and basis; quality evaluation results; safety outcomes; and tool success/failure outcomes. Use only already-approved, repository-scoped sources. |
 | Security and authorization | Explicit allow/deny outcomes for protected routes, APIs, and MCP tools, with counts and denominators by action/section where an approved source supports them; relevant authentication/policy failures, incidents, and tested stop-control results. Do not include identities, tokens, prompts, or private content. No observed denial events is not evidence that denial controls work; absent telemetry or tests is unknown. |
 | Limits and controls | Observed quota/limit use, shutdown or stop-control evidence, and privacy/retention evidence relevant to the reviewed systems. A lack of observed traffic does not prove a shutdown control works. |
@@ -85,7 +85,36 @@ Do not create a parallel markdown report or copy source datasets. This runbook
 defines the process only and does not itself authorize telemetry, product
 changes, issue creation, or decision approval.
 
-## Initial dry run
+## M03 collector dry run (2026-11-28 UTC)
+
+The read-only MBR collector was run for November 2026, with window
+`[2026-11-01T00:00:00Z, 2026-12-01T00:00:00Z)` and observation time
+`2026-11-28T03:45:40.894844Z`. This is a **month-to-date** observation, not a
+completed month. The raw snapshot remains in restricted local session storage;
+do not commit or publish it.
+
+| Evidence | Sanitized observation and limitation |
+| --- | --- |
+| GitHub pull-request and issue sources | Collection returned 132 pull-request records and 65 issue records. These are source records, not necessarily monthly delivery, feature adoption, customer outcomes, or deployments. |
+| Repository-filtered Actions billing | The source was available for this repository and month. No monetary, minute, or zero-cost claim is made here. |
+| Comparison | No equal-duration preceding-month comparison was established; trend and regression are unknown. |
+| Website, accessibility, outcomes, AI, security, and controls | Route/device experience, accessibility, adoption, AI usage/quality, denial outcomes, quota/stop controls, and privacy/retention evidence were not established by this collector run; unknown, not zero or passing. |
+| Test quality | The collector does not establish exact-revision per-component and aggregate coverage, test duration, or flakiness. The open #109 baseline and its threshold wording require separate evidence and reconciliation. |
+| Releases and follow-through | Incidents, prior-action follow-through, participant review, and accepted decisions were not established. A collector run alone does not complete the monthly review. |
+
+The issue ledger on 2026-11-28 showed [#108](https://github.com/Jamula/Jamula-www-Website/issues/108),
+[#115](https://github.com/Jamula/Jamula-www-Website/issues/115),
+[#116](https://github.com/Jamula/Jamula-www-Website/issues/116),
+[#119](https://github.com/Jamula/Jamula-www-Website/issues/119), and
+[#120](https://github.com/Jamula/Jamula-www-Website/issues/120) open.
+[#109](https://github.com/Jamula/Jamula-www-Website/issues/109) and replacement
+content work [#182](https://github.com/Jamula/Jamula-www-Website/issues/182)
+were also open. [#110](https://github.com/Jamula/Jamula-www-Website/issues/110)
+was closed completed; #111-#114 and #117-#118 were closed not planned, not
+completed. Their old dependency references do not establish that equivalent
+release or security gates passed.
+
+## Historical initial dry run
 
 The prior runbook draft recorded a reported MBR collector run for `2026-11` on
 2026-11-08. It gave the snapshot window as
