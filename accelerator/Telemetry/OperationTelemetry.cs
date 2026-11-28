@@ -35,36 +35,33 @@ public sealed class OperationTelemetry : IDisposable
         };
         ArgumentOutOfRangeException.ThrowIfLessThan(duration, TimeSpan.Zero);
 
-        // A root span avoids inheriting untrusted baggage or trace state from a request.
+        // Keep span and metric recording detached from untrusted request context.
         var parent = Activity.Current;
-        Activity? activity;
+        Activity? activity = null;
         try
         {
             Activity.Current = null;
-            activity = _activities.StartActivity("accelerator.operation.completed", ActivityKind.Internal);
-        }
-        finally
-        {
-            Activity.Current = parent;
-        }
-
-        try
-        {
-            using (activity)
+            activity = _activities.CreateActivity("accelerator.operation.completed", ActivityKind.Internal);
+            activity?.Start();
+            if (outcome == OperationOutcome.Failure)
             {
-                if (outcome == OperationOutcome.Failure)
-                {
-                    activity?.SetStatus(ActivityStatusCode.Error);
-                }
-                activity?.SetTag("outcome", outcomeLabel);
-                var tag = new KeyValuePair<string, object?>("outcome", outcomeLabel);
-                _completed.Add(1, tag);
-                _duration.Record(duration.TotalMilliseconds, tag);
+                activity?.SetStatus(ActivityStatusCode.Error);
             }
+            activity?.SetTag("outcome", outcomeLabel);
+            var tag = new KeyValuePair<string, object?>("outcome", outcomeLabel);
+            _completed.Add(1, tag);
+            _duration.Record(duration.TotalMilliseconds, tag);
         }
         finally
         {
-            Activity.Current = parent;
+            try
+            {
+                activity?.Dispose();
+            }
+            finally
+            {
+                Activity.Current = parent;
+            }
         }
     }
 

@@ -5,7 +5,7 @@ using JamulaAccelerator.Telemetry;
 
 const string secret = "private-prompt-document-and-exception";
 var spans = new ConcurrentBag<Activity>();
-var measurements = new ConcurrentBag<(string Name, double Value, KeyValuePair<string, object?>[] Tags)>();
+var measurements = new ConcurrentBag<(string Name, double Value, KeyValuePair<string, object?>[] Tags, Activity? Activity)>();
 using var spanListener = new ActivityListener
 {
     ShouldListenTo = source => source.Name == OperationTelemetry.InstrumentationName,
@@ -24,9 +24,9 @@ using var meterListener = new MeterListener
     }
 };
 meterListener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
-    measurements.Add((instrument.Name, value, tags.ToArray())));
+    measurements.Add((instrument.Name, value, tags.ToArray(), Activity.Current)));
 meterListener.SetMeasurementEventCallback<double>((instrument, value, tags, _) =>
-    measurements.Add((instrument.Name, value, tags.ToArray())));
+    measurements.Add((instrument.Name, value, tags.ToArray(), Activity.Current)));
 meterListener.Start();
 
 void Check(bool condition, string message)
@@ -88,14 +88,35 @@ foreach (var (outcome, duration) in new[] { ("success", 42d), ("failure", 0d), (
         "Missing operation count.");
     Check(matching.Any(measurement => measurement.Name == "jamula.accelerator.duration" && measurement.Value == duration),
         "Missing operation duration.");
+    var span = spans.Single(activity => (string?)activity.GetTagItem("outcome") == outcome);
+    Check(matching.All(measurement => ReferenceEquals(measurement.Activity, span)),
+        "A metric inherited the request activity instead of the detached span.");
 }
 
 spanListener.Dispose();
 meterListener.Dispose();
-using (var telemetry = new OperationTelemetry())
+var activitiesWithoutSpans = new ConcurrentBag<Activity?>();
+using (var metricsWithoutSpans = new MeterListener
 {
+    InstrumentPublished = (instrument, listener) =>
+    {
+        if (instrument.Meter.Name == OperationTelemetry.InstrumentationName)
+        {
+            listener.EnableMeasurementEvents(instrument);
+        }
+    }
+})
+{
+    metricsWithoutSpans.SetMeasurementEventCallback<long>((_, _, _, _) => activitiesWithoutSpans.Add(Activity.Current));
+    metricsWithoutSpans.SetMeasurementEventCallback<double>((_, _, _, _) => activitiesWithoutSpans.Add(Activity.Current));
+    metricsWithoutSpans.Start();
+    using var telemetry = new OperationTelemetry();
+    using var parent = new Activity("parent").AddBaggage("private", secret).Start();
     telemetry.RecordCompletion(OperationOutcome.Success, TimeSpan.Zero);
     telemetry.RecordCompletion(OperationOutcome.Failure, TimeSpan.Zero);
+    Check(activitiesWithoutSpans.Count == 4 && activitiesWithoutSpans.All(activity => activity is null),
+        "A metric inherited the request activity when no span was sampled.");
+    Check(Activity.Current == parent, "Recording without a sampled span replaced the ambient activity.");
 }
 
 var concurrentSpans = new ConcurrentBag<Activity>();
@@ -117,6 +138,82 @@ using (var telemetry = new OperationTelemetry())
     }));
     Check(concurrentSpans.Count == 16 && concurrentSpans.All(span =>
         span.ParentId is null && !span.Baggage.Any()), "Concurrent spans inherited request context.");
+}
+
+var startedSpans = new ConcurrentBag<Activity>();
+var stoppedSpans = new ConcurrentBag<Activity>();
+using (var trackingListener = new ActivityListener
+{
+    ShouldListenTo = source => source.Name == OperationTelemetry.InstrumentationName,
+    Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+    ActivityStarted = startedSpans.Add,
+    ActivityStopped = stoppedSpans.Add
+})
+using (var failingStartListener = new ActivityListener
+{
+    ShouldListenTo = source => source.Name == OperationTelemetry.InstrumentationName,
+    Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+    ActivityStarted = _ => throw new InvalidOperationException(secret)
+})
+{
+    ActivitySource.AddActivityListener(trackingListener);
+    ActivitySource.AddActivityListener(failingStartListener);
+    using var telemetry = new OperationTelemetry();
+    using var parent = new Activity("parent").Start();
+    try
+    {
+        telemetry.RecordCompletion(OperationOutcome.Success, TimeSpan.Zero);
+        throw new InvalidOperationException("Start listener failure was swallowed.");
+    }
+    catch (InvalidOperationException exception) when (exception.Message == secret)
+    {
+    }
+    Check(startedSpans.Count == 1 && stoppedSpans.Count == 1
+        && ReferenceEquals(startedSpans.Single(), stoppedSpans.Single()),
+        "A span was not stopped after an activity-start listener failed.");
+    Check(Activity.Current == parent, "Start listener failure replaced the ambient activity.");
+}
+
+using (var failingSampleListener = new ActivityListener
+{
+    ShouldListenTo = source => source.Name == OperationTelemetry.InstrumentationName,
+    Sample = (ref ActivityCreationOptions<ActivityContext> _) => throw new InvalidOperationException(secret)
+})
+{
+    ActivitySource.AddActivityListener(failingSampleListener);
+    using var telemetry = new OperationTelemetry();
+    using var parent = new Activity("parent").Start();
+    try
+    {
+        telemetry.RecordCompletion(OperationOutcome.Success, TimeSpan.Zero);
+        throw new InvalidOperationException("Sampling failure was swallowed.");
+    }
+    catch (InvalidOperationException exception) when (exception.Message == secret)
+    {
+    }
+    Check(Activity.Current == parent, "Sampling failure replaced the ambient activity.");
+}
+
+using (var failingStartAndStop = new ActivityListener
+{
+    ShouldListenTo = source => source.Name == OperationTelemetry.InstrumentationName,
+    Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+    ActivityStarted = _ => throw new InvalidOperationException("span-start failure"),
+    ActivityStopped = _ => throw new InvalidOperationException("span-stop failure")
+})
+{
+    ActivitySource.AddActivityListener(failingStartAndStop);
+    using var telemetry = new OperationTelemetry();
+    using var parent = new Activity("parent").Start();
+    try
+    {
+        telemetry.RecordCompletion(OperationOutcome.Success, TimeSpan.Zero);
+        throw new InvalidOperationException("Listener failures were swallowed.");
+    }
+    catch (InvalidOperationException exception) when (exception.Message == "span-stop failure")
+    {
+    }
+    Check(Activity.Current == parent, "Start and stop listener failures replaced the ambient activity.");
 }
 
 using (var failingListener = new MeterListener
