@@ -237,6 +237,10 @@ dotnet-coverage collect --output "$reports\mbr-dotnet.cobertura.xml" --output-fo
   dotnet run --project scripts\mbr\tests\JamulaMbr.Tests.csproj --configuration Release
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+dotnet-coverage collect --output "$reports\accelerator-authorization.cobertura.xml" --output-format cobertura `
+  dotnet run --project accelerator\Authorization.Tests\JamulaAccelerator.Authorization.Tests.csproj --configuration Release
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 # The fixture publishes fresh artifacts and exercises the running child processes
 # in one collector session. Its explicit coverage mode forwards only dotnet-coverage's
 # profiler/session variables to the published .NET hosts; all other child environment
