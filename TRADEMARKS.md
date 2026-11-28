@@ -2,12 +2,14 @@
 
 Jamula, Jamula.net, Jamula.com, and related Jamula names, logos, and brand assets are used by Jamula, Inc. and may function as trademarks or service marks. Domain registration alone does not establish trademark rights. The repository licenses do not grant rights to use Jamula branding.
 
-The repository currently includes internal Squad coordination files that use
-fictional-character codenames. These are internal workflow labels, not Jamula
-brands, public content, or statements of affiliation. Do not copy them into
-public-facing materials or use them to imply a relationship with a rights holder.
-Their provenance is recorded in `docs/legal/license-inventory.md` and
-`THIRD_PARTY_NOTICES.md`; no rights or legal clearance are asserted.
+Internal Squad coordination files that used fictional-character codenames have
+been retired from the active repository tree and remain in Git history only.
+Those historical codenames were internal workflow labels, not Jamula brands,
+public content, or statements of affiliation. Do not copy them from repository
+history into public-facing materials or use them to imply a relationship with a
+rights holder. Their historical provenance is recorded in
+`docs/legal/license-inventory.md` and `THIRD_PARTY_NOTICES.md`; no rights or
+legal clearance are asserted.
 
 This project is not affiliated with, endorsed by, sponsored by, or connected to
 third-party rights holders unless explicitly documented and approved. Third-party
