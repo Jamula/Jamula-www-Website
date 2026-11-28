@@ -168,9 +168,13 @@
     {
       "id": "accelerator-authorization",
       "reports": ["accelerator-authorization.cobertura.xml"],
-      "sources": ["accelerator/Authorization/CustomerPolicies.cs"],
+      "sources": [
+        "accelerator/Authorization/CustomerPolicies.cs",
+        "accelerator/Authorization/CustomerContext.cs"
+      ],
       "sourceReports": {
-        "accelerator/Authorization/CustomerPolicies.cs": "accelerator-authorization.cobertura.xml"
+        "accelerator/Authorization/CustomerPolicies.cs": "accelerator-authorization.cobertura.xml",
+        "accelerator/Authorization/CustomerContext.cs": "accelerator-authorization.cobertura.xml"
       }
     },
     {

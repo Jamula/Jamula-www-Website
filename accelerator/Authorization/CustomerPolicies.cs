@@ -30,7 +30,9 @@ public static class CustomerPolicies
         policy.RequireAssertion(context =>
         {
             var identities = context.User.Identities.Where(identity => identity.IsAuthenticated).Take(2).ToArray();
-            return identities.Length == 1 && identities[0].HasClaim(identities[0].RoleClaimType, role);
+            return identities.Length == 1
+                && context.Resource is CustomerContext customerContext
+                && customerContext.Allows(identities[0], role);
         });
     }
 }
