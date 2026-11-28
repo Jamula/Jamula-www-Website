@@ -6,7 +6,9 @@ Zero-inference-cost Model Context Protocol (`MCP`) server and vendor-neutral
 ## Why caller-brings-model MCP eliminates inference spend
 
 External MCP clients (GitHub Copilot, Claude, Cursor) supply their own LLM
-tokens. `JamulaMcp` serves strictly read-only, path-confined tools over
+tokens. `JamulaMcp` binds strictly to `127.0.0.1`, rejects unexpected `Host`,
+`Origin`, and `Sec-Fetch-Site` headers with `403 Forbidden` before endpoint
+dispatch, and serves read-only, path-confined tools over
 Jamula's approved public corpus (`www/src/content/tech/*.md` plus baseline
 company overview) with content-suppressed `.NET 11` OpenTelemetry (`ActivitySource`
 and `Meter`) instrumentation:

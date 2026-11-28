@@ -315,6 +315,125 @@ await RunAsync("McpHost_ServesReadyEndpointSecurityHeadersAndStreamableHttpMcpTo
     }
 });
 
+await RunAsync("McpHost_RejectsUntrustedHostOriginAndFetchSiteBeforeDispatch", async () =>
+{
+    const string expected = "127.0.0.1:5180";
+    Check(McpHost.AllowsRequest(expected, "", "", expected), "CLI request without Origin or Sec-Fetch-Site must be allowed");
+    Check(McpHost.AllowsRequest(expected, $"http://{expected}", "same-origin", expected), "same-origin loopback request must be allowed");
+    Check(McpHost.AllowsRequest(expected, "", "none", expected), "direct user navigation must be allowed");
+    Check(!McpHost.AllowsRequest("attacker.invalid:5180", "", "", expected), "DNS-rebinding host with port must be rejected");
+    Check(!McpHost.AllowsRequest("evil.rebind.test", "", "", expected), "DNS-rebinding host without port must be rejected");
+    Check(!McpHost.AllowsRequest("127.0.0.1:5181", "", "", expected), "wrong loopback port host must be rejected");
+    Check(!McpHost.AllowsRequest("", "", "", expected) && !McpHost.AllowsRequest(null, "", "", expected), "missing host must be rejected");
+    Check(!McpHost.AllowsRequest(expected, "https://evil.example", "", expected), "cross-origin Origin must be rejected");
+    Check(!McpHost.AllowsRequest(expected, "null", "", expected), "opaque null Origin must be rejected");
+    Check(!McpHost.AllowsRequest(expected, "http://127.0.0.1:5181", "same-origin", expected), "wrong-port Origin must be rejected");
+    Check(!McpHost.AllowsRequest(expected, "", "cross-site", expected), "Sec-Fetch-Site cross-site must be rejected");
+    Check(!McpHost.AllowsRequest(expected, "", "same-site", expected), "Sec-Fetch-Site same-site must be rejected");
+    Check(!McpHost.AllowsRequest(expected, "", "Cross-Site", expected), "unexpected Sec-Fetch-Site casing must be rejected");
+
+    await using var app = McpHost.BuildLoopbackApp(realTechDir, port: 0);
+    await app.StartAsync();
+    try
+    {
+        var boundUri = new Uri(app.Services.GetRequiredService<IServer>()
+            .Features.Get<IServerAddressesFeature>()!.Addresses.Single());
+        var expectedAuthority = $"127.0.0.1:{boundUri.Port}";
+        var wrongPort = boundUri.Port == 65535 ? boundUri.Port - 1 : boundUri.Port + 1;
+        using var http = new HttpClient { BaseAddress = boundUri };
+
+        using (var sameOriginReady = new HttpRequestMessage(HttpMethod.Get, "/health/ready"))
+        {
+            sameOriginReady.Headers.TryAddWithoutValidation("Origin", $"http://{expectedAuthority}");
+            sameOriginReady.Headers.TryAddWithoutValidation("Sec-Fetch-Site", "same-origin");
+            using var resp = await http.SendAsync(sameOriginReady);
+            Check(resp.StatusCode == HttpStatusCode.OK, "same-origin /health/ready must return 200");
+        }
+
+        using (var directNavReady = new HttpRequestMessage(HttpMethod.Get, "/health/ready"))
+        {
+            directNavReady.Headers.TryAddWithoutValidation("Sec-Fetch-Site", "none");
+            using var resp = await http.SendAsync(directNavReady);
+            Check(resp.StatusCode == HttpStatusCode.OK, "Sec-Fetch-Site: none /health/ready must return 200");
+        }
+
+        const string initPayload =
+            """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"rebind-probe","version":"1.0.0"}}}""";
+
+        async Task AssertForbiddenBeforeDispatchAsync(
+            HttpMethod method,
+            string path,
+            Action<HttpRequestMessage> mutateHeaders,
+            string description)
+        {
+            using var req = new HttpRequestMessage(method, path);
+            if (method == HttpMethod.Post)
+            {
+                req.Content = new StringContent(initPayload, Encoding.UTF8, "application/json");
+                req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+            }
+
+            mutateHeaders(req);
+            using var resp = await http.SendAsync(req);
+            var body = await resp.Content.ReadAsStringAsync();
+            Check(resp.StatusCode == HttpStatusCode.Forbidden, $"{description}: expected 403, got {(int)resp.StatusCode}");
+            Check(body.Length == 0, $"{description}: expected empty 403 body before endpoint dispatch");
+            Check(!resp.Headers.Contains("Mcp-Session-Id"), $"{description}: must not issue Mcp-Session-Id");
+            Check(resp.Headers.CacheControl?.NoStore == true, $"{description}: expected Cache-Control: no-store on 403");
+        }
+
+        foreach (var (method, path) in new[] { (HttpMethod.Get, "/health/ready"), (HttpMethod.Post, "/mcp") })
+        {
+            await AssertForbiddenBeforeDispatchAsync(
+                method,
+                path,
+                req => req.Headers.Host = $"attacker.invalid:{boundUri.Port}",
+                $"{method} {path} with attacker.invalid:{boundUri.Port} Host");
+
+            await AssertForbiddenBeforeDispatchAsync(
+                method,
+                path,
+                req => req.Headers.Host = "evil.rebind.test",
+                $"{method} {path} with evil.rebind.test Host");
+
+            await AssertForbiddenBeforeDispatchAsync(
+                method,
+                path,
+                req => req.Headers.TryAddWithoutValidation("Origin", "https://evil.example"),
+                $"{method} {path} with cross-origin Origin");
+
+            await AssertForbiddenBeforeDispatchAsync(
+                method,
+                path,
+                req => req.Headers.TryAddWithoutValidation("Origin", $"http://127.0.0.1:{wrongPort}"),
+                $"{method} {path} with wrong-port loopback Origin");
+
+            await AssertForbiddenBeforeDispatchAsync(
+                method,
+                path,
+                req => req.Headers.TryAddWithoutValidation("Origin", "null"),
+                $"{method} {path} with null Origin");
+
+            await AssertForbiddenBeforeDispatchAsync(
+                method,
+                path,
+                req => req.Headers.TryAddWithoutValidation("Sec-Fetch-Site", "cross-site"),
+                $"{method} {path} with Sec-Fetch-Site: cross-site");
+
+            await AssertForbiddenBeforeDispatchAsync(
+                method,
+                path,
+                req => req.Headers.TryAddWithoutValidation("Sec-Fetch-Site", "same-site"),
+                $"{method} {path} with Sec-Fetch-Site: same-site");
+        }
+    }
+    finally
+    {
+        await app.StopAsync();
+    }
+});
+
 Console.WriteLine($"{passed} deterministic offline MCP checks passed.");
 return 0;
 

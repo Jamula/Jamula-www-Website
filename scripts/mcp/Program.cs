@@ -90,6 +90,19 @@ public static class McpHost
             context.Response.Headers["X-Content-Type-Options"] = "nosniff";
             context.Response.Headers["Cache-Control"] = "no-store";
             context.Response.Headers["Referrer-Policy"] = "no-referrer";
+
+            var request = context.Request;
+            var expectedHost = string.Create(CultureInfo.InvariantCulture, $"127.0.0.1:{context.Connection.LocalPort}");
+            if (!AllowsRequest(
+                request.Host.Value,
+                request.Headers.Origin.ToString(),
+                request.Headers["Sec-Fetch-Site"].ToString(),
+                expectedHost))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return;
+            }
+
             await next();
         });
 
@@ -98,4 +111,9 @@ public static class McpHost
         app.MapMcp("/mcp");
         return app;
     }
+
+    public static bool AllowsRequest(string? host, string origin, string fetchSite, string expectedHost) =>
+        host == expectedHost &&
+        (origin.Length == 0 || origin == $"http://{expectedHost}") &&
+        fetchSite is "" or "same-origin" or "none";
 }
