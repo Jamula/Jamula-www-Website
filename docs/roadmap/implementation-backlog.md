@@ -3,7 +3,7 @@
 **Status:** Historical Phase 1-5 proposal, not the current backlog or a live
 authorization. The Astro public site is implemented; website follow-ups are
 tracked in the current GitHub issues linked from [the documentation index](../README.md).
-The later customer-platform epics below remain proposals, not active assignments.
+The later customer-platform epics below remain historical proposals, not active assignments. Use the [current delivery roadmap](current-roadmap.md) for M01–M05 and release dependencies.
 
 | Order | Draft epic | Proposed owner / reviewers | Depends on | Acceptance summary |
 |---:|---|---|---|---|

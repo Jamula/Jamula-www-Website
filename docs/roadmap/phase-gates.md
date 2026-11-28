@@ -3,6 +3,8 @@
 **Status:** Historical proposed release gates; not evidence that a phase has
 passed or a current live deployment/test status
 
+Use the [current delivery roadmap](current-roadmap.md) for active milestone gates, including separate preflight authorization and post-release acceptance. Historical phase numbers below are not current milestone numbers.
+
 The public Astro website and Azure deployment configuration now exist. The
 proposed Phase 1 criteria below remain a test plan, not a claim that the site
 passes every gate. The approved domain policy is direct serving on all four

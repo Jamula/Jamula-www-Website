@@ -6,6 +6,8 @@ dated planning records, not evidence that a control, vendor, phase, professional
 review, or public claim is current or approved. Check each artifact's status and
 source date before relying on it.
 
+The [current delivery roadmap](roadmap/current-roadmap.md) is the active issue map and release-gate sequence. The [current architecture and trust boundaries](architecture/current-architecture.md) distinguishes implemented, local-only and planned components.
+
 ## Architecture & milestone topology
 
 ```mermaid
@@ -24,7 +26,7 @@ flowchart LR
 
   subgraph M03["M03 — Caller-Brings-LLM MCP & OTel"]
     MCP["JamulaMcp (.NET 11)<br/>ModelContextProtocol + MEAI + OTel<br/>($0 server inference spend)"]
-    WEB -.->|"Approved Markdown"| MCP
+    WEB -.->|"Technical Markdown; approval manifest pending"| MCP
   end
 
   subgraph M04_M05["M04–M05 — Turnkey Ops & Client IP"]
@@ -32,7 +34,10 @@ flowchart LR
     ACC["M05: Client-Hosted .NET 11 Aspire<br/>Single-Tenant Entra + Cited RAG Accelerator"]
   end
 
-  M01 --> M02 --> M03 --> M04_M05
+  M02 --> M01
+  M02 --> M03
+  M01 --> OPS
+  M02 --> ACC
 ```
 
 ## Current project state
