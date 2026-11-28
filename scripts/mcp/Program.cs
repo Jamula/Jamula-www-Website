@@ -178,33 +178,49 @@ public static class McpHost
                 JsonRpcNotification notification => notification.Params,
                 _ => null
             };
-            var metadata = (parameters as JsonObject)?["_meta"] as JsonObject;
-            var declaresModernMetadata = metadata is not null &&
-                (metadata.ContainsKey(MetaKeys.ProtocolVersion) ||
-                 metadata.ContainsKey(MetaKeys.ClientInfo) ||
-                 metadata.ContainsKey(MetaKeys.ClientCapabilities) ||
-                 metadata.ContainsKey(MetaKeys.LogLevel) ||
-                 metadata.ContainsKey(MetaKeys.SubscriptionId));
             var declaresModernHeaders = request.Headers.ContainsKey("Mcp-Method") ||
                 request.Headers.ContainsKey("Mcp-Name") ||
                 request.Headers.Keys.Any(key => key.StartsWith("Mcp-Param-", StringComparison.OrdinalIgnoreCase));
             var isDiscovery = message is JsonRpcRequest { Method: "server/discover" };
-            var versionMismatch = protocolVersion.Length != 0 &&
-                metadata?.ContainsKey(MetaKeys.ProtocolVersion) == true &&
-                (metadata[MetaKeys.ProtocolVersion] is not JsonValue versionValue ||
-                 !versionValue.TryGetValue<string>(out var metadataVersion) ||
-                 !string.Equals(protocolVersion, metadataVersion, StringComparison.Ordinal));
-            if ((protocolVersion.Length == 0 &&
-                 (declaresModernMetadata || declaresModernHeaders || isDiscovery)) ||
-                versionMismatch)
+            var errorCode = (int)McpErrorCode.HeaderMismatch;
+            string? errorMessage = null;
+            try
+            {
+                var metadata = (parameters as JsonObject)?["_meta"] as JsonObject;
+                var declaresModernMetadata = metadata is not null &&
+                    (metadata.ContainsKey(MetaKeys.ProtocolVersion) ||
+                     metadata.ContainsKey(MetaKeys.ClientInfo) ||
+                     metadata.ContainsKey(MetaKeys.ClientCapabilities) ||
+                     metadata.ContainsKey(MetaKeys.LogLevel) ||
+                     metadata.ContainsKey(MetaKeys.SubscriptionId));
+                var versionMismatch = protocolVersion.Length != 0 &&
+                    metadata?.ContainsKey(MetaKeys.ProtocolVersion) == true &&
+                    (metadata[MetaKeys.ProtocolVersion] is not JsonValue versionValue ||
+                     !versionValue.TryGetValue<string>(out var metadataVersion) ||
+                     !string.Equals(protocolVersion, metadataVersion, StringComparison.Ordinal));
+                if ((protocolVersion.Length == 0 &&
+                     (declaresModernMetadata || declaresModernHeaders || isDiscovery)) ||
+                    versionMismatch)
+                {
+                    errorMessage = "The MCP-Protocol-Version header is missing or does not match request metadata.";
+                }
+            }
+            catch (ArgumentException)
+            {
+                // JsonObject materializes its keys lazily and rejects duplicates here.
+                errorCode = (int)McpErrorCode.InvalidRequest;
+                errorMessage = "Request parameters or metadata contain duplicate keys.";
+            }
+
+            if (errorMessage is not null)
             {
                 var error = new JsonRpcError
                 {
                     Id = message is JsonRpcRequest rpcRequest ? rpcRequest.Id : default,
                     Error = new JsonRpcErrorDetail
                     {
-                        Code = (int)McpErrorCode.HeaderMismatch,
-                        Message = "The MCP-Protocol-Version header is missing or does not match request metadata."
+                        Code = errorCode,
+                        Message = errorMessage
                     }
                 };
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;

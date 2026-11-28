@@ -739,6 +739,41 @@ await RunAsync("McpHost_SupportsCurrentStatelessProtocolAndRejectsInvalidMetadat
               customHeaderOnlyJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
             "a modern custom parameter header without a version must be rejected");
 
+        foreach (var protocolVersion in new string?[] { null, "2025-03-26" })
+        {
+            foreach (var (payload, id) in new[]
+            {
+                ("""{"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"get_jamula_overview","name":"list_tech_notes","arguments":{}}}""", "21"),
+                ("""{"jsonrpc":"2.0","id":"duplicate-meta","method":"tools/call","params":{"name":"get_jamula_overview","arguments":{},"_meta":{"progressToken":"one","progressToken":"two"}}}""", "\"duplicate-meta\""),
+                ("""{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"_meta":{"progressToken":"one","progressToken":"two"}}}""", (string?)null)
+            })
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
+                {
+                    Content = new StringContent(payload, Encoding.UTF8, "application/json")
+                };
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+                if (protocolVersion is not null)
+                {
+                    request.Headers.Add("MCP-Protocol-Version", protocolVersion);
+                }
+
+                using var response = await http.SendAsync(request);
+                var body = await response.Content.ReadAsStringAsync();
+                Check(response.StatusCode == HttpStatusCode.BadRequest,
+                    $"duplicate params or metadata must return 400, got {(int)response.StatusCode}");
+                using var json = JsonDocument.Parse(body);
+                Check(response.Content.Headers.ContentType?.MediaType == "application/json" &&
+                      (id is null
+                          ? !json.RootElement.TryGetProperty("id", out var responseId) ||
+                            responseId.ValueKind == JsonValueKind.Null
+                          : json.RootElement.GetProperty("id").GetRawText() == id) &&
+                      json.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32600,
+                    "duplicate params or metadata must return Invalid Request with the original ID");
+            }
+        }
+
         Check(Interlocked.Read(ref toolInvocations) == invocationsBeforeRejections,
             "invalid protocol requests must not invoke a tool");
     }

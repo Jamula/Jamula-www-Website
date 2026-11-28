@@ -26,8 +26,9 @@ Its registered tools are:
 Modern MCP requests must include `MCP-Protocol-Version`; requests that identify
 themselves as modern without it, or carry mismatched version metadata, are
 rejected. Legacy and headerless requests remain supported, with a 1 MiB
-request-body limit. This local limit is not a general request, public traffic,
-or spend control.
+request-body limit. Duplicate keys directly in their `params` or `_meta`
+objects are rejected with a JSON-RPC invalid-request error. This local limit
+is not a general request, public traffic, or spend control.
 
 The registered tools make no model calls. An MCP client may bring its own model
 and incur inference charges; hosting, network, telemetry, and other infrastructure
