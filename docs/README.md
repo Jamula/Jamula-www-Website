@@ -100,6 +100,9 @@ flowchart LR
   measured existing test/coverage evidence and unmeasured release gates
 - [Side-quest operations review](operations/side-quest-operations-review.md) —
   monthly evidence review using the existing MBR, with data-quality and privacy rules
+- [M04 turnkey operations readiness](operations/m04-turnkey-readiness.md) —
+  dated vendor evidence and proposed CRM, scheduling, deletion, and reconciliation
+  runbooks; not a provider selection or production approval
 - [Public claims register](content/public-claims-register.md) —
   distinguishes baseline factual, inquiry, and scoped privacy copy in `main`
   source from candidate claims still awaiting formal register verification and
@@ -138,12 +141,14 @@ historical redirect as a current requirement.
 
 <a id="core-governance"></a>
 
-Research and source registers have evidence cut-offs in August 2026. Vendor
-prices, quotas, legal requirements, and public-source claims can change; those
-records are not live quotes or current legal advice. Verify the primary source
-again before relying on a time-sensitive claim. No source date, issue closure,
-review verdict, or merged documentation PR by itself approves a public claim,
-professional conclusion, migration, production action, or future product phase.
+The historical evaluation research and source registers have evidence cut-offs
+in August 2026; later operational documents state their own evidence dates.
+Vendor prices, quotas, legal requirements, and public-source claims can change;
+those records are not live quotes or current legal advice. Verify the primary
+source again before relying on a time-sensitive claim. No source date, issue
+closure, review verdict, or merged documentation PR by itself approves a public
+claim, professional conclusion, migration, production action, or future
+product phase.
 
 `artifacts-manifest.md`, `planning/work-ownership.md`, and
 `decisions/approvals.md` retain the August evaluation package's authorship,
