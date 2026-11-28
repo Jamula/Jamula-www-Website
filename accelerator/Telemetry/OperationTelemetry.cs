@@ -13,15 +13,42 @@ public enum OperationOutcome
 public sealed class OperationTelemetry : IDisposable
 {
     public const string InstrumentationName = "Jamula.Accelerator";
-    private readonly ActivitySource _activities = new(InstrumentationName);
-    private readonly Meter _meter = new(InstrumentationName);
+    private readonly ActivitySource _activities;
+    private readonly Meter _meter;
     private readonly Counter<long> _completed;
     private readonly Histogram<double> _duration;
 
     public OperationTelemetry()
     {
-        _completed = _meter.CreateCounter<long>("jamula.accelerator.operations");
-        _duration = _meter.CreateHistogram<double>("jamula.accelerator.duration", "ms");
+        var parent = Activity.Current;
+        try
+        {
+            Activity.Current = null;
+            _activities = new ActivitySource(InstrumentationName);
+            try
+            {
+                _meter = new Meter(InstrumentationName);
+                try
+                {
+                    _completed = _meter.CreateCounter<long>("jamula.accelerator.operations");
+                    _duration = _meter.CreateHistogram<double>("jamula.accelerator.duration", "ms");
+                }
+                catch
+                {
+                    _meter.Dispose();
+                    throw;
+                }
+            }
+            catch
+            {
+                _activities.Dispose();
+                throw;
+            }
+        }
+        finally
+        {
+            Activity.Current = parent;
+        }
     }
 
     public void RecordCompletion(OperationOutcome outcome, TimeSpan duration)
@@ -67,8 +94,23 @@ public sealed class OperationTelemetry : IDisposable
 
     public void Dispose()
     {
-        _activities.Dispose();
-        _meter.Dispose();
+        var parent = Activity.Current;
+        try
+        {
+            Activity.Current = null;
+            try
+            {
+                _activities.Dispose();
+            }
+            finally
+            {
+                _meter.Dispose();
+            }
+        }
+        finally
+        {
+            Activity.Current = parent;
+        }
     }
 
 }

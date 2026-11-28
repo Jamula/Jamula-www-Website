@@ -116,7 +116,186 @@ using (var metricsWithoutSpans = new MeterListener
     telemetry.RecordCompletion(OperationOutcome.Failure, TimeSpan.Zero);
     Check(activitiesWithoutSpans.Count == 4 && activitiesWithoutSpans.All(activity => activity is null),
         "A metric inherited the request activity when no span was sampled.");
+    using var unsampledListener = new ActivityListener
+    {
+        ShouldListenTo = source => source.Name == OperationTelemetry.InstrumentationName,
+        Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.None
+    };
+    ActivitySource.AddActivityListener(unsampledListener);
+    telemetry.RecordCompletion(OperationOutcome.Success, TimeSpan.Zero);
+    Check(activitiesWithoutSpans.Count == 6 && activitiesWithoutSpans.All(activity => activity is null),
+        "A metric inherited the request activity when sampling returned none.");
     Check(Activity.Current == parent, "Recording without a sampled span replaced the ambient activity.");
+}
+
+var sourceDiscoveryActivities = new ConcurrentBag<Activity?>();
+var publicationActivities = new ConcurrentBag<Activity?>();
+var completionActivities = new ConcurrentBag<Activity?>();
+using (var sourceDiscovery = new ActivityListener
+{
+    ShouldListenTo = source =>
+    {
+        if (source.Name != OperationTelemetry.InstrumentationName)
+        {
+            return false;
+        }
+        sourceDiscoveryActivities.Add(Activity.Current);
+        return true;
+    }
+})
+using (var lifecycleListener = new MeterListener
+{
+    InstrumentPublished = (instrument, listener) =>
+    {
+        if (instrument.Meter.Name == OperationTelemetry.InstrumentationName)
+        {
+            publicationActivities.Add(Activity.Current);
+            listener.EnableMeasurementEvents(instrument);
+        }
+    },
+    MeasurementsCompleted = (_, _) => completionActivities.Add(Activity.Current)
+})
+{
+    ActivitySource.AddActivityListener(sourceDiscovery);
+    lifecycleListener.Start();
+    using var parent = new Activity("parent").AddBaggage("private", secret).Start();
+    using var telemetry = new OperationTelemetry();
+    Check(Activity.Current == parent, "Construction replaced the ambient activity.");
+    telemetry.Dispose();
+    Check(Activity.Current == parent, "Disposal replaced the ambient activity.");
+    Check(sourceDiscoveryActivities.Count == 1 && sourceDiscoveryActivities.All(activity => activity is null),
+        "Activity source discovery inherited the request activity.");
+    Check(publicationActivities.Count == 2 && publicationActivities.All(activity => activity is null),
+        "Instrument publication inherited the request activity.");
+    Check(completionActivities.Count == 2 && completionActivities.All(activity => activity is null),
+        "Instrument completion inherited the request activity.");
+}
+
+foreach (var failedInstrument in new[] { "jamula.accelerator.operations", "jamula.accelerator.duration" })
+{
+    ActivitySource? createdSource = null;
+    var publishedInstruments = new ConcurrentBag<Instrument>();
+    var completedInstruments = new ConcurrentBag<Instrument>();
+    using var sourceTracker = new ActivityListener
+    {
+        ShouldListenTo = source =>
+        {
+            if (source.Name != OperationTelemetry.InstrumentationName)
+            {
+                return false;
+            }
+            createdSource = source;
+            return true;
+        }
+    };
+    using var failingPublication = new MeterListener
+    {
+        InstrumentPublished = (instrument, listener) =>
+        {
+            if (instrument.Meter.Name == OperationTelemetry.InstrumentationName)
+            {
+                publishedInstruments.Add(instrument);
+                listener.EnableMeasurementEvents(instrument);
+                if (instrument.Name == failedInstrument)
+                {
+                    throw new InvalidOperationException(secret);
+                }
+            }
+        },
+        MeasurementsCompleted = (instrument, _) => completedInstruments.Add(instrument)
+    };
+    ActivitySource.AddActivityListener(sourceTracker);
+    failingPublication.Start();
+    using var parent = new Activity("parent").Start();
+    try
+    {
+        using var telemetry = new OperationTelemetry();
+        throw new InvalidOperationException("Instrument publication failure was swallowed.");
+    }
+    catch (InvalidOperationException exception) when (exception.Message == secret)
+    {
+    }
+    Check(Activity.Current == parent, "Construction failure replaced the ambient activity.");
+    Check(createdSource is not null && !createdSource.HasListeners(),
+        "Construction failure left its activity source registered.");
+    Check(publishedInstruments.Count > 0 && publishedInstruments.Count == completedInstruments.Count
+        && publishedInstruments.All(completedInstruments.Contains),
+        "Construction failure left instruments registered.");
+}
+
+ActivitySource? sourceWithFailedCleanup = null;
+using (var sourceTracker = new ActivityListener
+{
+    ShouldListenTo = source =>
+    {
+        if (source.Name != OperationTelemetry.InstrumentationName)
+        {
+            return false;
+        }
+        sourceWithFailedCleanup = source;
+        return true;
+    }
+})
+using (var failingPublicationAndCleanup = new MeterListener
+{
+    InstrumentPublished = (instrument, listener) =>
+    {
+        if (instrument.Meter.Name == OperationTelemetry.InstrumentationName)
+        {
+            listener.EnableMeasurementEvents(instrument);
+            throw new InvalidOperationException("publication failure");
+        }
+    },
+    MeasurementsCompleted = (_, _) => throw new InvalidOperationException("cleanup failure")
+})
+{
+    ActivitySource.AddActivityListener(sourceTracker);
+    failingPublicationAndCleanup.Start();
+    using var parent = new Activity("parent").Start();
+    try
+    {
+        using var telemetry = new OperationTelemetry();
+        throw new InvalidOperationException("Publication and cleanup failures were swallowed.");
+    }
+    catch (InvalidOperationException exception) when (exception.Message == "cleanup failure")
+    {
+    }
+    Check(Activity.Current == parent, "Construction cleanup failure replaced the ambient activity.");
+    Check(sourceWithFailedCleanup is not null && !sourceWithFailedCleanup.HasListeners(),
+        "A meter cleanup failure left the activity source registered.");
+}
+
+var completionCount = 0;
+using (var failingCompletion = new MeterListener
+{
+    InstrumentPublished = (instrument, listener) =>
+    {
+        if (instrument.Meter.Name == OperationTelemetry.InstrumentationName)
+        {
+            listener.EnableMeasurementEvents(instrument);
+        }
+    },
+    MeasurementsCompleted = (_, _) =>
+    {
+        if (Interlocked.Increment(ref completionCount) == 1)
+        {
+            throw new InvalidOperationException(secret);
+        }
+    }
+})
+{
+    failingCompletion.Start();
+    using var parent = new Activity("parent").Start();
+    using var telemetry = new OperationTelemetry();
+    try
+    {
+        telemetry.Dispose();
+        throw new InvalidOperationException("Instrument completion failure was swallowed.");
+    }
+    catch (InvalidOperationException exception) when (exception.Message == secret)
+    {
+    }
+    Check(Activity.Current == parent, "Disposal failure replaced the ambient activity.");
 }
 
 var concurrentSpans = new ConcurrentBag<Activity>();
