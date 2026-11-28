@@ -23,6 +23,12 @@ Its registered tools are:
 - `search_public_corpus` — deterministic ranked keyword search with bounded
   excerpts and canonical citation URLs.
 
+Modern MCP requests must include `MCP-Protocol-Version`; requests that identify
+themselves as modern without it, or carry mismatched version metadata, are
+rejected. Legacy and headerless requests remain supported, with a 1 MiB
+request-body limit. This local limit is not a general request, public traffic,
+or spend control.
+
 The registered tools make no model calls. An MCP client may bring its own model
 and incur inference charges; hosting, network, telemetry, and other infrastructure
 may also incur costs. No total-cost or free-operation guarantee is implied.

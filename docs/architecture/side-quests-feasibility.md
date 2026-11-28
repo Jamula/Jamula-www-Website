@@ -26,9 +26,11 @@ read-only public-corpus tools, preserving the SDK's protocol validation. The
 describes stateless operation and mirrored-header validation; the
 [C# SDK versioning guidance](https://csharp.sdk.modelcontextprotocol.io/v2/versioning.html)
 documents protocol support. Current corpus limits include 256 KiB per source
-file, a 512-character search query, and 1-10 results; they are not an HTTP
-request-size, traffic, or spend limit. No representative traffic, concurrency,
-CPU duration, response size, bandwidth, retention, or model usage has been measured.
+file, a 512-character search query, and 1-10 results; they are not a general
+HTTP request-size, traffic, or spend limit. The local MCP host separately limits
+legacy and headerless request bodies to 1 MiB; this does not establish a public
+traffic or spend boundary. No representative traffic, concurrency, CPU duration,
+response size, bandwidth, retention, or model usage has been measured.
 
 For comparison only, use the same **1,000 requests/day** and **100,000
 requests/day** planning scenarios for each candidate, with a 30-day month
