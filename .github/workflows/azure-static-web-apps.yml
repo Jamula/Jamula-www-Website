@@ -188,9 +188,29 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  attest:
+    name: Attest artifact provenance
+    needs: [prepare, build]
+    if: >-
+      needs.prepare.outputs.should_deploy == 'true'
+      && github.event_name == 'workflow_dispatch'
+      && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Attest production static-site artifact provenance
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: swa-site-${{ env.DEPLOYMENT_SHA }}.zip
+          subject-digest: ${{ needs.build.outputs.artifact_digest }}
+
   deploy:
     name: Deploy and verify
-    needs: [prepare, build]
+    needs: [prepare, build, attest]
     if: >-
       needs.prepare.outputs.should_deploy == 'true'
       && github.event_name == 'workflow_dispatch'
@@ -389,7 +409,7 @@ jobs:
 
   deploy-com:
     name: Deploy and verify .com app
-    needs: [prepare, build]
+    needs: [prepare, build, attest]
     if: >-
       needs.prepare.outputs.should_deploy == 'true'
       && github.event_name == 'workflow_dispatch'

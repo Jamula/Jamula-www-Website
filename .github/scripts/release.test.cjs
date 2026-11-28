@@ -59,7 +59,7 @@ test("required PR validation builds and tests explicit release and versionless m
     if (index % 3 === 2) {
       assert.match(
         step,
-        /^        run: >-\n          node --experimental-test-coverage --test\n          --test-coverage-include=public\/analytics-consent\.js\n          --test-coverage-lines=90 --test-coverage-branches=90\n          tests\/\*\.test\.mjs$/m,
+        /^        run: >-\n          node --experimental-test-coverage --test\n          --test-coverage-include=public\/analytics-consent\.js\n          --test-coverage-lines=95 --test-coverage-branches=90\n          tests\/\*\.test\.mjs$/m,
       );
     } else {
       assert.ok(step.includes(`\n        run: ${commands[index % 3]}\n`));
@@ -118,7 +118,7 @@ test("required PR validation preserves build contracts and measured behavior cov
     if (index % 3 === 2) {
       assert.match(
         step,
-        /^        run: >-\n          node --experimental-test-coverage --test\n          --test-coverage-include=public\/analytics-consent\.js\n          --test-coverage-lines=90 --test-coverage-branches=90\n          tests\/\*\.test\.mjs$/m,
+        /^        run: >-\n          node --experimental-test-coverage --test\n          --test-coverage-include=public\/analytics-consent\.js\n          --test-coverage-lines=95 --test-coverage-branches=90\n          tests\/\*\.test\.mjs$/m,
       );
     } else {
       assert.ok(step.includes(`\n        run: ${commands[index % 3]}\n`));
@@ -627,12 +627,24 @@ test("release wiring preserves isolation, serialization and publication ordering
     )
     .replace(/\r\n/g, "\n");
   const prepare = workflow.split("\n  prepare:")[1].split("\n  build:")[0];
+  const attest = workflow.split("\n  attest:")[1].split("\n  deploy:")[0];
   const publish = workflow.split("\n  publish:")[1];
   assert.doesNotMatch(workflow, /^  push:/m);
   assert.match(workflow, /cancel-in-progress:.*pull_request/);
   assert.match(workflow, /\|\| 'production'/);
   assert.match(prepare, /Non-main or stale release revision[\s\S]*exit 1/);
   assert.match(workflow, /name: swa-site-\$\{\{ env\.DEPLOYMENT_SHA \}\}/);
+  assert.match(attest, /needs: \[prepare, build\]/);
+  assert.match(attest, /github\.event_name == 'workflow_dispatch'/);
+  assert.match(attest, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(attest, /id-token: write/);
+  assert.match(attest, /attestations: write/);
+  assert.match(attest, /uses: actions\/attest-build-provenance@/);
+  assert.match(
+    attest,
+    /subject-digest: \$\{\{ needs\.build\.outputs\.artifact_digest \}\}/,
+  );
+  assert.doesNotMatch(attest, /secrets\.|environment:/);
   assert.match(publish, /needs: \[prepare, build, deploy, deploy-com\]/);
   assert.match(publish, /contents: write/);
   assert.match(
@@ -649,6 +661,7 @@ test("release wiring preserves isolation, serialization and publication ordering
   );
   for (const name of ["deploy", "deploy-com"]) {
     const body = workflow.split(`\n  ${name}:`)[1].split(/\n  [\w-]+:/)[0];
+    assert.match(body, /needs: \[prepare, build, attest\]/);
     assert.match(body, /github\.event_name == 'workflow_dispatch'/);
     assert.match(body, /github\.ref == 'refs\/heads\/main'/);
     assert.match(body, /environment: swa-deployment/);
@@ -683,7 +696,11 @@ test("publication fails before writing on stale identity, main or history", () =
   for (const [scenario, overrides, expected] of [
     ["success", {}, [true, true]],
     ["fix reuse", { CHANGE_TYPE: "fix", TEST_EXISTING: "1" }, [false, false]],
-    ["fix moved tag", { CHANGE_TYPE: "fix", TEST_EXISTING: "1", TEST_MOVED: "1" }, [false, false]],
+    [
+      "fix moved tag",
+      { CHANGE_TYPE: "fix", TEST_EXISTING: "1", TEST_MOVED: "1" },
+      [false, false],
+    ],
     ["stale site", { TEST_VERSION: "0.0.9" }, [false, false]],
     ["stale main", { TEST_MAIN: oldSha }, [false, false]],
     ["changed history", { TEST_HISTORY: "1" }, [false, false]],

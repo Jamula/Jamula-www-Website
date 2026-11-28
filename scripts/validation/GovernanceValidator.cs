@@ -118,6 +118,15 @@ public static class GovernanceValidator
             }
         }
 
+        if (jobs.TryGetValue("attest", out var attestJob) &&
+            (attestJob.Contains("secrets.", StringComparison.Ordinal) ||
+             attestJob.Contains("environment:", StringComparison.Ordinal) ||
+             !attestJob.Contains("github.event_name == 'workflow_dispatch'", StringComparison.Ordinal) ||
+             !attestJob.Contains("github.ref == 'refs/heads/main'", StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException("attest must require a manual main release without deployment secrets or environment access");
+        }
+
         foreach (var name in new[] { "deploy", "deploy-com" })
         {
             var job = jobs.GetValueOrDefault(name, "");

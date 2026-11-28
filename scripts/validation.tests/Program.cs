@@ -15,6 +15,17 @@ runner.Run("Governance_EnvironmentFileIgnoreBoundary_IsEnforced", GovernanceIgno
 runner.Run("Governance_PrepareJobSecret_IsRejected", () => GovernanceWorkflowMutationFails(
     "  prepare:\n    steps: []", "  prepare:\n    env:\n      TOKEN: ${{ secrets.TEST_TOKEN }}\n    steps: []", "The PR prepare job"));
 runner.Run("Governance_BuildJobEnvironment_IsRejected", () => GovernanceWorkflowMutationFails("  build:\n    steps: []", "  build:\n    environment: swa-deployment", "The PR build job"));
+runner.Run("Governance_AttestJobMustBeMainOnlySecretless_IsEnforced", () =>
+{
+    GovernanceWorkflowMutationFails(
+        "  build:\n    steps: []",
+        "  build:\n    steps: []\n  attest:\n    if: github.event_name == 'pull_request'\n    steps: []",
+        "attest must require");
+    GovernanceWorkflowMutationFails(
+        "  build:\n    steps: []",
+        "  build:\n    steps: []\n  attest:\n    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'\n    environment: swa-deployment\n    steps: []",
+        "attest must require");
+});
 runner.Run("Governance_DeployRequiresManualMainEnvironment_IsEnforced", () => GovernanceWorkflowMutationFails(
     "  deploy:\n    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'",
     "  deploy:\n    if: github.event_name == 'pull_request'", "deploy must require"));

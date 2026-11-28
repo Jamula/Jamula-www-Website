@@ -6,12 +6,17 @@ measured source is bound to exactly one named Cobertura report; the gate rejects
 missing or invalid bindings, sources reported in a different file, duplicate,
 malformed, or unclassified measurements, and calculates
 line/branch rates from covered and valid counts rather than averaging rounded
-percentages. `gate.mjs` supports asymmetric thresholds (`lineThresholdPercent`
-and `branchThresholdPercent`, targeting `>=95%` line and `>=90%` branch coverage
-under `M02.03`; `inventory.json` retains `thresholdPercent: 90` until `M02.03`
-closes component line gaps). The printed aggregate is measured sources only;
-known unmeasured sources are reported as blockers, not silently omitted from an
-otherwise green result.
+percentages. `gate.mjs` enforces asymmetric thresholds (`lineThresholdPercent: 95` and
+`branchThresholdPercent: 90`) across every first-party executable component
+(`website-browser`, `github-automation`, `coverage-gate`, `validation-tool`,
+`monitor`, `monthly-business-review`, `mcp-server`) and the overall weighted
+aggregate. The printed aggregate is measured sources only; declarative `.astro`
+templates and `.github/workflows/*.yml` files are guarded under
+`validatedDeclarative` (failing closed if inline executable scripts or malformed
+workflow structures appear), `scripts/monitor/InternalsVisibleTo.cs` is guarded
+under `validatedMetadata`, and test-only harnesses and collector runners are
+explicitly classified in `excludedSources`. Any known unmeasured source is
+reported as a blocker, not silently omitted.
 
 First-party `.NET 11` read-only MCP sources under `scripts/mcp/` are inventoried
 as `mcp-server` (`mcp.cobertura.xml`), with `scripts/mcp/tests/Program.cs`
@@ -323,11 +328,11 @@ The fresh 2026-11-13 local collection ran
 and passed **19 checks, 0 skipped, 0 failed**. The report resolved both source
 paths to this checkout and measured:
 
-| Source | Lines | Branches |
-| --- | ---: | ---: |
-| `SectionHost.cs` (verified once across Admin/Finance/Tech) | 32/32 (100%) | 0/0 (N/A; no branches) |
-| `Gateway/Program.cs` (Gateway module only) | 61/62 (98.39%) | 38/40 (95.00%) |
-| Measured runtime-source subtotal | 93/94 (98.94%) | 38/40 (95.00%) |
+| Source                                                     |          Lines |               Branches |
+| ---------------------------------------------------------- | -------------: | ---------------------: |
+| `SectionHost.cs` (verified once across Admin/Finance/Tech) |   32/32 (100%) | 0/0 (N/A; no branches) |
+| `Gateway/Program.cs` (Gateway module only)                 | 61/62 (98.39%) |         38/40 (95.00%) |
+| Measured runtime-source subtotal                           | 93/94 (98.94%) |         38/40 (95.00%) |
 
 These are class/line identities from Cobertura, not unique physical line
 numbers. The `SectionHost.cs` count is taken from one of three verified
@@ -361,15 +366,15 @@ gate exited **1**. Counts below are covered/valid for inventoried production
 sources; component results include unmeasured-source blockers. The metadata
 guard was integrated afterward and does not change these measurement counts.
 
-| Component | Lines | Branches | Gate result |
-| --- | ---: | ---: | --- |
-| Website browser and config | 301/301 | 102/106 | Fail: seven unmeasured templates |
-| GitHub automation | 575/604 | 211/226 | Fail: nine unmeasured workflows |
-| Monitor | 186/205 | 80/86 | Fail: assembly metadata was unclassified in this baseline |
-| Monthly business review | 460/463 | 395/401 | Pass |
-| Validation tool | 358/391 | 279/302 | Pass |
-| Coverage gate | 427/429 | 175/180 | Pass |
-| Squad maintenance templates | Unmeasured | Unmeasured | Fail |
+| Component                   |      Lines |   Branches | Gate result                                               |
+| --------------------------- | ---------: | ---------: | --------------------------------------------------------- |
+| Website browser and config  |    301/301 |    102/106 | Fail: seven unmeasured templates                          |
+| GitHub automation           |    575/604 |    211/226 | Fail: nine unmeasured workflows                           |
+| Monitor                     |    186/205 |      80/86 | Fail: assembly metadata was unclassified in this baseline |
+| Monthly business review     |    460/463 |    395/401 | Pass                                                      |
+| Validation tool             |    358/391 |    279/302 | Pass                                                      |
+| Coverage gate               |    427/429 |    175/180 | Pass                                                      |
+| Squad maintenance templates | Unmeasured | Unmeasured | Fail                                                      |
 
 The measured-only aggregate was 2,307/2,393 lines (96.41%) and
 1,242/1,301 branches (95.47%); its measured threshold passed, but the overall

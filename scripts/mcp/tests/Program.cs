@@ -77,6 +77,7 @@ Run("PublicCorpus_LoadsRealRepositoryTechNotesAndOverview", () =>
 
 Run("PublicCorpus_RejectsInvalidDirectoriesMalformedFrontmatterAndUnsafeQueries", () =>
 {
+    Throws<ArgumentNullException>(() => _ = new PublicCorpus(null!), "entries");
     Throws<ArgumentException>(() => PublicCorpus.LoadFromDirectory(" "), "techDirectoryPath");
     Throws<DirectoryNotFoundException>(() => PublicCorpus.LoadFromDirectory(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))), "not found");
 
@@ -84,6 +85,41 @@ Run("PublicCorpus_RejectsInvalidDirectoriesMalformedFrontmatterAndUnsafeQueries"
     Directory.CreateDirectory(tempDir);
     try
     {
+        File.WriteAllText(Path.Combine(tempDir, "empty.md"), "");
+        Throws<InvalidDataException>(() => PublicCorpus.LoadFromDirectory(tempDir), "invalid byte length");
+        File.Delete(Path.Combine(tempDir, "empty.md"));
+
+        var linkTarget = Path.Combine(Path.GetTempPath(), "jamula-mcp-target-" + Guid.NewGuid().ToString("N"));
+        var linkDir = Path.Combine(Path.GetTempPath(), "jamula-mcp-link-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(linkTarget);
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                using var junction = Process.Start(new ProcessStartInfo("powershell.exe")
+                {
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    Arguments = $"-NoProfile -NonInteractive -Command \"New-Item -ItemType Junction -Path '{linkDir}' -Target '{linkTarget}' | Out-Null\""
+                })!;
+                junction.WaitForExit();
+            }
+            else
+            {
+                Directory.CreateSymbolicLink(linkDir, linkTarget);
+            }
+
+            if (Directory.Exists(linkDir))
+            {
+                Throws<InvalidDataException>(() => PublicCorpus.LoadFromDirectory(linkDir), "symlink or reparse point");
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(linkDir)) Directory.Delete(linkDir);
+            Directory.Delete(linkTarget, recursive: true);
+        }
         File.WriteAllText(Path.Combine(tempDir, "BAD_SLUG.md"), "---\ntitle: \"Bad\"\npublishedDate: \"2026-11-26\"\nsummary: \"Sum\"\n---\nBody");
         Throws<InvalidDataException>(() => PublicCorpus.LoadFromDirectory(tempDir), "unsafe slug");
         File.Delete(Path.Combine(tempDir, "BAD_SLUG.md"));
@@ -112,11 +148,21 @@ Run("PublicCorpus_RejectsInvalidDirectoriesMalformedFrontmatterAndUnsafeQueries"
         File.WriteAllText(
             Path.Combine(tempDir, "long-note.md"),
             $"---\n# YAML comment line\ntitle: 'Long''s Note'\npublishedDate: '2026-11-26'\nsummary: >-\n  Detailed folded\n  summary text\n---\n{longBody}");
+        File.WriteAllText(
+            Path.Combine(tempDir, "literal-note.md"),
+            $"---\ntitle: \"Quoted \\\"Literal\\\" Note\"\npublishedDate: 2026-11-26\nsummary: |-\n\tFirst line\n\tSecond line\n---\n{string.Join(' ', Enumerable.Repeat("bodyfiller", 60))}");
         var valid = PublicCorpus.LoadFromDirectory(tempDir);
-        var parsedNote = valid.ListTechNotes().Single(n => n.Id == "long-note");
+        var notes = valid.ListTechNotes();
+        Check(notes[0].Id == "literal-note" && notes[1].Id == "long-note", "same-date notes must sort deterministically by Id");
+        var parsedNote = notes.Single(n => n.Id == "long-note");
         Check(parsedNote.Title == "Long's Note", "expected single-quoted title unescaping");
         Check(parsedNote.PublishedDate == "2026-11-26", "expected single-quoted date");
         Check(parsedNote.Summary == "Detailed folded summary text", "expected folded YAML summary");
+        var literalNote = notes.Single(n => n.Id == "literal-note");
+        Check(literalNote.Title == "Quoted \"Literal\" Note", "expected double-quoted title unescaping");
+        Check(literalNote.Summary == "First line\nSecond line", "expected literal block YAML summary");
+        var titleOnlyMatch = valid.Search("Literal", 1);
+        Check(titleOnlyMatch.Count == 1 && titleOnlyMatch[0].Excerpt.EndsWith("...", StringComparison.Ordinal), "expected fallback excerpt start when term matches title only");
         var excerptMatch = valid.Search("targetkeyword", 1);
         Check(excerptMatch.Count == 1 && excerptMatch[0].Excerpt.EndsWith("...", StringComparison.Ordinal), "expected truncated excerpt");
         Check(valid.Search("!", 1).Count == 0, "expected single-punctuation query to produce zero tokens");
@@ -133,6 +179,15 @@ Run("PublicCorpus_RejectsInvalidDirectoriesMalformedFrontmatterAndUnsafeQueries"
 
 await RunAsync("McpTelemetry_EmitsContentSuppressedSpansAndCountersWithoutQueryLeakage", async () =>
 {
+    using (var unlistened = new McpTelemetry())
+    {
+        Check(unlistened.ExecuteTool("unlistened_ok", () => 7) == 7, "unlistened ExecuteTool success");
+        Throws<InvalidOperationException>(() => unlistened.ExecuteTool<int>("unlistened_err", () => throw new InvalidOperationException("boom")), "boom");
+        Check(await unlistened.ExecuteAsync("unlistened_async", () => Task.FromResult(9)) == 9, "unlistened ExecuteAsync default classifier");
+        await ThrowsAsync<InvalidOperationException>(() => unlistened.ExecuteAsync<int>("unlistened_async_err", () => throw new InvalidOperationException("async boom")), "async boom");
+        unlistened.RecordTokens(null, null);
+    }
+
     var activities = new List<Activity>();
     var counters = new List<(string Instrument, long Value, KeyValuePair<string, object?>[] Tags)>();
 
@@ -191,7 +246,12 @@ await RunAsync("McpTelemetry_EmitsContentSuppressedSpansAndCountersWithoutQueryL
     var blankModelReply = await emptyModelAdvisor.AskAsync("custom software");
     Check(!blankModelReply.Answered, "blank model output must fail closed");
 
+    var nullUsageAdvisor = new GroundedAdvisor(corpus, new FakeChatClient(null, null, null), telemetry);
+    var nullUsageReply = await nullUsageAdvisor.AskAsync("custom software");
+    Check(!nullUsageReply.Answered, "null usage and null text must fail closed");
+
     await ThrowsAsync<ArgumentException>(() => advisor.AskAsync(" "), "non-empty");
+    await ThrowsAsync<ArgumentException>(() => advisor.AskAsync(new string('q', GroundedAdvisor.MaxQuestionLength + 1)), "at most");
 
     // Verify no activity tag or metric tag ever contains the raw query canary.
     foreach (var activity in activities)
@@ -222,8 +282,35 @@ await RunAsync("McpTelemetry_EmitsContentSuppressedSpansAndCountersWithoutQueryL
 await RunAsync("McpHost_ServesReadyEndpointSecurityHeadersAndStreamableHttpMcpTools", async () =>
 {
     Check(await McpHost.RunMainAsync(["--verify-corpus", realTechDir]) == 0, "CLI verify-corpus must exit 0");
+    var previousCwd = Directory.GetCurrentDirectory();
+    try
+    {
+        Directory.SetCurrentDirectory(Path.Join(repoRoot, "scripts", "mcp"));
+        Check(await McpHost.RunMainAsync(["--verify-corpus", "www/src/content/tech"]) == 0, "CLI relative verify-corpus fallback must exit 0");
+    }
+    finally
+    {
+        Directory.SetCurrentDirectory(previousCwd);
+    }
     Check(await McpHost.RunMainAsync(["--unknown"]) == 2, "CLI invalid args must exit 2");
     Check(await McpHost.RunMainAsync(["--port", "99999"]) == 2, "CLI out-of-range port must exit 2");
+    Check(await McpHost.RunMainAsync(["--port", "abc"]) == 2, "CLI non-numeric port must exit 2");
+
+    using (var cliProc = Process.Start(new ProcessStartInfo("dotnet")
+    {
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        ArgumentList = { Path.Join(AppContext.BaseDirectory, "JamulaMcp.dll"), "--verify-corpus", realTechDir }
+    })!)
+    {
+        await cliProc.WaitForExitAsync();
+        Check(cliProc.ExitCode == 0, "JamulaMcp.dll top-level entry point must exit 0");
+    }
+
+    using (var silentStartCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(150)))
+    {
+        Check(await McpHost.RunMainAsync(["--port", "0"], silentStartCts.Token, TextWriter.Null, onStarted: null) == 0, "RunMainAsync without onStarted callback must exit 0 on cancellation");
+    }
     Check(Directory.Exists(McpHost.ResolveDefaultCorpusDirectory(repoRoot)), "ResolveDefaultCorpusDirectory from repo root");
     Check(Directory.Exists(McpHost.ResolveDefaultCorpusDirectory(Path.Join(repoRoot, "scripts", "mcp"))), "ResolveDefaultCorpusDirectory from project dir");
 
@@ -441,7 +528,7 @@ await RunAsync("McpHost_RejectsUntrustedHostOriginAndFetchSiteBeforeDispatch", a
 Console.WriteLine($"{passed} deterministic offline MCP checks passed.");
 return 0;
 
-sealed class FakeChatClient(string replyText, int inputTokens, int outputTokens) : IChatClient
+sealed class FakeChatClient(string? replyText, int? inputTokens, int? outputTokens) : IChatClient
 {
     public int CallCount { get; private set; }
 
@@ -453,15 +540,18 @@ sealed class FakeChatClient(string replyText, int inputTokens, int outputTokens)
         CancellationToken cancellationToken = default)
     {
         CallCount++;
-        var response = new ChatResponse(new ChatMessage(ChatRole.Assistant, replyText))
+        var response = replyText is null
+            ? new ChatResponse([])
+            : new ChatResponse(new ChatMessage(ChatRole.Assistant, replyText));
+        if (inputTokens.HasValue || outputTokens.HasValue)
         {
-            Usage = new UsageDetails
+            response.Usage = new UsageDetails
             {
                 InputTokenCount = inputTokens,
                 OutputTokenCount = outputTokens,
-                TotalTokenCount = inputTokens + outputTokens
-            }
-        };
+                TotalTokenCount = (inputTokens ?? 0) + (outputTokens ?? 0)
+            };
+        }
         return Task.FromResult(response);
     }
 
