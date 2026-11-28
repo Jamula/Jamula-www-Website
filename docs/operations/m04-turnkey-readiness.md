@@ -235,9 +235,11 @@ implement that projection.
 
 ## Proposed processor-to-accounting-to-bank reconciliation
 
-Before any payment testing, obtain the applicable counsel, acquirer/payment
-brand or qualified QSA/ISA, and broker reviews required by the
-[professional gates](../legal/phase-review-gates.md). Before accepting value,
+Before any payment testing, obtain the applicable counsel and broker reviews,
+the acquiring-bank/payment-brand merchant-validation determination, and a
+qualified QSA/ISA scope review when required by the
+[professional gates](../legal/phase-review-gates.md).
+Before accepting value,
 also obtain CPA review and Cyrus's provider, accounting, roles, terms, spending,
 and exact-version approvals. A hosted flow is not proof of PCI exemption.
 Assign an operator, a reviewer independent of the reconciler, and backup
