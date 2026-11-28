@@ -15,6 +15,7 @@ import {
   runVerification,
   startDistServer,
   verifyKernelNetworkNone,
+  waitForLayoutShiftFrame,
 } from "../scripts/verify-wcag-cls.mjs";
 
 function fetchLocal(url) {
@@ -62,7 +63,7 @@ async function createFakeDist() {
   return root;
 }
 
-test("installClsObserver and readClsAndLandmarks compute windowed CLS and landmark rects", () => {
+test("installClsObserver, waitForLayoutShiftFrame, and readClsAndLandmarks compute windowed CLS and landmark rects", async () => {
   const observers = [];
   class FakeObserver {
     constructor(callback) {
@@ -78,6 +79,7 @@ test("installClsObserver and readClsAndLandmarks compute windowed CLS and landma
   };
   installClsObserver(win, FakeObserver);
   assert.equal(observers.length, 1);
+  assert.equal(win.__jamulaShiftObserver, observers[0]);
   assert.deepEqual(observers[0].options, { type: "layout-shift", buffered: true });
 
   observers[0].callback({
@@ -105,6 +107,27 @@ test("installClsObserver and readClsAndLandmarks compute windowed CLS and landma
   assert.equal(snapshot.scrollbarGutter, "stable");
   assert.deepEqual(snapshot.landmarks.header, { x: 12, width: 960 });
 
+  let queuedRecords = [
+    { startTime: 2100, value: 0.07, hadRecentInput: false },
+    { startTime: 2200, value: 0.4, hadRecentInput: true },
+  ];
+  observers[0].takeRecords = () => {
+    const flushed = queuedRecords;
+    queuedRecords = [];
+    return flushed;
+  };
+  const flushedSnapshot = readClsAndLandmarks(doc, win);
+  assert.equal(Number(flushedSnapshot.cls.toFixed(2)), 0.09);
+
+  let rafFrames = 0;
+  await waitForLayoutShiftFrame({
+    requestAnimationFrame(callback) {
+      rafFrames++;
+      callback(rafFrames * 16);
+    },
+  });
+  assert.equal(rafFrames, 2);
+
   const missingDoc = { documentElement: {}, querySelector: () => null };
   const emptySnapshot = readClsAndLandmarks(missingDoc, {
     getComputedStyle: () => ({ scrollbarGutter: "auto" }),
@@ -114,22 +137,30 @@ test("installClsObserver and readClsAndLandmarks compute windowed CLS and landma
 });
 
 test("verifyKernelNetworkNone accepts loopback-only and rejects external interfaces or sockets", async () => {
-  const makeSocket = (mode) => () => {
-    const socket = new EventEmitter();
-    socket.destroyed = false;
-    socket.destroy = () => {
-      socket.destroyed = true;
+  const makeSocket =
+    (mode, ...customError) =>
+    () => {
+      const socket = new EventEmitter();
+      socket.destroyed = false;
+      socket.destroy = () => {
+        socket.destroyed = true;
+      };
+      socket.setTimeout = (_ms, callback) => {
+        if (mode === "timeout") queueMicrotask(callback);
+      };
+      queueMicrotask(() => {
+        if (mode === "error") {
+          socket.emit(
+            "error",
+            customError.length > 0
+              ? customError[0]
+              : Object.assign(new Error("ENETUNREACH"), { code: "ENETUNREACH" })
+          );
+        }
+        if (mode === "connect") socket.emit("connect");
+      });
+      return socket;
     };
-    socket.setTimeout = (_ms, callback) => {
-      if (mode === "timeout") queueMicrotask(callback);
-    };
-    queueMicrotask(() => {
-      if (mode === "error")
-        socket.emit("error", Object.assign(new Error("unreachable"), { code: "ENETUNREACH" }));
-      if (mode === "connect") socket.emit("connect");
-    });
-    return socket;
-  };
 
   await verifyKernelNetworkNone({
     networkInterfaces: () => ({ lo: [{ address: "127.0.0.1", internal: true }], empty: undefined }),
@@ -162,6 +193,27 @@ test("verifyKernelNetworkNone accepts loopback-only and rejects external interfa
     }),
     /timed out instead of failing immediately/
   );
+
+  for (const [err, pattern] of [
+    [
+      Object.assign(new Error("connect ECONNREFUSED 192.0.2.1:443"), { code: "ECONNREFUSED" }),
+      /unexpected error \(ECONNREFUSED: connect ECONNREFUSED/,
+    ],
+    [
+      Object.assign(new Error("connect EACCES 192.0.2.1:443"), { code: "EACCES" }),
+      /unexpected error \(EACCES: connect EACCES/,
+    ],
+    [new Error("socket failure without code"), /unexpected error \(missing-code: socket failure/],
+    [undefined, /unexpected error \(missing-code: undefined\)/],
+  ]) {
+    await assert.rejects(
+      verifyKernelNetworkNone({
+        networkInterfaces: () => ({ lo: [{ address: "127.0.0.1", internal: true }] }),
+        connect: makeSocket("error", err),
+      }),
+      pattern
+    );
+  }
 });
 
 test("discoverRoutes and startDistServer serve static routes and block path traversal", async () => {
@@ -206,22 +258,15 @@ test("discoverRoutes and startDistServer serve static routes and block path trav
 
 function createFakePlaywright({
   violationsFor = () => [],
+  onAudit = () => {},
   beforeEval,
   afterEval,
+  finalEval,
   consentVisibleOnLoad,
   rejectVisibleOnLoad,
   hideConsentOnReject = true,
   emitExternalRequest = false,
 } = {}) {
-  const defaultSnapshot = {
-    cls: 0,
-    scrollbarGutter: "stable",
-    landmarks: {
-      header: { x: 16, width: 960 },
-      main: { x: 16, width: 960 },
-      footer: { x: 16, width: 960 },
-    },
-  };
   let contextsCreated = 0;
   let contextsClosed = 0;
   let clickedReject = 0;
@@ -231,24 +276,58 @@ function createFakePlaywright({
     async newContext(contextOptions) {
       contextsCreated++;
       const requestListeners = [];
+      const initScripts = [];
       const localStorage = new Map();
       let currentScheme = contextOptions.colorScheme ?? "light";
       return {
         on(event, handler) {
           if (event === "request") requestListeners.push(handler);
         },
-        async addInitScript() {},
+        async addInitScript(script) {
+          initScripts.push(script);
+        },
         async newPage() {
-          let evalCount = 0;
+          let snapshotEvalCount = 0;
           let currentRoute = "";
           let panelVisible = false;
           let rejectVisible = false;
+          let pendingShiftEntries = [];
+          let pageWin = null;
+          let pageDoc = null;
           return {
             async emulateMedia({ colorScheme }) {
               currentScheme = colorScheme;
             },
             async goto(url) {
               currentRoute = new URL(url).pathname;
+              snapshotEvalCount = 0;
+              pendingShiftEntries = [];
+              class PageObserver {
+                constructor(callback) {
+                  this.callback = callback;
+                }
+                observe() {}
+                takeRecords() {
+                  return pendingShiftEntries.splice(0);
+                }
+              }
+              const landmarks = {
+                header: { x: 16, width: 960 },
+                "main#main-content": { x: 16, width: 960 },
+                footer: { x: 16, width: 960 },
+              };
+              pageDoc = {
+                documentElement: {},
+                querySelector: (selector) =>
+                  landmarks[selector] ? { getBoundingClientRect: () => landmarks[selector] } : null,
+              };
+              pageWin = {
+                getComputedStyle: () => ({ scrollbarGutter: "stable" }),
+                requestAnimationFrame: (callback) => callback(0),
+              };
+              for (const script of initScripts) {
+                script(pageWin, PageObserver);
+              }
               for (const handler of requestListeners) {
                 handler({ url: () => url });
                 if (emitExternalRequest) {
@@ -285,17 +364,22 @@ function createFakePlaywright({
               }
               throw new Error(`Unexpected locator selector: ${selector}`);
             },
-            async evaluate() {
-              evalCount++;
-              return evalCount === 1
-                ? (beforeEval ?? defaultSnapshot)
-                : (afterEval ?? defaultSnapshot);
+            async evaluate(fn) {
+              if (fn === waitForLayoutShiftFrame) {
+                return waitForLayoutShiftFrame(pageWin);
+              }
+              snapshotEvalCount++;
+              if (snapshotEvalCount === 1 && beforeEval) return beforeEval;
+              if (snapshotEvalCount === 2 && afterEval) return afterEval;
+              if (snapshotEvalCount === 3 && finalEval) return finalEval;
+              return fn(pageDoc, pageWin);
             },
             async close() {},
             currentScheme: () => currentScheme,
             currentRoute: () => currentRoute,
             currentViewportWidth: () => contextOptions.viewport.width,
             isPanelVisible: () => panelVisible,
+            queueLayoutShift: (entry) => pendingShiftEntries.push(entry),
           };
         },
         async close() {
@@ -318,6 +402,7 @@ function createFakePlaywright({
             panelVisible: page.isPanelVisible(),
           };
           audits.push(audit);
+          onAudit(audit, page);
           return {
             violations: violationsFor(audit),
           };
@@ -340,7 +425,13 @@ test("runVerification audits both themes before and after consent dismissal in f
   const dist = await createFakeDist();
   try {
     const logs = [];
-    const clean = createFakePlaywright();
+    const clean = createFakePlaywright({
+      onAudit: ({ colorScheme, panelVisible }, page) => {
+        if (colorScheme === "dark" && !panelVisible) {
+          page.queueLayoutShift({ startTime: 2400, value: 0.06, hadRecentInput: false });
+        }
+      },
+    });
     const summary = await runVerification({
       distRoot: dist,
       requireNetworkNone: true,
@@ -352,13 +443,16 @@ test("runVerification audits both themes before and after consent dismissal in f
           const s = new EventEmitter();
           s.destroy = () => {};
           s.setTimeout = () => {};
-          queueMicrotask(() => s.emit("error", new Error("ENETUNREACH")));
+          queueMicrotask(() =>
+            s.emit("error", Object.assign(new Error("ENETUNREACH"), { code: "ENETUNREACH" }))
+          );
           return s;
         },
       },
       log: (line) => logs.push(JSON.parse(line)),
     });
     assert.equal(summary.checks, 10);
+    assert.equal(summary.maxObservedCls, 0.06);
     assert.equal(summary.externalRequests, 0);
     assert.equal(clean.getContextsCreated(), 10);
     assert.equal(clean.getContextsClosed(), 10);
@@ -442,6 +536,32 @@ test("runVerification audits both themes before and after consent dismissal in f
           },
         },
         /CLS 0\.15 exceeds maximum 0\.1/,
+      ],
+      [
+        "CLS budget exceeded during post-dismissal dark audit",
+        {
+          onAudit: ({ colorScheme, panelVisible }, page) => {
+            if (colorScheme === "dark" && !panelVisible) {
+              page.queueLayoutShift({ startTime: 2400, value: 0.18, hadRecentInput: false });
+            }
+          },
+        },
+        /CLS 0\.18 exceeds maximum 0\.1/,
+      ],
+      [
+        "landmark shift during post-dismissal audits",
+        {
+          finalEval: {
+            cls: 0,
+            scrollbarGutter: "stable",
+            landmarks: {
+              header: { x: 24, width: 960 },
+              main: { x: 16, width: 960 },
+              footer: { x: 16, width: 960 },
+            },
+          },
+        },
+        /<header> landmark shifted/,
       ],
       [
         "missing scrollbar-gutter",

@@ -45,9 +45,24 @@ export function installClsObserver(win = globalThis, Observer = globalThis.Perfo
     }
   });
   observer.observe({ type: "layout-shift", buffered: true });
+  win.__jamulaShiftObserver = observer;
+}
+
+export function waitForLayoutShiftFrame(win = globalThis) {
+  return new Promise((resolve) => {
+    win.requestAnimationFrame(() => {
+      win.requestAnimationFrame(() => resolve());
+    });
+  });
 }
 
 export function readClsAndLandmarks(doc = globalThis.document, win = globalThis) {
+  for (const entry of win.__jamulaShiftObserver?.takeRecords?.() ?? []) {
+    if (!entry.hadRecentInput) {
+      win.__jamulaShifts.push({ time: entry.startTime, value: entry.value });
+    }
+  }
+
   let cls = 0;
   let windowSum = 0;
   let windowStart = 0;
@@ -113,7 +128,19 @@ export async function verifyKernelNetworkNone({
     socket.once("connect", () =>
       finish(new Error("External TCP connection unexpectedly succeeded; network is not isolated."))
     );
-    socket.once("error", () => finish());
+    socket.once("error", (error) => {
+      if (error?.code === "ENETUNREACH") {
+        finish();
+        return;
+      }
+      const code = error?.code ?? "missing-code";
+      const message = error?.message ?? String(error);
+      finish(
+        new Error(
+          `External network probe failed with unexpected error (${code}: ${message}); expected ENETUNREACH.`
+        )
+      );
+    });
   });
 }
 
@@ -214,6 +241,12 @@ function assertLandmarksStable(route, viewportName, before, after) {
   }
 }
 
+function assertClsWithinBudget(route, viewportName, snapshot) {
+  if (snapshot.cls > MAX_CLS) {
+    throw new Error(`${viewportName} ${route}: CLS ${snapshot.cls} exceeds maximum ${MAX_CLS}.`);
+  }
+}
+
 async function auditColorSchemes(page, createAxeBuilder, viewportName, route, stateLabel) {
   for (const colorScheme of COLOR_SCHEMES) {
     await page.emulateMedia({ colorScheme });
@@ -296,11 +329,7 @@ export async function runVerification({
             const after = await page.evaluate(readClsAndLandmarks);
 
             assertLandmarksStable(route, viewport.name, before, after);
-            if (after.cls > MAX_CLS) {
-              throw new Error(
-                `${viewport.name} ${route}: CLS ${after.cls} exceeds maximum ${MAX_CLS}.`
-              );
-            }
+            assertClsWithinBudget(route, viewport.name, after);
 
             await auditColorSchemes(
               page,
@@ -310,10 +339,16 @@ export async function runVerification({
               "consent-dismissed"
             );
 
+            await page.evaluate(waitForLayoutShiftFrame);
+            const finalSnapshot = await page.evaluate(readClsAndLandmarks);
+
+            assertLandmarksStable(route, viewport.name, before, finalSnapshot);
+            assertClsWithinBudget(route, viewport.name, finalSnapshot);
+
             results.push({
               viewport: viewport.name,
               route,
-              cls: after.cls,
+              cls: finalSnapshot.cls,
               wcagLightViolations: 0,
               wcagDarkViolations: 0,
             });
