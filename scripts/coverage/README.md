@@ -104,7 +104,7 @@ From the repository root in PowerShell, create isolated report directories:
 ```powershell
 $reports = Join-Path (Get-Location) "coverage-reports"
 New-Item -ItemType Directory -Force `
-  "$reports\website", "$reports\astro-config", "$reports\automation", "$reports\mbr-ui", "$reports\coverage-gate", "$reports\ralph-triage", "$reports\sidequest-artifacts" | Out-Null
+  "$reports\website", "$reports\astro-config", "$reports\automation", "$reports\mbr-ui", "$reports\coverage-gate" | Out-Null
 ```
 
 Install website dependencies with `npm ci --prefix www` if needed. The gate
@@ -156,148 +156,12 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   --include="scripts/coverage/gate.mjs" --exclude="scripts/coverage/gate.test.mjs" `
   node --test scripts/coverage/gate.test.mjs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-& .\www\node_modules\.bin\c8.cmd --all --include=".squad/templates/ralph-triage.js" `
-  --exclude="" --reporter=text --reporter=cobertura --reporter=json-summary `
-  --reports-dir="$reports\ralph-triage" --check-coverage --lines=90 --branches=90 --per-file `
-  node --test scripts/coverage/ralph-triage.test.cjs
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 ```
 
-Run the focused offline behavior tests for the notes-fetch PowerShell template
-with `node --test scripts/coverage/notes-fetch.test.cjs`. The test harness
-shadows Git with a fixture-only function and uses a disposable repo-shaped
-directory; it does not collect source coverage. Pester 3.4.0's standard
-`CodeCoverage` output supplies line hits, not branch outcomes. PowerShell AST
-inspection identifies control-flow structure but does not show which paths ran.
-Inserting hit markers or wrapping conditions would execute transformed code;
-no method has been verified here to preserve automatic variables, pipeline and
-scope behavior, exceptions, and the original source mapping while accounting for
-every executable statement and decision outcome. Boolean-term counts, AST-node
-counts, passing behavior tests, and line hits are not source coverage or a
-line-and-branch report. The focused test also
-rejects an inventory mutation that reclassifies this template as measured.
-Keep it explicitly unmeasured until a semantics-preserving collector proves
-complete attribution against the original source.
-
-The Ralph collector explicitly includes the hidden source and clears c8's
-default exclusions. Run from the repository root: Cobertura records that
-absolute root, which the gate checks against its own checkout. Its offline CLI
-tests stub Git, HTTPS and output writes; no GitHub request or result file is
-created. c8 reports V8 line and branch counts, not independent boolean
-condition coverage. Other Squad templates remain unmeasured.
-
-Run `node --test scripts\coverage\sync-mesh.test.mjs` for offline shell mesh
-behavior tests. The harness pins the audited template content, runs a copy in
-a disposable directory, and intercepts every external command through a
-private PATH. Git, curl, jq, and printenv are deterministic fakes; only a
-constrained mkdir wrapper invokes the local mkdir executable. Fixtures contain
-no real remote addresses or credentials. The jq fake does not verify actual jq
-semantics, and the harness is not an OS-level network sandbox. No available
-offline collector provides defensible shell line and branch counts, so the
-template stays unmeasured and remains a gate blocker.
-
-The notes-fetch PowerShell template has offline behavior tests:
-`node --test scripts/coverage/notes-fetch.test.cjs`. The harness uses a fake Git
-function and a disposable repository-shaped directory; it does not touch real
-refs/remotes or make network requests. These tests do not collect source
-coverage. Pester 3.4.0's standard `CodeCoverage` output supplies line hits, not
-branch outcomes. PowerShell AST inspection identifies control-flow structure
-but does not show which paths ran. Inserting hit markers or wrapping conditions
-would execute transformed code; no method has been verified here to preserve
-automatic variables, pipeline and scope behavior, exceptions, and the original
-source mapping while accounting for every executable statement and decision
-outcome. Boolean-term counts, AST-node counts, passing behavior tests, and line
-hits are not source coverage or a line-and-branch report. The focused test also
-rejects an inventory mutation that reclassifies this template as measured.
-Keep it explicitly unmeasured until a semantics-preserving collector proves
-complete attribution against the original source.
-The same offline test demonstrates one concrete instrumentation hazard: adding
-`Write-Output` to the `$existing` condition in a temporary copy makes a missing
-refspec truthy, so the script skips the fake Git `config --add` call. The
-uninstrumented source adds it. This rejects that particular probe, not every
-possible instrumentation method; it does not measure source coverage or
-establish a complete denominator. The test only runs with the fake Git fixture.
-These behavior checks do not complete the #109 coverage gate.
-
-The same offline test demonstrates one concrete instrumentation hazard: adding
-`Write-Output` to the `$existing` condition in a temporary copy makes a missing
-refspec truthy, so the script skips the fake Git `config --add` call. The
-uninstrumented source adds it. This rejects that particular probe, not every
-possible instrumentation method; it does not measure source coverage or
-establish a complete denominator. The test only runs with the fake Git fixture.
-
-Two debugger controls run with `node --test scripts/coverage/notes-fetch.test.cjs`.
-On PowerShell 7.7.0, an empty-action breakpoint at the original `$existing`
-condition has one hit for both missing and existing refspecs, despite opposite
-outcomes; for these two scenarios, stdout, stderr, exit status, and fake Git
-calls match the uninstrumented runs. A separate synthetic `-and` fixture places
-a column breakpoint at its right-hand `Test-Path` operand: it hits once whether
-that fake operand runs or is short-circuited. The current template has no
-`-and`/`-or` AST nodes; this fixture tests a limitation, not template coverage.
-These checks do not prove all debugger approaches unsound, but breakpoint hits
-alone cannot establish operand outcomes or a complete denominator, and
-exception paths and every source statement have not been attributed and
-validated. The template remains unmeasured.
-
-On PowerShell 7.7.0, `Set-PSDebug -Trace 1` adds host-visible trace output
-when the original template runs with fake Git; redirecting stream 5 does not
-remove that output. In the tested setup scenario the traced and untraced runs
-have the same exit status, stderr, and fake Git calls, but not the same stdout.
-A separate synthetic `-and` test shows the same traced condition line when its
-right-hand variable is short-circuited and when it is evaluated. This does not
-establish that every tracing or AST-based approach fails, nor does it test all
-error, scope, or side-effect behavior. Tracing is not a source coverage report,
-and notes-fetch remains unmeasured.
-
-The live `.github/workflows/squad-triage.yml` JavaScript block has deterministic
-offline behavioral tests: `node --test scripts/coverage/squad-triage.test.cjs`.
-The tests extract the block directly from the workflow and supply local
-filesystem, GitHub API, and core fakes; they do not call GitHub. The VM filename
-and line offset support diagnostics, not a coverage source map: V8 ranges refer
-to the extracted and wrapped JavaScript, not the original YAML bytes. The
-repository-pinned c8 excludes `.yml` by default; forcing `--extension .yml`
-produces a misleading report attributing execution to YAML metadata and
-misplacing JavaScript branches. Do not use that report as coverage evidence.
-Node's experimental test-coverage report also cannot reliably map this VM
-script back to the original YAML. Neither report measures the Actions event,
-job condition, step execution, or external actions. The gate classifies whole
-source paths, so treating the YAML as measured from the script alone would hide
-those behaviors. It remains an unmeasured blocker; no counts are added to the
-gate. V8 branch ranges are not independent boolean-condition coverage.
-
-`node --test scripts/coverage/squad-triage-mapping.test.cjs` checks a more
-limited mapping experiment. The script's generated lines can be aligned to the
-YAML block without including metadata, and an in-memory exact-source guard
-rejects synthetic candidate strings that differ from the source extracted
-from the unchanged workflow. It does not mutate the workflow text or prove
-that a workflow/source mutation is caught by the mapping or coverage path.
-However, even when the pinned `v8-to-istanbul` converter receives the exact VM
-source, the missing-roster early-return control falsely marks the later
-dispatch condition as covered. Its line report includes blank and comment
-lines, too, so it is not an executable-line denominator. V8's dynamically
-reported ranges also do not independently establish a complete static branch
-denominator. This experiment is diagnostic only: it is not a source-mapped
-coverage report, an Actions integration run, or evidence for the 90% gate.
-
-Run `node --test scripts\coverage\write-note.test.cjs` for offline PowerShell
-note-writer behavior checks. A disposable fixture intercepts Git and sleeps;
-these checks do not produce source-level line or branch coverage, so
-`write-note.ps1` remains unmeasured and the gate remains blocked.
-
-The distributed-mesh PowerShell template has offline behavior checks:
-`node --test scripts/coverage/sync-mesh.test.cjs`. Its disposable PowerShell
-fixture verifies that `git` and `Invoke-WebRequest` resolve to scoped fake
-functions before invoking the tracked source; all paths and generated state
-stay under a temporary directory, and the fixture's `PATH` excludes system
-executables. These checks cover initialization/idempotency and success/failure
-handling for both remote zones, but do not produce source coverage. The
-available Pester 3.4.0 CodeCoverage output has line hits but no branch counts or
-repository-pinned Cobertura export; dotnet-coverage measures CLR code, not
-PowerShell source. AST inspection, behavior assertions, and line hits do not
-establish a complete source line/branch denominator. Keep
-`sync-mesh.ps1` explicitly unmeasured until a semantics-preserving collector
-produces defensible attribution for both metrics.
+Retired `@bradygaster/squad-cli` scaffolding (`.squad/`, `.github/workflows/squad-*.yml`,
+`.github/workflows/sync-squad-labels.yml`, and the accompanying offline Squad
+template behavior harnesses previously under `scripts/coverage/`) has been
+removed from the active repository tree and inventory.
 
 The Astro collector writes a fresh temporary directory on each run; the copy
 above uses the directory printed by that successful run. Its Cobertura
@@ -506,9 +370,9 @@ and are not full first-party coverage.
 
 On CI, `.github/workflows/required-pr-validation.yml` runs `npm --prefix www ci`
 and `node --test "scripts/coverage/*.test.*"` unconditionally on every pull
-request to enforce inventory classification and offline Squad template behavior
-checks. For full coverage evaluation, use the commands above with the pinned
-Node/npm/.NET versions from the existing workflows, and retain every report plus
+request to enforce inventory classification and coverage-gate checks. For full
+coverage evaluation, use the commands above with the pinned Node/npm/.NET
+versions from the existing workflows, and retain every report plus
 `summary.json` as artifacts for the exact source revision. Do not treat a failed
 collector, empty report, or console-only runner summary as a successful gate.
 
@@ -538,9 +402,8 @@ collector, empty report, or console-only runner summary as a successful gate.
   and the overall gate blocked; `SectionHost.cs` has no branch points in any of
   its three compiled modules, so its branch result is explicitly N/A (`0/0`),
   not a fabricated 100%.
-- `.squad/templates/` contains first-party Node, PowerShell, shell, and 11
-  runnable workflow templates. Only `ralph-triage.js` is measured; all other
-  executable templates remain unmeasured blockers.
+- `.squad/` and Squad-originated integration files have been retired from the
+  active tree and are no longer part of the current inventory.
 - The validation utility (`GovernanceValidator.cs`,
   `PreviewArtifactValidator.cs`, and `Program.cs`) is measured separately from
   its offline unit and CLI test runners (`PreviewSiteVerifier.cs` and its

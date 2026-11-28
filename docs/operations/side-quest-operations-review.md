@@ -7,10 +7,11 @@ dashboard or a claim that unmeasured signals are healthy.
 
 ## Owners and workflow
 
-Seven coordinates the review and prior actions. Spock presents engineering and
-AI-operation evidence. Data checks evidence quality, privacy, access, and
-retention. Uhura maintains this runbook. Run the review manually once per month;
-do not create a scheduled automation for it.
+The review coordinator leads the review and prior-action check. Engineering
+presents operational and AI-operation evidence. An independent reviewer checks
+evidence quality, privacy, access, and retention. Documentation updates this
+runbook when process rules change. Run the review manually once per month; do
+not create a scheduled automation for it.
 
 Start from the MBR snapshot for the selected `YYYY-MM` month. Record its exact
 UTC start, exclusive end, and observation timestamp. Review prior GitHub issue
@@ -52,15 +53,13 @@ estimates and provisional comparisons explicitly.
 
 ## Data handling and follow-through
 
-Use existing access only. Seven coordinates; Spock supplies metric evidence;
-Data reviews data quality and privacy; Uhura needs only process changes and
-sanitized outcomes. Give restricted source evidence only to review participants
-who already have source authorization. The local MBR dashboard is not an
-authenticated multi-user service, so do not expose its local snapshot to other
-OS users or attach it to a public issue or report. Keep restricted evidence in
-its authorized source and link to it only for people who already have access.
-GitHub issue threads may be visible to the repository audience; put only
-non-sensitive summaries and evidence links that are safe for that audience
+Use existing access only. Give restricted source evidence only to review
+participants who already have source authorization. The local MBR dashboard is
+not an authenticated multi-user service, so do not expose its local snapshot to
+other OS users or attach it to a public issue or report. Keep restricted
+evidence in its authorized source and link to it only for people who already
+have access. GitHub issue threads may be visible to the repository audience; put
+only non-sensitive summaries and evidence links that are safe for that audience
 there.
 
 Do not copy raw prompts, private posts, financial content, personal identity,
@@ -69,22 +68,13 @@ Do not broaden collection or access to fill a gap. Follow each source's approved
 retention and deletion rules; if those rules or an approved source are unclear,
 retain no additional export and report the metric as unknown.
 
-Persist accepted durable decisions through the configured `squad_state`
-governed bridge, not GitHub issue threads: use `memory.write`
-(`squad_state-memory-write`) with the appropriate governed decision class and
-required approval, or `decide` (`squad_state-squad_decide`) for the team decision
-inbox and its review process. An inbox submission is pending review, not proof
-of acceptance. Verify the bridge's successful result and retain the returned
-record identifier or reference before claiming persistence. Keep restricted
-evidence in its authorized source; persist only appropriately sanitized
-decision context, rationale, approval status, and safe evidence references.
-
-If the configured bridge is missing, unavailable, or rejects the write, do not
-fake persistence or bypass it: report the decision as **pending persistence**
-in the review handoff and halt Squad state mutation until the governed bridge
-is available and the write succeeds. Do not edit raw `.squad` state files,
-including decision inbox or memory files, or use manual Git/file operations as
-a persistence fallback.
+Persist accepted durable architectural or governance decisions in tracked
+`docs/decisions/` records (ADRs and `docs/decisions/approvals.md`) via reviewed
+pull requests, and use native GitHub Copilot Memory (`store_memory` /
+`vote_memory`) only for non-sensitive workflow conventions backed by exact
+`path:line` citations. Keep restricted evidence in its authorized source;
+persist only appropriately sanitized decision context, rationale, approval
+status, and safe evidence references.
 
 Use GitHub issues only as the actionable data-gap and follow-up work ledger,
 reusing existing issues where possible. Each follow-up needs one accountable
