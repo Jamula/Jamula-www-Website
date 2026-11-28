@@ -112,10 +112,14 @@ jobs:
         shell: bash
         env:
           DEPLOYMENT_TOKEN: ${{ secrets.SWA_NET_DEPLOYMENT_TOKEN }}
+          PREVIEW_ACTION: ${{ steps.gate.outputs.action }}
         run: |
           if [[ -z "$DEPLOYMENT_TOKEN" ]]; then
             echo "::error::Environment secret swa-deployment/SWA_NET_DEPLOYMENT_TOKEN is unavailable to the trusted preview workflow."
             exit 1
+          fi
+          if [[ "$PREVIEW_ACTION" == "close" ]]; then
+            cp .preview/event.json "$GITHUB_EVENT_PATH"
           fi
 
       - name: Deploy or close selected PR preview

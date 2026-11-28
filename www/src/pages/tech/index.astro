@@ -1,0 +1,150 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+const notes = (await getCollection("tech")).sort((left, right) =>
+  right.data.publishedDate.localeCompare(left.data.publishedDate)
+);
+---
+
+<BaseLayout
+  title="Technical notes"
+  description="Architecture and engineering notes from Jamula across AI systems, custom software, and cloud delivery."
+  canonicalUrl="https://jamula.net/tech/"
+>
+  <div class="tech-index">
+    <section class="tech-index__intro" aria-labelledby="tech-heading">
+      <p class="woven-label">Architecture &amp; Engineering</p>
+      <h1 id="tech-heading" class="tech-index__heading">
+        Technical notes
+      </h1>
+      <p class="tech-index__lead">
+        Selected notes on how Jamula designs, verifies, and operates software and cloud systems.
+        Machine-readable indexes are also published at <a href="/llms.txt">/llms.txt</a> and{" "}
+        <a href="/llms-full.txt">/llms-full.txt</a>.
+      </p>
+    </section>
+
+    <section class="tech-index__list" aria-labelledby="published-notes-heading">
+      <h2 id="published-notes-heading" class="tech-index__section-title">
+        Published notes
+      </h2>
+      <ul class="tech-notes" role="list">
+        {notes.map((note) => (
+          <li class="tech-notes__item">
+            <p class="tech-notes__date">{note.data.publishedDate}</p>
+            <div class="tech-notes__content">
+              <a class="tech-notes__link" href={`/tech/${note.id}/`}>
+                {note.data.title}
+              </a>
+              <p class="tech-notes__summary">{note.data.summary}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .tech-index {
+    max-width: var(--j-max-width);
+    margin-inline: auto;
+    padding-inline: var(--j-space-6);
+  }
+
+  .tech-index__intro {
+    padding-block: clamp(var(--j-space-8), 6vw, var(--j-space-16));
+    border-block-end: 3px solid var(--j-ochre);
+  }
+
+  .tech-index__heading {
+    margin-block: var(--j-space-2) var(--j-space-6);
+    font-size: var(--j-display-2);
+  }
+
+  .tech-index__lead {
+    max-width: var(--j-content-width);
+    color: var(--j-cloth);
+    font-size: var(--j-text-lg);
+  }
+
+  .tech-index__list {
+    padding-block: var(--j-space-12);
+  }
+
+  .tech-index__section-title {
+    margin-block-end: var(--j-space-6);
+    font-size: var(--j-text-2xl);
+  }
+
+  .tech-notes {
+    display: grid;
+    gap: 0;
+    list-style: none;
+  }
+
+  .tech-notes__item {
+    display: grid;
+    grid-template-columns: minmax(9rem, 0.28fr) minmax(0, 1fr);
+    gap: var(--j-space-6);
+    padding: var(--j-space-8) var(--j-space-6);
+    background: var(--j-cloth);
+    color: var(--j-deep);
+  }
+
+  .tech-notes__item + .tech-notes__item {
+    border-block-start: 1px solid rgb(22 45 50 / 38%);
+  }
+
+  .tech-notes__date {
+    font-size: var(--j-text-sm);
+    font-weight: 700;
+    letter-spacing: var(--j-tracking-label);
+    text-transform: uppercase;
+  }
+
+  .tech-notes__content {
+    display: grid;
+    gap: var(--j-space-3);
+    max-width: var(--j-content-width);
+  }
+
+  .tech-notes__link {
+    display: inline-block;
+    min-height: 44px;
+    padding-block: var(--j-space-1);
+    border-block-end: 2px solid var(--j-ochre);
+    color: var(--j-deep);
+    font-family: var(--j-font-display);
+    font-size: var(--j-text-xl);
+    font-weight: 700;
+    line-height: var(--j-leading-snug);
+    text-decoration: none;
+  }
+
+  .tech-notes__link:hover {
+    border-block-end-width: 4px;
+    color: var(--j-deep);
+  }
+
+  .tech-notes__item :focus-visible {
+    outline-color: var(--j-deep);
+  }
+
+  .tech-notes__summary {
+    font-size: var(--j-text-base);
+  }
+
+  @media (max-width: 46rem) {
+    .tech-index {
+      padding-inline: var(--j-space-4);
+    }
+
+    .tech-notes__item {
+      grid-template-columns: 1fr;
+      gap: var(--j-space-2);
+      padding: var(--j-space-6) var(--j-space-4);
+    }
+  }
+</style>

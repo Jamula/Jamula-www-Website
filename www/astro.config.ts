@@ -9,8 +9,7 @@ export default defineConfig({
   integrations: [
     sitemap({
       // Exclude any Azure Static Web Apps system paths.
-      filter: (page) =>
-        !page.includes("/.auth/") && !page.includes("/api/"),
+      filter: (page) => !page.includes("/.auth/") && !page.includes("/api/"),
     }),
   ],
   build: {

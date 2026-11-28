@@ -6,19 +6,51 @@ dated planning records, not evidence that a control, vendor, phase, professional
 review, or public claim is current or approved. Check each artifact's status and
 source date before relying on it.
 
+## Architecture & milestone topology
+
+```mermaid
+flowchart LR
+  subgraph M01["M01 — Public Website & Buyer Trust"]
+    WEB["Astro 7 Static Site (www/)<br/>Woven Plane · /tech/ Collection · /llms.txt"]
+    SWA["Two Free Azure Static Web Apps<br/>jamula.net (canonical) + jamula.com"]
+    WEB -->|"Manual workflow_dispatch"| SWA
+  end
+
+  subgraph M02["M02 — .NET 11 & 95%/90% Quality Gates"]
+    NET11[".NET 11 Governance, Monitor & MBR<br/>scripts/{validation,monitor,mbr}"]
+    COV["Asymmetric Cobertura Gate<br/>>=95% Line / >=90% Branch"]
+    NET11 --> COV
+  end
+
+  subgraph M03["M03 — Caller-Brings-LLM MCP & OTel"]
+    MCP["JamulaMcp (.NET 11)<br/>ModelContextProtocol + MEAI + OTel<br/>($0 server inference spend)"]
+    WEB -.->|"Approved Markdown"| MCP
+  end
+
+  subgraph M04_M05["M04–M05 — Turnkey Ops & Client IP"]
+    OPS["M04: Turnkey SaaS<br/>M365 Bookings · CRM · Stripe Hosted"]
+    ACC["M05: Client-Hosted .NET 11 Aspire<br/>Single-Tenant Entra + Cited RAG Accelerator"]
+  end
+
+  M01 --> M02 --> M03 --> M04_M05
+```
+
 ## Current project state
 
 - The repository contains a static Astro site under `www/` implementing the
-  [Woven Plane design system](../DESIGN.md); local development and release
-  commands are in the root [README](../README.md).
+  [Woven Plane design system](../DESIGN.md), build-time [`/tech/`](../www/src/pages/tech/index.astro)
+  Astro Content Collections, and static [`/llms.txt`](../www/src/pages/llms.txt.ts) /
+  [`/llms-full.txt`](../www/src/pages/llms-full.txt.ts) indexes, plus `.NET 11`
+  governance, monitoring, MBR, and read-only MCP tooling under `scripts/`; local
+  development and release commands are in the root [README](../README.md).
 - The production deployment workflow
   ([`.github/workflows/azure-static-web-apps.yml`](../.github/workflows/azure-static-web-apps.yml))
   builds from protected `main` and deploys only via authorized manual
-  `workflow_dispatch` (zero GitHub Releases have been dispatched yet). The
-  approved domain policy directly serves all four Jamula.net/.com apex and www
-  hostnames over HTTPS; `jamula.net` is canonical for indexing, and HTTP upgrades
-  on the same hostname. This is configuration and policy documentation, not
-  proof of live DNS, TLS, secret, or end-to-end availability.
+  `workflow_dispatch`. The approved domain policy directly serves all four
+  Jamula.net/.com apex and www hostnames over HTTPS; `jamula.net` is canonical
+  for indexing, and HTTP upgrades on the same hostname. This is configuration
+  and policy documentation, not proof of live DNS, TLS, secret, or end-to-end
+  availability.
 - The approved hosting configuration uses two Free Azure Static Web Apps. The
   site must incur zero incremental paid operating-service spend; existing domain
   renewals and CI allowances are separate. Free-tier quotas and absence of an
@@ -26,26 +58,20 @@ source date before relying on it.
 - On `main`, the homepage ([`www/src/pages/index.astro`](../www/src/pages/index.astro))
   renders the baseline capability narrative, `Organization` structured data, and
   an accessible `mailto:spam@jamula.net` inquiry link with plain-text fallback,
-  alongside a scoped analytics privacy notice at
-  [`/privacy/`](../www/src/pages/privacy.astro) and consent-gated GA4 controls
-  (closing prior implementation issues
-  [#86](https://github.com/Jamula/Jamula-www-Website/issues/86)–[#89](https://github.com/Jamula/Jamula-www-Website/issues/89)).
-  Open work as of `2026-11-25T08:29:40.046-08:00` is tracked across four
-  canonical GitHub milestones (check GitHub for current status):
-  - `M01 - Phase 1: Public website` —
-    [#94](https://github.com/Jamula/Jamula-www-Website/issues/94) (Search Console
-    indexing/performance baseline) and
-    [#95](https://github.com/Jamula/Jamula-www-Website/issues/95) (analytics
-    vendor/DPA disposition and post-release four-origin verification).
-  - `M02 - Side-quests: Foundation` —
-    [#108](https://github.com/Jamula/Jamula-www-Website/issues/108)–[#111](https://github.com/Jamula/Jamula-www-Website/issues/111).
-  - `M03 - Side-quests: Features` —
-    [#112](https://github.com/Jamula/Jamula-www-Website/issues/112)–[#114](https://github.com/Jamula/Jamula-www-Website/issues/114)
-    and
-    [#116](https://github.com/Jamula/Jamula-www-Website/issues/116)–[#117](https://github.com/Jamula/Jamula-www-Website/issues/117).
-  - `M04 - Side-quests: Operations & Release` —
-    [#115](https://github.com/Jamula/Jamula-www-Website/issues/115) and
-    [#118](https://github.com/Jamula/Jamula-www-Website/issues/118)–[#120](https://github.com/Jamula/Jamula-www-Website/issues/120).
+  alongside [`/tech/`](../www/src/pages/tech/index.astro) technical notes, a scoped
+  analytics privacy notice at [`/privacy/`](../www/src/pages/privacy.astro), and
+  consent-gated GA4 controls.
+- Open work is organized across five canonical `M01`–`M05` milestones using
+  hierarchical `Mxx.yy` sub-milestones (check GitHub for live issue status):
+  - `M01 - Public website launch & buyer trust` (`M01.01`–`M01.99`)
+  - `M02 - .NET 11, 95%/90% coverage & CI modernization` (`M02.01`–`M02.99`)
+  - `M03 - Zero-inference-cost MCP & content-suppressed OTel` (`M03.01`–`M03.99`)
+  - `M04 - Turnkey business operations (CRM, scheduling & billing)` (`M04.01`–`M04.99`)
+  - `M05 - Client-deployable .NET 11 Aspire RAG accelerator` (`M05.01`–`M05.99`)
+  - Bespoke multi-process internal `/admin` and `/finance` CMS issues (`#111`–`#114`,
+    `#117`–`#118`) were retired as negative-ROI in favor of static Astro Content
+    Collections, caller-brings-LLM MCP, and the client-hosted `.NET 11` Aspire
+    accelerator.
 - Platform-evaluation PR [#10](https://github.com/Jamula/Jamula-www-Website/pull/10)
   and bootstrap PR [#2](https://github.com/Jamula/Jamula-www-Website/pull/2)
   are merged. Their historical drafts, review findings, and approval records

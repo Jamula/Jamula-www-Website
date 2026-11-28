@@ -530,6 +530,10 @@ test("workflow routes both operations through the validated explicit environment
       workflow.indexOf("Require trusted deployment token"),
   );
   assert.match(workflow, /pr\.head\.ref === saved\.pull_request\.head\.ref/);
+  assert.match(
+    workflow,
+    /if \[\[ "\$PREVIEW_ACTION" == "close" \]\]; then\n\s+cp \.preview\/event\.json "\$GITHUB_EVENT_PATH"/,
+  );
   assert.match(workflow, /\$\{DEPLOYED_URL%\/\}" != "\$expected/);
 });
 

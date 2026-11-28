@@ -6,20 +6,19 @@ measured source is bound to exactly one named Cobertura report; the gate rejects
 missing or invalid bindings, sources reported in a different file, duplicate,
 malformed, or unclassified measurements, and calculates
 line/branch rates from covered and valid counts rather than averaging rounded
-percentages. It fails if any component or the weighted aggregate of measured
-sources is below 90% in either metric. The printed aggregate is measured
-sources only; known unmeasured sources are reported as blockers, not silently
-omitted from an otherwise green result.
+percentages. `gate.mjs` supports asymmetric thresholds (`lineThresholdPercent`
+and `branchThresholdPercent`, targeting `>=95%` line and `>=90%` branch coverage
+under `M02.03`; `inventory.json` retains `thresholdPercent: 90` until `M02.03`
+closes component line gaps). The printed aggregate is measured sources only;
+known unmeasured sources are reported as blockers, not silently omitted from an
+otherwise green result.
 
-Tracked runnable sources in the local side-quest artifact spike are inventoried
-as `sidequest-artifacts-local-runtime`. The PowerShell publisher is executable
-authored code, not test-only; it has no compatible line/branch report and remains
-an explicit unmeasured blocker. The section host and gateway are measured by the
-offline process checks described below; linked `SectionHost.cs` attribution is
-verified across Admin/Finance/Tech before counting one copy.
-Only the offline checks runner and its child-process fixture are excluded as
-test support. The spike measurement does not imply a passing component or overall
-gate.
+First-party `.NET 11` read-only MCP sources under `scripts/mcp/` are inventoried
+as `mcp-server` (`mcp.cobertura.xml`), with `scripts/mcp/tests/Program.cs`
+classified in `excludedSources` as offline test support. Retired multi-process
+local CMS spikes (`scripts/spikes/sidequest-artifacts/` and
+`scripts/spikes/sidequest-routing/`) have been removed from the repository and
+inventory.
 
 Source attribution is anchored to this gate's actual repository root, not the
 report directory or a matching filename suffix. Without `<sources>`, relative

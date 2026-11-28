@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text.Json;
 using JamulaMbr;
 using Microsoft.Win32.SafeHandles;
@@ -12,8 +13,13 @@ internal static class FakeGhEntrypoint
     private const string ModeVariable = "JAMULA_MBR_TEST_GH_MODE";
     private const string RootVariable = "JAMULA_MBR_TEST_GH_ROOT";
 
+    internal static string ExecutableName => OperatingSystem.IsWindows() ? "gh.exe" : "gh";
+
     public static bool IsFixtureProcess =>
-        string.Equals(Path.GetFileName(Environment.ProcessPath), "gh.exe", StringComparison.OrdinalIgnoreCase);
+        string.Equals(
+            Path.GetFileName(Environment.ProcessPath),
+            ExecutableName,
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     public static async Task<int> RunAsync(string[] args)
     {
@@ -82,6 +88,7 @@ internal static class MbrIntegrationTests
 {
     private const string ModeVariable = "JAMULA_MBR_TEST_GH_MODE";
     private const string RootVariable = "JAMULA_MBR_TEST_GH_ROOT";
+    private const string TreeVariable = "JAMULA_MBR_TEST_TREE_ID";
 
     public static async Task RunAsync(Action<bool, string> check)
     {
@@ -617,37 +624,64 @@ internal static class MbrIntegrationTests
     private static async Task VerifyWebTreeTerminationAsync(
         Action<bool, string> check, string root, string appAssembly, string month)
     {
-        var terminatedRoot = Path.Combine(root, "terminated-web");
+        await VerifyWebTreeTerminationCoreAsync(
+            check, Path.Join(root, "terminated-web"), appAssembly, month,
+            forcePortableTree: false, "MbrFixture_ForcedHostTerminationWaitsForGatedProviderTree");
+        await VerifyWebTreeTerminationCoreAsync(
+            check, Path.Join(root, "terminated-portable-web"), appAssembly, month,
+            forcePortableTree: true, "MbrFixture_PortableProcessTreeTerminationWaitsForGatedProviderTree");
+        VerifyProcTreeDiscovery(check, Path.Join(root, "fake-proc"));
+    }
+
+    private static async Task VerifyWebTreeTerminationCoreAsync(
+        Action<bool, string> check, string terminatedRoot, string appAssembly, string month,
+        bool forcePortableTree, string checkName)
+    {
         Directory.CreateDirectory(terminatedRoot);
-        var appRoot = Path.Combine(terminatedRoot, "web");
+        var appRoot = Path.Join(terminatedRoot, "web");
         CopyWebRoot(appRoot);
-        var app = await StartApplicationAsync(appAssembly, appRoot, terminatedRoot);
+        var app = await StartApplicationAsync(appAssembly, appRoot, terminatedRoot, forcePortableTree);
         using var client = new HttpClient { BaseAddress = app.Address, Timeout = TimeSpan.FromSeconds(15) };
         Task<HttpResponseMessage>? refresh = null;
-        var providers = new List<Process>();
-        try
+        using var providers = new ProcessBag();
+        await WithCleanupAsync(async () =>
         {
-            await WithCleanupAsync(async () =>
-            {
-                refresh = client.SendAsync(RefreshRequest(app.Address, month));
-                await WaitForProvidersAsync(terminatedRoot, TimeSpan.FromSeconds(10));
-                CaptureGatedProviders(terminatedRoot, providers);
-            }, () =>
-            {
-                app.Dispose();
-                return Task.CompletedTask;
-            });
-            var disconnected = false;
-            try { (await refresh!).Dispose(); }
-            catch (HttpRequestException) { disconnected = true; }
-            check(disconnected && providers.Count == 2 && providers.All(provider => provider.WaitForExit(0)) &&
-                !File.Exists(Path.Combine(appRoot, ".local", $"snapshot-{month}.json")),
-                "MbrFixture_ForcedHostTerminationWaitsForGatedProviderTree");
-        }
-        finally
+            refresh = client.SendAsync(RefreshRequest(app.Address, month));
+            await WaitForProvidersAsync(terminatedRoot, TimeSpan.FromSeconds(10));
+            CaptureGatedProviders(terminatedRoot, providers.Items);
+        }, () =>
         {
-            foreach (var provider in providers) provider.Dispose();
-        }
+            app.Dispose();
+            return Task.CompletedTask;
+        });
+        var disconnected = false;
+        try { (await refresh!).Dispose(); }
+        catch (HttpRequestException) { disconnected = true; }
+        check(disconnected && providers.Items.Count == 2 && providers.Items.All(provider => provider.WaitForExit(0)) &&
+            !File.Exists(Path.Join(appRoot, ".local", $"snapshot-{month}.json")),
+            checkName);
+    }
+
+    private static void VerifyProcTreeDiscovery(Action<bool, string> check, string procRoot)
+    {
+        Directory.CreateDirectory(Path.Join(procRoot, "self"));
+        Directory.CreateDirectory(Path.Join(procRoot, "100"));
+        Directory.CreateDirectory(Path.Join(procRoot, "201"));
+        Directory.CreateDirectory(Path.Join(procRoot, "202"));
+        Directory.CreateDirectory(Path.Join(procRoot, "303"));
+        Directory.CreateDirectory(Path.Join(procRoot, "404"));
+
+        File.WriteAllText(Path.Join(procRoot, "100", "stat"), "100 (dotnet) S 1 100 100 0 -1");
+        File.WriteAllText(Path.Join(procRoot, "201", "stat"), "201 (gh (worker)) S 100 100 100 0 -1");
+        File.WriteAllText(Path.Join(procRoot, "202", "stat"), "202 (leaf) Z 201 100 100 0 -1");
+        File.WriteAllText(Path.Join(procRoot, "303", "stat"), "303 (reparented) S 1 100 100 0 -1");
+        File.WriteAllText(Path.Join(procRoot, "303", "environ"), $"PATH=/usr/bin\0{TreeVariable}=tree-token\0");
+        File.WriteAllText(Path.Join(procRoot, "404", "stat"), "404 (unrelated) S 1 404 404 0 -1");
+        File.WriteAllText(Path.Join(procRoot, "404", "environ"), $"PATH=/usr/bin\0{TreeVariable}=other-token\0");
+
+        var discovered = PortableFixtureProcessTree.CollectProcTreePids(procRoot, rootPid: 100, "tree-token");
+        check(discovered.SetEquals([201, 202, 303]),
+            "MbrFixture_ProcTreeDiscoveryFindsNestedAndReparentedDescendants");
     }
 
     private static void CaptureGatedProviders(string root, List<Process> providers)
@@ -665,11 +699,16 @@ internal static class MbrIntegrationTests
     {
         var source = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!;
         foreach (var file in Directory.EnumerateFiles(source))
-            File.Copy(file, Path.Combine(target, Path.GetFileName(file)), overwrite: true);
-        File.Copy(
-            Path.Combine(source, "JamulaMbr.Tests.exe"),
-            Path.Combine(target, "gh.exe"),
-            overwrite: true);
+            File.Copy(file, Path.Join(target, Path.GetFileName(file)), overwrite: true);
+        var sourceAppHost = Path.Join(source, OperatingSystem.IsWindows() ? "JamulaMbr.Tests.exe" : "JamulaMbr.Tests");
+        var targetAppHost = Path.Join(target, FakeGhEntrypoint.ExecutableName);
+        File.Copy(sourceAppHost, targetAppHost, overwrite: true);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(
+                targetAppHost,
+                File.GetUnixFileMode(sourceAppHost) | UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
+        }
     }
 
     private static void CopyWebRoot(string appRoot)
@@ -713,8 +752,9 @@ internal static class MbrIntegrationTests
     }
 
     private static async Task<LocalApp> StartApplicationAsync(
-        string appAssembly, string workingDirectory, string fixtureRoot)
+        string appAssembly, string workingDirectory, string fixtureRoot, bool forcePortableTree = false)
     {
+        var treeId = Guid.NewGuid().ToString("N");
         var start = new ProcessStartInfo("dotnet")
         {
             WorkingDirectory = workingDirectory,
@@ -726,20 +766,23 @@ internal static class MbrIntegrationTests
         start.ArgumentList.Add(appAssembly);
         start.Environment[ModeVariable] = "gate";
         start.Environment[RootVariable] = fixtureRoot;
+        start.Environment[TreeVariable] = treeId;
         start.Environment["Logging__LogLevel__Default"] = "Information";
         var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start MBR web fixture.");
-        FixtureProcessJob? job = null;
-        var startupTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        IDisposable? tree = null;
+        using var startupTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         try
         {
-            // Attach before any HTTP request can start a provider; descendants inherit job membership.
-            job = new FixtureProcessJob(process);
+            // Attach before any HTTP request can start a provider; descendants inherit job or environment membership.
+            tree = OperatingSystem.IsWindows() && !forcePortableTree
+                ? new FixtureProcessJob(process)
+                : new PortableFixtureProcessTree(process, fixtureRoot, treeId);
             while (await process.StandardOutput.ReadLineAsync(startupTimeout.Token) is { } line)
             {
                 const string marker = "Now listening on: ";
                 var index = line.IndexOf(marker, StringComparison.Ordinal);
                 if (index >= 0 && Uri.TryCreate(line[(index + marker.Length)..].Trim(), UriKind.Absolute, out var address))
-                    return new LocalApp(process, address, job);
+                    return new LocalApp(process, address, tree);
                 if (process.HasExited)
                     throw new InvalidOperationException("MBR web fixture exited before listening: " +
                         await process.StandardError.ReadToEndAsync());
@@ -752,7 +795,7 @@ internal static class MbrIntegrationTests
             {
                 try
                 {
-                    if (job is not null) job.Dispose();
+                    if (tree is not null) tree.Dispose();
                     else if (!process.HasExited) process.Kill(entireProcessTree: true);
                     using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(15));
                     await process.WaitForExitAsync(cleanup.Token).WaitAsync(cleanup.Token);
@@ -761,28 +804,213 @@ internal static class MbrIntegrationTests
             });
             throw;
         }
-        finally
-        {
-            startupTimeout.Dispose();
-        }
     }
 
-    private sealed class LocalApp(Process process, Uri address, FixtureProcessJob job) : IDisposable
+    private sealed class LocalApp(Process process, Uri address, IDisposable tree) : IDisposable
     {
+        private readonly Process _process = process;
+        private readonly IDisposable _tree = tree;
         public Uri Address { get; } = address;
 
         public void Dispose()
         {
-            try
-            {
-                job.Dispose();
-                if (!process.WaitForExit(15000))
-                    throw new TimeoutException("MBR web fixture exit could not be confirmed.");
-            }
-            finally { process.Dispose(); }
+            using var ownedProcess = _process;
+            _tree.Dispose();
+            if (!ownedProcess.WaitForExit(15000))
+                throw new TimeoutException("MBR web fixture exit could not be confirmed.");
         }
     }
 
+    private sealed class ProcessBag : IDisposable
+    {
+        public List<Process> Items { get; } = [];
+
+        public void Dispose()
+        {
+            foreach (var item in Items) item.Dispose();
+        }
+    }
+
+    private sealed class ProcessMap : IDisposable
+    {
+        public Dictionary<int, Process> ById { get; } = [];
+
+        public void Dispose()
+        {
+            foreach (var process in ById.Values) process.Dispose();
+        }
+    }
+
+    private sealed class PortableFixtureProcessTree(Process process, string fixtureRoot, string treeId) : IDisposable
+    {
+        public void Dispose()
+        {
+            var deadline = Stopwatch.StartNew();
+            using var descendants = new ProcessMap();
+            TrackKnownDescendants(process.Id, fixtureRoot, treeId, descendants.ById);
+            if (!process.HasExited)
+            {
+                try { process.Kill(entireProcessTree: true); }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException && process.WaitForExit(100))
+                {
+                    _ = ex.Message;
+                }
+            }
+
+            WaitForRemaining(process, deadline);
+            TrackKnownDescendants(process.Id, fixtureRoot, treeId, descendants.ById);
+            foreach (var descendant in descendants.ById.Values.Where(candidate => !candidate.HasExited))
+            {
+                try { descendant.Kill(entireProcessTree: true); }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException)
+                {
+                    _ = ex.Message;
+                }
+            }
+
+            foreach (var descendant in descendants.ById.Values)
+                WaitForRemaining(descendant, deadline);
+        }
+
+        private static void WaitForRemaining(Process target, Stopwatch deadline)
+        {
+            var remaining = (int)Math.Max(0, 15000 - deadline.ElapsedMilliseconds);
+            if (!target.WaitForExit(remaining))
+                throw new TimeoutException("MBR fixture process tree did not empty after termination.");
+        }
+
+        private static void TrackKnownDescendants(
+            int rootPid, string fixtureRoot, string treeToken, Dictionary<int, Process> descendants)
+        {
+            foreach (var pid in CollectProcTreePids("/proc", rootPid, treeToken))
+                TryTrackProcess(pid, descendants);
+            foreach (var pid in CollectMarkerPids(fixtureRoot))
+                TryTrackProcess(pid, descendants);
+        }
+
+        internal static HashSet<int> CollectProcTreePids(string procRoot, int rootPid, string treeToken)
+        {
+            var found = new HashSet<int>();
+            if (!Directory.Exists(procRoot)) return found;
+
+            var childrenByParent = new Dictionary<int, List<int>>();
+            var expectedEntry = $"{TreeVariable}={treeToken}";
+            IEnumerable<string> entries;
+            try { entries = Directory.EnumerateDirectories(procRoot); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return found; }
+
+            var pidEntries = entries
+                .Select(entry => (Entry: entry, Valid: int.TryParse(Path.GetFileName(entry), CultureInfo.InvariantCulture, out var parsed) && parsed > 0, Pid: parsed))
+                .Where(item => item.Valid);
+
+            foreach (var (procEntry, _, pid) in pidEntries)
+            {
+                if (TryReadParentPid(procEntry, out var ppid))
+                {
+                    if (!childrenByParent.TryGetValue(ppid, out var list))
+                    {
+                        list = [];
+                        childrenByParent[ppid] = list;
+                    }
+                    list.Add(pid);
+                }
+
+                if (pid != rootPid && pid != Environment.ProcessId && HasEnvironmentEntry(procEntry, expectedEntry))
+                    found.Add(pid);
+            }
+
+            var queue = new Queue<int>();
+            queue.Enqueue(rootPid);
+            var visited = new HashSet<int> { rootPid };
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+                if (!childrenByParent.TryGetValue(current, out var children)) continue;
+                foreach (var child in children.Where(visited.Add))
+                {
+                    if (child != Environment.ProcessId) found.Add(child);
+                    queue.Enqueue(child);
+                }
+            }
+
+            return found;
+        }
+
+        private static HashSet<int> CollectMarkerPids(string fixtureRoot)
+        {
+            var found = new HashSet<int>();
+            if (!Directory.Exists(fixtureRoot)) return found;
+            try
+            {
+                var parsedPids = Directory.GetFiles(fixtureRoot, "gh-started-*")
+                    .Select(marker => int.TryParse(Path.GetFileName(marker)["gh-started-".Length..], CultureInfo.InvariantCulture, out var pid) ? pid : 0)
+                    .Where(pid => pid > 0 && pid != Environment.ProcessId);
+                foreach (var pid in parsedPids)
+                {
+                    found.Add(pid);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return found;
+            }
+            return found;
+        }
+
+        private static bool TryReadParentPid(string procEntry, out int ppid)
+        {
+            ppid = 0;
+            try
+            {
+                var stat = File.ReadAllText(Path.Join(procEntry, "stat"));
+                var closeParen = stat.LastIndexOf(')');
+                if (closeParen < 0 || closeParen + 4 >= stat.Length) return false;
+                var afterState = stat.AsSpan(closeParen + 2);
+                var spaceAfterState = afterState.IndexOf(' ');
+                if (spaceAfterState <= 0) return false;
+                var afterPpidStart = afterState[(spaceAfterState + 1)..];
+                var spaceAfterPpid = afterPpidStart.IndexOf(' ');
+                var ppidSpan = spaceAfterPpid >= 0 ? afterPpidStart[..spaceAfterPpid] : afterPpidStart;
+                return int.TryParse(ppidSpan.Trim(), CultureInfo.InvariantCulture, out ppid);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+
+        private static bool HasEnvironmentEntry(string procEntry, string expectedEntry)
+        {
+            try
+            {
+                var environ = File.ReadAllText(Path.Join(procEntry, "environ"));
+                return environ.Split('\0', StringSplitOptions.RemoveEmptyEntries)
+                    .Any(part => string.Equals(part, expectedEntry, StringComparison.Ordinal));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+
+        private static void TryTrackProcess(int pid, Dictionary<int, Process> descendants)
+        {
+            if (pid <= 0 || pid == Environment.ProcessId || descendants.ContainsKey(pid)) return;
+            Process? candidate = null;
+            try
+            {
+                candidate = Process.GetProcessById(pid);
+                _ = candidate.SafeHandle;
+                descendants[pid] = candidate;
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                candidate?.Dispose();
+            }
+        }
+    }
+
+    [SupportedOSPlatform("windows")]
     private sealed class FixtureProcessJob : IDisposable
     {
         private const int AssociateCompletionPortInformation = 7;

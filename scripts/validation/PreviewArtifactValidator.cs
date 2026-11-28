@@ -98,20 +98,27 @@ public static class PreviewArtifactValidator
         for (var entryIndex = 0; entryIndex < entries.Count; entryIndex++)
         {
             var entry = entries[entryIndex];
-            using var input = entry.Open();
-            var buffer = new byte[64 * 1024];
             long entrySize = 0;
             var entryCrc = uint.MaxValue;
-            int read;
-            while ((read = input.Read(buffer, 0, buffer.Length)) != 0)
+            try
             {
-                entrySize = checked(entrySize + read);
-                validatedExpandedSize = checked(validatedExpandedSize + read);
-                entryCrc = UpdateCrc32(entryCrc, buffer, read);
-                if (validatedExpandedSize > MaxBytes)
+                using var input = entry.Open();
+                var buffer = new byte[64 * 1024];
+                int read;
+                while ((read = input.Read(buffer, 0, buffer.Length)) != 0)
                 {
-                    throw new InvalidDataException("The expanded preview artifact exceeds the size limit.");
+                    entrySize = checked(entrySize + read);
+                    validatedExpandedSize = checked(validatedExpandedSize + read);
+                    entryCrc = UpdateCrc32(entryCrc, buffer, read);
+                    if (validatedExpandedSize > MaxBytes)
+                    {
+                        throw new InvalidDataException("The expanded preview artifact exceeds the size limit.");
+                    }
                 }
+            }
+            catch (InvalidDataException ex) when (!ex.Message.Contains("exceeds the size limit", StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("The preview artifact contains an entry with invalid size or checksum.", ex);
             }
 
             if (entrySize != entry.Length || ~entryCrc != encryptedEntries[entryIndex].Crc32)

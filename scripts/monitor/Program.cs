@@ -88,7 +88,8 @@ static class Config
     public const string ExpectedCanonical = "https://jamula.net/";
     public const string ExpectedHomeTitle = "AI Strategy, Custom Software & Cloud Consulting — Jamula";
     public const string ExpectedHomeContent = "AI strategy.";
-    public const string ExpectedNotFoundContent = "Page not found";
+    public const string ExpectedNotFoundTitle = "Page not found — Jamula";
+    public const string ExpectedNotFoundContent = "Return to the home page";
     public const string UpgradePath = "/__jamula_monitor_path_check__";
     public const string UpgradeQuery = "jamula-monitor=1";
     public const string NotFoundPath = "/__jamula_monitor_not_found__";
@@ -394,12 +395,17 @@ static class Monitor
         {
             using var response = await client.GetAsync(notFoundUri, ct);
             string html = await response.Content.ReadAsStringAsync(ct);
+            Match titleMatch = HtmlTitle.Match(html);
+            string title = titleMatch.Success
+                ? WebUtility.HtmlDecode(titleMatch.Groups[1].Value.Trim())
+                : string.Empty;
             if ((int)response.StatusCode != 404
+                || title != Config.ExpectedNotFoundTitle
                 || !html.Contains(Config.ExpectedNotFoundContent, StringComparison.Ordinal))
             {
                 fail(10, "404 experience",
                     $"{notFoundUri} returned HTTP {(int)response.StatusCode}; expected HTTP 404 "
-                    + $"with '{Config.ExpectedNotFoundContent}' content.");
+                    + $"with title '{Config.ExpectedNotFoundTitle}' and '{Config.ExpectedNotFoundContent}' content.");
                 return;
             }
 

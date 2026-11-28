@@ -22,3 +22,12 @@ updates:
       npm-dependencies:
         patterns:
           - "*"
+
+  - package-ecosystem: "nuget"
+    directory: "/scripts/mcp"
+    schedule:
+      interval: "weekly"
+    groups:
+      nuget-mcp:
+        patterns:
+          - "*"

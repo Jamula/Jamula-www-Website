@@ -2,24 +2,52 @@
 
 Source of truth for the public website of **Jamula, Inc.** ([`www/`](www/)), its
 evidence-first architecture, privacy, legal, and product decision ledger
-([`docs/`](docs/)), and internal `.NET 10` and Node.js governance and operational
-tooling ([`scripts/`](scripts/)).
+([`docs/`](docs/)), and first-party `.NET 11` and Node.js governance,
+discovery, and operational tooling ([`scripts/`](scripts/)).
 
-Documentation for future business-platform phases (CRM/scheduling, authenticated
-customer portal, storage connectors, payments, and candidate side-quests) records
-internal requirements, evaluations, and approval gates—not shipped features or
-public commitments.
+Documentation for future business-platform milestones (turnkey CRM/scheduling/billing
+and the client-deployable `.NET 11` Aspire RAG accelerator) records internal
+requirements, evaluations, and approval gates—not shipped features or public
+commitments.
+
+## Architecture overview
+
+```mermaid
+flowchart TB
+  subgraph Repo["Repository Components (main)"]
+    WWW["www/ — Astro 7 Static Site<br/>Woven Plane CSS · /tech/ Content Collection<br/>/llms.txt & /llms-full.txt · analytics-consent.js"]
+    VAL["scripts/validation/ (.NET 11)<br/>Governance + CRC32/ZIP Preview Validator"]
+    GHA[".github/workflows + scripts/ (Node CJS)<br/>Secretless PR Build, Release & CSP Verifier"]
+    MCP["scripts/mcp/ (.NET 11)<br/>Caller-Brings-LLM Read-Only MCP Server<br/>ModelContextProtocol + MEAI + Content-Free OTel"]
+    MON["scripts/monitor/ (.NET 11)<br/>4-Host DNS, HTTP→HTTPS, 200 & Custom 404 Monitor"]
+    MBR["scripts/mbr/ (.NET 11 + Vanilla JS)<br/>Loopback CEO/CTO Monthly Business Review"]
+    COV["scripts/coverage/ (Node MJS)<br/>Cobertura Gate (Target: >=95% Line / >=90% Branch)"]
+  end
+
+  subgraph Prod["Azure Production ($0 Incremental Spend)"]
+    SWA1["swa-jamula-web-prod<br/>jamula.net (canonical) + www.jamula.net"]
+    SWA2["swa-jamula-com-prod<br/>jamula.com + www.jamula.com"]
+  end
+
+  WWW --> GHA
+  VAL --> GHA
+  WWW -.->|"Published /tech/*.md corpus"| MCP
+  GHA -->|"Manual workflow_dispatch on main"| SWA1 & SWA2
+  MON -->|"Scheduled health & drift checks"| SWA1 & SWA2
+```
 
 ## Current repository state
 
 - **Static public website (`www/`):** Astro (`output: "static"`,
   [`www/astro.config.ts`](www/astro.config.ts)) implementing the
-  [Woven Plane design system](DESIGN.md). The current site renders the homepage
-  capability narrative (`AI Strategy`, `Custom Software`, `Cloud Consulting`), an
+  [Woven Plane design system](DESIGN.md). Renders the homepage capability
+  narrative (`AI Strategy`, `Custom Software`, `Cloud Consulting`), an
   accessible `mailto:spam@jamula.net` inquiry link with plain-text fallback,
-  `Organization` structured data, a dedicated [`/privacy/`](www/src/pages/privacy.astro)
-  notice, and consent-gated GA4 measurement controls (no contact form or server
-  backend is deployed).
+  `Organization` structured data, build-time [`/tech/`](www/src/pages/tech/index.astro)
+  Astro Content Collections, static [`/llms.txt`](www/src/pages/llms.txt.ts) and
+  [`/llms-full.txt`](www/src/pages/llms-full.txt.ts) discovery endpoints, a
+  dedicated [`/privacy/`](www/src/pages/privacy.astro) notice, and consent-gated
+  GA4 measurement controls (no server-side CMS database or contact form is deployed).
 - **Approved domain and hosting policy:** `jamula.net`, `www.jamula.net`,
   `jamula.com`, and `www.jamula.com` are served directly over HTTPS across two
   Free Azure Static Web Apps (`swa-jamula-web-prod` and `swa-jamula-com-prod`).
@@ -27,29 +55,37 @@ public commitments.
   hostname. Website operation must not add paid operating services; free-tier
   quotas and lack of an SLA remain real constraints rather than availability
   guarantees. See [`docs/architecture/two-free-static-apps.md`](docs/architecture/two-free-static-apps.md).
-- **Open Phase 1 & side-quest gates:** Remaining Phase 1 public-website readiness
-  gates are tracked in [#94](https://github.com/Jamula/Jamula-www-Website/issues/94)
-  (Search Console indexing/performance baseline) and
-  [#95](https://github.com/Jamula/Jamula-www-Website/issues/95) (analytics vendor/DPA
-  disposition and post-release four-origin verification). Exploratory zero-spend
-  platform side-quests are tracked separately in
-  [#108](https://github.com/Jamula/Jamula-www-Website/issues/108)–[#120](https://github.com/Jamula/Jamula-www-Website/issues/120).
-- **Operational and governance tooling (`scripts/`):**
-  - [`scripts/validation/`](scripts/validation/) — `.NET 10` repository governance
+- **Canonical milestones (`M01`–`M05` with sub-milestones):**
+  - `M01 - Public website launch & buyer trust` (`M01.01`–`M01.99`, including
+    [#94](https://github.com/Jamula/Jamula-www-Website/issues/94) and
+    [#95](https://github.com/Jamula/Jamula-www-Website/issues/95)).
+  - `M02 - .NET 11, 95%/90% coverage & CI modernization` (`M02.01`–`M02.99`,
+    raising executable coverage gates to `>=95%` line and `>=90%` branch).
+  - `M03 - Zero-inference-cost MCP & content-suppressed OTel` (`M03.01`–`M03.99`,
+    retargeting [#108](https://github.com/Jamula/Jamula-www-Website/issues/108),
+    [#115](https://github.com/Jamula/Jamula-www-Website/issues/115),
+    [#116](https://github.com/Jamula/Jamula-www-Website/issues/116),
+    [#119](https://github.com/Jamula/Jamula-www-Website/issues/119), and
+    [#120](https://github.com/Jamula/Jamula-www-Website/issues/120)).
+  - `M04 - Turnkey business operations (CRM, scheduling & billing)` (`M04.01`–`M04.99`).
+  - `M05 - Client-deployable .NET 11 Aspire RAG accelerator` (`M05.01`–`M05.99`).
+- **Operational, MCP, and governance tooling (`scripts/`):**
+  - [`scripts/validation/`](scripts/validation/) — `.NET 11` repository governance
     and preview-archive validator (`JamulaValidation`; live preview HTTP
     verification runs via `.github/scripts/verify-preview.cjs`).
-  - [`scripts/monitor/`](scripts/monitor/) — zero-dependency `.NET 10` scheduled
+  - [`scripts/monitor/`](scripts/monitor/) — zero-dependency `.NET 11` scheduled
     apex DNS A-record, HTTP-to-HTTPS same-host upgrade, HTTPS 200 content,
-    canonical link, and 404 drift monitor (`JamulaMonitor`).
-  - [`scripts/mbr/`](scripts/mbr/) — local loopback `.NET 10` Monthly Business
+    canonical link, and Jamula custom 404 drift monitor (`JamulaMonitor`).
+  - [`scripts/mbr/`](scripts/mbr/) — local loopback `.NET 11` Monthly Business
     Review dashboard (`JamulaMbr`).
-  - [`scripts/coverage/`](scripts/coverage/) — Cobertura inventory and `>=90%`
-    line/branch coverage gate across every first-party deployable and the
-    overall aggregate, with unmeasured first-party sources tracked as blockers
+  - [`scripts/mcp/`](scripts/mcp/) — `.NET 11` caller-brings-LLM read-only Model
+    Context Protocol (`MCP`) server (`JamulaMcp`) built on the official
+    `ModelContextProtocol.AspNetCore` C# SDK, `Microsoft.Extensions.AI.Abstractions`,
+    and content-suppressed BCL OpenTelemetry (`ActivitySource` / `Meter`).
+  - [`scripts/coverage/`](scripts/coverage/) — Cobertura inventory and coverage
+    evaluator supporting asymmetric `>=95%` line and `>=90%` branch thresholds
+    across every first-party executable component and the overall aggregate
     ([`scripts/coverage/README.md`](scripts/coverage/README.md)).
-  - [`scripts/spikes/`](scripts/spikes/) — local loopback mechanism spikes
-    (`scripts/spikes/sidequest-artifacts/` and `scripts/spikes/sidequest-routing/`)
-    for side-quest evaluation; never deployed to production.
 
 Repository workflow configuration documents the intended deployment boundary; it
 does not by itself prove live DNS, TLS, secret, or account-side configuration.
@@ -82,11 +118,12 @@ verification, retries, and partial-deployment recovery.
 
 ## Local development
 
-CI uses `global.json`-pinned `.NET 10.0` SDKs
-([`scripts/validation/global.json`](scripts/validation/global.json) and
-[`scripts/monitor/global.json`](scripts/monitor/global.json) via
-`actions/setup-dotnet`), Node.js `26.13.0`, and npm `12.2.1`. From the
-repository root:
+CI uses `global.json`-pinned `.NET 11.0` SDKs
+([`scripts/validation/global.json`](scripts/validation/global.json),
+[`scripts/monitor/global.json`](scripts/monitor/global.json),
+[`scripts/mbr/global.json`](scripts/mbr/global.json), and
+[`scripts/mcp/global.json`](scripts/mcp/global.json) via `actions/setup-dotnet`),
+Node.js `26.13.0`, and npm `12.2.1`. From the repository root:
 
 ```sh
 npm --prefix www ci
@@ -123,12 +160,13 @@ node --test "www/tests/*.test.mjs"
   and does not purchase commercial Jamula, Inc. consulting services, support SLAs,
   or rights in reserved brand/content materials.
 
-For governance, workflow, and `.NET` validation checks from the repository root:
+For governance, workflow, MCP, and `.NET 11` validation checks from the repository root:
 
 ```sh
 dotnet run --project scripts/validation/JamulaValidation.csproj --configuration Release -- validate-governance .
 dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release
 dotnet run --project scripts/validation.cli.tests/JamulaValidation.Cli.Tests.csproj --configuration Release
+dotnet run --project scripts/mcp/tests/JamulaMcp.Tests.csproj --configuration Release
 node --test .github/scripts/swa-preview.test.cjs .github/scripts/verify-preview.test.cjs .github/scripts/release.test.cjs
 ```
 

@@ -1,7 +1,7 @@
 # Repository monthly business review
 
 A small, reusable, read-only dashboard for `Jamula/Jamula-www-Website`. Runs on
-.NET 10 LTS with vanilla HTML/CSS/JavaScript and no third-party packages, analytics,
+.NET 11 with vanilla HTML/CSS/JavaScript and no third-party packages, analytics,
 external fonts, cloud resources, deployment changes or paid services.
 
 This is a **local web dashboard opened in the Copilot Browser canvas**, not a
@@ -11,7 +11,7 @@ skeleton is used. Code is repository-shared; generated data stays local.
 
 ## Run and refresh
 
-Requires a supported .NET 10 SDK and GitHub CLI (`gh`) already authenticated to
+Requires a supported .NET 11 SDK and GitHub CLI (`gh`) already authenticated to
 github.com. The API only reads this repository's pull requests and issues.
 Public repository metadata can be read with ordinary CLI authentication; private
 access needs repository visibility, **Issues: read** and **Pull requests: read**

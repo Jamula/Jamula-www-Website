@@ -62,5 +62,5 @@
 - **Connected:** 2026-11-01
 - **Platform:** GitHub
 - **Filters:**
-  - Milestones: `M01 - Phase 1: Public website`, `M02 - Side-quests: Foundation`, `M03 - Side-quests: Features`, `M04 - Side-quests: Operations & Release`
+  - Milestones: `M01 - Public website launch & buyer trust`, `M02 - .NET 11, 95%/90% coverage & CI modernization`, `M03 - Zero-inference-cost MCP & content-suppressed OTel`, `M04 - Turnkey business operations (CRM, scheduling & billing)`, `M05 - Client-deployable .NET 11 Aspire RAG accelerator`
   - Labels: `squad`, `squad:{member}` (when routed through automated label triage)

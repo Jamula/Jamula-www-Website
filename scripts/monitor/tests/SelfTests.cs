@@ -14,7 +14,7 @@ static class SelfTests
         + "<body><p>AI strategy.</p></body></html>";
     private const string NotFoundHtml =
         "<html><head><title>Page not found — Jamula</title></head>"
-        + "<body><h1>Page not found</h1></body></html>";
+        + "<body><h1>Page not found</h1><a href=\"/\">Return to the home page</a></body></html>";
 
     public static async Task<int> RunAsync()
     {
@@ -281,7 +281,17 @@ static class SelfTests
                 ? HtmlResponse(HttpStatusCode.NotFound, HomeHtml)
                 : DefaultResponse(request, _),
             10,
-            "Page not found");
+            "Page not found — Jamula");
+
+        await AssertScenarioAsync(
+            "GenericPlatform404Page_IsRejected",
+            (request, _) => request.AbsolutePath == Config.NotFoundPath
+                ? HtmlResponse(HttpStatusCode.NotFound,
+                    "<html><head><title>Azure Static Web Apps - 404: Page not found</title></head>"
+                    + "<body><h1>404: Page not found</h1></body></html>")
+                : DefaultResponse(request, _),
+            10,
+            "Return to the home page");
 
         await AssertScenarioAsync(
             "NotFoundTimeout_IsReported",

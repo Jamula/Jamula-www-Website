@@ -2,12 +2,12 @@
 
 ## Work tracking and toolchain
 
-- Start with a GitHub issue in the appropriate milestone (`M01 - Phase 1: Public website` or the `M02`-`M04` `Side-quests` milestones) that defines scope, owner, acceptance criteria, dependencies, and required reviews.
+- Start with a GitHub issue in the appropriate milestone (`M01`–`M05`) using the `[Mxx.yy]` sub-milestone title prefix that defines scope, owner, acceptance criteria, dependencies, and required reviews.
 - Use an isolated pull-request branch or worktree based on protected `main`.
 - Assign one integration owner and one writer to each PR branch (they may be the same person). Contributors work in isolation and hand off changes; only the owning session writes the delivery branch.
 - `main` is the only persistent production source. Pull-request previews are isolated and are never promoted to production.
-- Prefer currently supported `.NET LTS` (`.NET 10.0` with `<Nullable>enable</Nullable>`, `<ImplicitUsings>enable</ImplicitUsings>`, `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, and minimal/zero unnecessary third-party NuGet dependencies) and `Node.js` (`26.13.0` / npm `12.2.1` in CI). Tracked `.py` scripts have been replaced by `.NET` and Node.js utilities while full retirement acceptance remains open in [#110](https://github.com/Jamula/Jamula-www-Website/issues/110); do not introduce new Python tooling.
-- Every first-party deployable and the overall aggregate must meet at least `90%` line and `90%` branch coverage ([#109](https://github.com/Jamula/Jamula-www-Website/issues/109), `scripts/coverage/inventory.json`), and unmeasured first-party sources remain tracked blockers in [`scripts/coverage/README.md`](scripts/coverage/README.md); prioritize deterministic offline happy-path and failure-path tests.
+- Prefer currently supported `.NET` (`.NET 11.0` / `net11.0` in this repository with `<Nullable>enable</Nullable>`, `<ImplicitUsings>enable</ImplicitUsings>`, `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, and minimal/zero unnecessary third-party NuGet dependencies) and `Node.js` (`26.13.0` / npm `12.2.1` in CI). All five legacy `.py` scripts have been retired and replaced by `.NET 11` and Node.js utilities; do not introduce new Python tooling.
+- Every first-party executable component and the overall aggregate target at least `95%` line and `90%` branch coverage (`scripts/coverage/inventory.json`), and unmeasured sources remain tracked in [`scripts/coverage/README.md`](scripts/coverage/README.md); prioritize deterministic offline happy-path and failure-path tests.
 
 ## Website validation
 

@@ -9,6 +9,25 @@ and response behavior independently before claiming operational success.
 | swa-jamula-web-prod | jamula.net, www.jamula.net | ashy-beach-033c7d01e.7.azurestaticapps.net |
 | swa-jamula-com-prod | jamula.com, www.jamula.com | red-cliff-0ee064a1e.2.azurestaticapps.net  |
 
+```mermaid
+flowchart TB
+  subgraph PR["Isolated Pull-Request Preview Flow"]
+    PRB["PR Build (azure-static-web-apps.yml)<br/>No secrets · Emits swa-site-<sha>"]
+    WFR["Trusted workflow_run (azure-static-web-apps-preview.yml)<br/>SHA-256 + .NET 11 JamulaValidation ZIP/CRC32/Config Check"]
+    PRE["Numbered SWA Preview (<number>.7.azurestaticapps.net)<br/>Live headers, noindex & 404 verified · Never promoted"]
+    PRB --> WFR --> PRE
+  end
+
+  subgraph REL["Authorized Production Release Flow (main only)"]
+    DIS["Manual workflow_dispatch on main<br/>(change_type: material | fix)"]
+    ART["Immutable Artifact + /release.json"]
+    NET["swa-jamula-web-prod<br/>jamula.net · www.jamula.net"]
+    COM["swa-jamula-com-prod<br/>jamula.com · www.jamula.com"]
+    PUB["Verify Live CSP + /release.json on Both Apps<br/>→ Create Immutable Tag & GitHub Release"]
+    DIS --> ART --> NET & COM --> PUB
+  end
+```
+
 The production workflow builds one artifact and deploys it to both apps. Pull request previews remain on the original .net app only. Deployment jobs use the `swa-deployment` GitHub environment, restricted to the `main` branch. The .net token is environment secret `SWA_NET_DEPLOYMENT_TOKEN`; the .com token is `SWA_COM_DEPLOYMENT_TOKEN`. Never commit their values.
 
 PR builds in `azure-static-web-apps.yml` do not deploy or consume deployment secrets, including for Dependabot. Production jobs require a `workflow_dispatch` event on `refs/heads/main`, latest-main SHA checks, and the main-only deployment environment; pushes do not deploy; a PR cannot unlock that environment by editing a job condition. `azure-static-web-apps-preview.yml` runs from the default branch after a successful build and uses the same restricted environment. It resolves the current same-repository PR, checks the workflow identity and head SHA, verifies the artifact's GitHub SHA-256 digest, rejects unsafe archive entries, and requires `staticwebapp.config.json` to match the trusted default branch. It never installs dependencies or executes PR scripts. The current PR is rechecked immediately before deployment; a validated positive numeric PR number is passed as the explicit `deployment_environment` input to the pinned Azure action for both upload and close. The returned URL must match that exact numbered environment before live verification. Closed PRs and PRs with no remaining deployable changes select cleanup through this same trusted workflow.
