@@ -280,6 +280,59 @@ export async function navigateMeasurementPage(
   }
 }
 
+export function installPerformanceObservers(
+  targetWindow = globalThis.window,
+  Observer = globalThis.PerformanceObserver
+) {
+  const state = (targetWindow.__measurement = { lcp: null, shifts: [] });
+  new Observer((list) => {
+    for (const entry of list.getEntries()) state.lcp = entry.startTime;
+  }).observe({ type: "largest-contentful-paint", buffered: true });
+  new Observer((list) => {
+    for (const entry of list.getEntries()) {
+      if (!entry.hadRecentInput) {
+        state.shifts.push({
+          time: entry.startTime,
+          value: entry.value,
+          sources: entry.sources.map((source) => source.node?.outerHTML?.slice(0, 200) ?? null),
+        });
+      }
+    }
+  }).observe({ type: "layout-shift", buffered: true });
+}
+
+export function extractPerformanceMetrics(
+  targetWindow = globalThis.window,
+  targetPerformance = globalThis.performance
+) {
+  const nav = targetPerformance.getEntriesByType("navigation")[0];
+  const paint = targetPerformance.getEntriesByName("first-contentful-paint")[0];
+  let max = 0;
+  let sum = 0;
+  let start = 0;
+  let last = 0;
+  for (const { time, value } of targetWindow.__measurement.shifts) {
+    if (!sum || time - last >= 1000 || time - start >= 5000) {
+      start = time;
+      sum = 0;
+    }
+    sum += value;
+    last = time;
+    max = Math.max(max, sum);
+  }
+  return {
+    lcp: targetWindow.__measurement.lcp,
+    fcp: paint?.startTime ?? null,
+    shifts: targetWindow.__measurement.shifts,
+    ttfb: nav?.responseStart ?? null,
+    cls: max,
+    resources: targetPerformance
+      .getEntriesByType("resource")
+      .map((entry) => ({ name: entry.name, transferSize: entry.transferSize })),
+    documentTransfer: nav?.transferSize ?? null,
+  };
+}
+
 export async function runMeasurement({
   root = resolve("dist"),
   createProfile = () => mkdtemp(resolve(".performance-profile-")),
@@ -360,31 +413,8 @@ export async function runMeasurement({
     resources.browser = browser;
 
     const { send, eventHandlers } = createMeasurementConnection(browser);
-    const instrumentation = `(() => {
-  const state = window.__measurement = { lcp: null, shifts: [] };
-  new PerformanceObserver(list => {
-    for (const entry of list.getEntries()) state.lcp = entry.startTime;
-  }).observe({ type: "largest-contentful-paint", buffered: true });
-  new PerformanceObserver(list => {
-    for (const entry of list.getEntries()) if (!entry.hadRecentInput) state.shifts.push({
-      time: entry.startTime, value: entry.value,
-      sources: entry.sources.map(source => source.node?.outerHTML?.slice(0, 200) ?? null)
-    });
-  }).observe({ type: "layout-shift", buffered: true });
-})()`;
-    const extraction = `(() => {
-  const nav = performance.getEntriesByType("navigation")[0];
-  const paint = performance.getEntriesByName("first-contentful-paint")[0];
-  let max = 0, sum = 0, start = 0, last = 0;
-  for (const {time, value} of window.__measurement.shifts) {
-    if (!sum || time - last >= 1000 || time - start >= 5000) { start = time; sum = 0; }
-    sum += value; last = time; max = Math.max(max, sum);
-  }
-  return { lcp: window.__measurement.lcp, fcp: paint?.startTime ?? null, shifts: window.__measurement.shifts,
-    ttfb: nav?.responseStart ?? null, cls: max,
-    resources: performance.getEntriesByType("resource").map(x => ({name: x.name, transferSize: x.transferSize})),
-    documentTransfer: nav?.transferSize ?? null };
-})()`;
+    const instrumentation = `(${installPerformanceObservers.toString()})()`;
+    const extraction = `(${extractPerformanceMetrics.toString()})()`;
     const version = await send("Browser.getVersion");
     log(
       JSON.stringify({

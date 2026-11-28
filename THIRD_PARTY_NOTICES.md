@@ -59,4 +59,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 (not vendored into Git source):
 
 - `ModelContextProtocol.AspNetCore` `2.4.0` (`https://github.com/modelcontextprotocol/csharp-sdk`, MIT License)
-- `Microsoft.Extensions.AI.Abstractions` `11.0.0` (`https://github.com/dotnet/extensions`, MIT License)
+- `Microsoft.Extensions.AI.Abstractions` `11.0.1` (`https://github.com/dotnet/extensions`, MIT License)
+
+## Playwright and axe-core test-only npm devDependencies
+
+`www/package.json` references test-only npm `devDependencies` installed at CI
+validation time and never bundled or shipped in `www/dist`:
+
+- `playwright` / `playwright-core` `1.65.1` (`https://github.com/microsoft/playwright`, Apache-2.0)
+- `@axe-core/playwright` `4.14.0` and `axe-core` (`https://github.com/dequelabs/axe-core-npm` and `https://github.com/dequelabs/axe-core`, MPL-2.0; used unmodified in CI accessibility verification)

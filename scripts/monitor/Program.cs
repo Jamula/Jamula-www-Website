@@ -25,57 +25,74 @@ using System.Text.RegularExpressions;
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-if (args.Length == 1 && args[0] == "--self-test")
-    return await RunSelfTestsAsync();
+return await MonitorCli.ExecuteAsync(args);
 
-if (args.Length > 0)
+static class MonitorCli
 {
-    Console.Error.WriteLine("Usage: JamulaMonitor [--self-test]");
-    return 64;
-}
+    public static Task<int> ExecuteAsync(string[] args) =>
+        ExecuteAsync(args, Monitor.RunAsync, Process.Start, TimeSpan.FromSeconds(110), Console.Error);
 
-using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(110));
-try
-{
-    return await Monitor.RunAsync(cts.Token);
-}
-catch (OperationCanceledException)
-{
-    Console.Error.WriteLine("::error::Monitor timed out (110-second global budget exceeded).");
-    return 3;
-}
-
-
-static async Task<int> RunSelfTestsAsync()
-{
-    string projectPath = Path.GetFullPath(Path.Combine(
-        AppContext.BaseDirectory, "..", "..", "..", "tests", "JamulaMonitor.Tests.csproj"));
-    var startInfo = new ProcessStartInfo("dotnet")
+    internal static async Task<int> ExecuteAsync(
+        string[] args,
+        Func<CancellationToken, Task<int>> runMonitorAsync,
+        Func<ProcessStartInfo, Process?> startProcess,
+        TimeSpan budget,
+        TextWriter errorOutput)
     {
-        WorkingDirectory = Path.GetDirectoryName(projectPath)!
-    };
-    startInfo.ArgumentList.Add("run");
-    startInfo.ArgumentList.Add("--project");
-    startInfo.ArgumentList.Add(projectPath);
-    startInfo.ArgumentList.Add("--configuration");
-    startInfo.ArgumentList.Add("Release");
+        if (args.Length == 1 && args[0] == "--self-test")
+            return await RunSelfTestsAsync(startProcess, errorOutput);
 
-    try
-    {
-        using Process? process = Process.Start(startInfo);
-        if (process is null)
+        if (args.Length > 0)
         {
-            Console.Error.WriteLine("Unable to start monitor self-test runner.");
-            return 1;
+            errorOutput.WriteLine("Usage: JamulaMonitor [--self-test]");
+            return 64;
         }
 
-        await process.WaitForExitAsync();
-        return process.ExitCode;
+        using var cts = new CancellationTokenSource(budget);
+        try
+        {
+            return await runMonitorAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            errorOutput.WriteLine("::error::Monitor timed out (110-second global budget exceeded).");
+            return 3;
+        }
     }
-    catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+
+    internal static async Task<int> RunSelfTestsAsync(
+        Func<ProcessStartInfo, Process?> startProcess,
+        TextWriter errorOutput)
     {
-        Console.Error.WriteLine($"Unable to start monitor self-test runner: {ex.Message}");
-        return 1;
+        string projectPath = Path.GetFullPath(Path.Join(
+            AppContext.BaseDirectory, "..", "..", "..", "tests", "JamulaMonitor.Tests.csproj"));
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            WorkingDirectory = Path.GetDirectoryName(projectPath)!
+        };
+        startInfo.ArgumentList.Add("run");
+        startInfo.ArgumentList.Add("--project");
+        startInfo.ArgumentList.Add(projectPath);
+        startInfo.ArgumentList.Add("--configuration");
+        startInfo.ArgumentList.Add("Release");
+
+        try
+        {
+            using Process? process = startProcess(startInfo);
+            if (process is null)
+            {
+                errorOutput.WriteLine("Unable to start monitor self-test runner.");
+                return 1;
+            }
+
+            await process.WaitForExitAsync();
+            return process.ExitCode;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            errorOutput.WriteLine($"Unable to start monitor self-test runner: {ex.Message}");
+            return 1;
+        }
     }
 }
 
@@ -199,23 +216,12 @@ static class Monitor
 
         output.WriteLine($"DNS OK: {Config.ApexHost} → {ipv4Addresses[0]}");
 
-        HttpMessageHandler handler = createHandler();
-        HttpClient client;
-        try
+        using HttpMessageHandler handler = createHandler();
+        using var client = new HttpClient(handler, disposeHandler: false)
         {
-            client = new HttpClient(handler)
-            {
-                Timeout = TimeSpan.FromSeconds(8)
-            };
-        }
-        catch
-        {
-            handler.Dispose();
-            throw;
-        }
-
-        using (client)
-            return await CheckApprovedHostsAsync(client, Config.ApprovedHosts, output, ct);
+            Timeout = TimeSpan.FromSeconds(8)
+        };
+        return await CheckApprovedHostsAsync(client, Config.ApprovedHosts, output, ct);
     }
 
     private static Task<IPAddress[]> ResolveHostAddressesAsync(
@@ -224,7 +230,7 @@ static class Monitor
         CancellationToken ct) =>
         Dns.GetHostAddressesAsync(host, addressFamily, ct);
 
-    private static HttpMessageHandler CreateProductionHandler() =>
+    internal static HttpMessageHandler CreateProductionHandler() =>
         new HttpClientHandler
         {
             AllowAutoRedirect = false

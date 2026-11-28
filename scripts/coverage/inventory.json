@@ -1,70 +1,78 @@
 {
   "schemaVersion": 2,
-  "thresholdPercent": 90,
+  "lineThresholdPercent": 95,
+  "branchThresholdPercent": 90,
   "components": [
     {
       "id": "website-browser",
       "reports": [
         "website/cobertura-coverage.xml",
-        "astro-config/cobertura-coverage.xml"
+        "astro-config/cobertura-coverage.xml",
+        "website-scripts/cobertura-coverage.xml"
       ],
-      "sources": ["www/public/analytics-consent.js", "www/astro.config.ts"],
+      "sources": [
+        "www/public/analytics-consent.js",
+        "www/astro.config.ts",
+        "www/src/content.config.ts",
+        "www/src/pages/llms.txt.ts",
+        "www/src/pages/llms-full.txt.ts",
+        "www/scripts/measure-local-performance.mjs",
+        "www/scripts/verify-wcag-cls.mjs"
+      ],
       "sourceReports": {
         "www/public/analytics-consent.js": "website/cobertura-coverage.xml",
-        "www/astro.config.ts": "astro-config/cobertura-coverage.xml"
+        "www/astro.config.ts": "astro-config/cobertura-coverage.xml",
+        "www/src/content.config.ts": "astro-config/cobertura-coverage.xml",
+        "www/src/pages/llms.txt.ts": "astro-config/cobertura-coverage.xml",
+        "www/src/pages/llms-full.txt.ts": "astro-config/cobertura-coverage.xml",
+        "www/scripts/measure-local-performance.mjs": "website-scripts/cobertura-coverage.xml",
+        "www/scripts/verify-wcag-cls.mjs": "website-scripts/cobertura-coverage.xml"
       },
-      "unmeasured": [
+      "validatedDeclarative": [
         {
           "path": "www/src/components/AnalyticsConsent.astro",
-          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
+          "kind": "astro-template",
+          "reason": "Declarative Astro markup/style template validated to contain no inline executable scripts; external /analytics-consent.js is measured directly."
         },
         {
           "path": "www/src/components/SiteFooter.astro",
-          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
+          "kind": "astro-template",
+          "reason": "Declarative Astro markup/style template validated to contain no inline executable scripts; rendered contracts verified by test_built_site.mjs and containerized WCAG/CLS checks."
         },
         {
           "path": "www/src/components/SiteHeader.astro",
-          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
+          "kind": "astro-template",
+          "reason": "Declarative Astro markup/style template validated to contain no inline executable scripts; rendered contracts verified by test_built_site.mjs and containerized WCAG/CLS checks."
         },
         {
           "path": "www/src/layouts/BaseLayout.astro",
-          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
+          "kind": "astro-template",
+          "reason": "Declarative Astro layout emitting static HTML and non-executable application/ld+json structured data; verified by test_built_site.mjs and containerized WCAG/CLS checks."
         },
         {
           "path": "www/src/pages/404.astro",
-          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
+          "kind": "astro-template",
+          "reason": "Declarative Astro page template validated to contain no inline executable scripts; rendered contracts verified by test_built_site.mjs and containerized WCAG/CLS checks."
         },
         {
           "path": "www/src/pages/index.astro",
-          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
+          "kind": "astro-template",
+          "reason": "Declarative Astro page template validated to contain no inline executable scripts; rendered contracts verified by test_built_site.mjs and containerized WCAG/CLS checks."
         },
         {
           "path": "www/src/pages/privacy.astro",
-          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
+          "kind": "astro-template",
+          "reason": "Declarative Astro page template validated to contain no inline executable scripts; rendered contracts verified by test_built_site.mjs and containerized WCAG/CLS checks."
         },
         {
           "path": "www/src/pages/tech/[slug].astro",
-          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
+          "kind": "astro-template",
+          "reason": "Declarative Astro page template validated to contain no inline executable scripts; rendered contracts verified by test_built_site.mjs, tech-and-llms.test.mjs, and containerized WCAG/CLS checks."
         },
         {
           "path": "www/src/pages/tech/index.astro",
-          "reason": "Source-map V8 coverage counts static template markup/styles as covered; executable line/branch attribution is not validated."
-        },
-        {
-          "path": "www/src/content.config.ts",
-          "reason": "Build-time Astro Content Layer schema evaluated during static compilation; validated by astro check and tech-and-llms.test.mjs."
-        },
-        {
-          "path": "www/src/pages/llms-full.txt.ts",
-          "reason": "Build-time static Astro endpoint evaluated during static compilation; output verified by tech-and-llms.test.mjs."
-        },
-        {
-          "path": "www/src/pages/llms.txt.ts",
-          "reason": "Build-time static Astro endpoint evaluated during static compilation; output verified by tech-and-llms.test.mjs."
-        },
-        {
-          "path": "www/scripts/measure-local-performance.mjs",
-          "reason": "The fake CDP tests do not execute the embedded browser-side logic; c8 host-line counts would not measure it. The Edge V8 prototype requires independently enforced external egress isolation; its acknowledgment check does not enforce or verify isolation. It maps each evaluated string to its exact source slice, but v8-to-istanbul initializes lines outside that mapped slice as covered; host and browser records cannot be combined without false line counts, so the diagnostic has no defensible denominator."
+          "kind": "astro-template",
+          "reason": "Declarative Astro page template validated to contain no inline executable scripts; rendered contracts verified by test_built_site.mjs, tech-and-llms.test.mjs, and containerized WCAG/CLS checks."
         }
       ]
     },
@@ -87,26 +95,31 @@
         ".github/scripts/verify-preview.cjs": "automation/cobertura-coverage.xml",
         ".github/scripts/verify-swa-csp.cjs": "automation/cobertura-coverage.xml"
       },
-      "unmeasured": [
+      "validatedDeclarative": [
         {
           "path": ".github/workflows/azure-static-web-apps-preview.yml",
-          "reason": "Embedded GitHub Actions JavaScript/shell lacks source-level coverage collection."
+          "kind": "github-actions-workflow",
+          "reason": "Declarative GitHub Actions workflow YAML; preview selection, artifact boundary, and live verification logic are measured in github-automation and validation-tool."
         },
         {
           "path": ".github/workflows/azure-static-web-apps.yml",
-          "reason": "Embedded GitHub Actions shell lacks source-level coverage collection."
+          "kind": "github-actions-workflow",
+          "reason": "Declarative GitHub Actions workflow YAML; release selection, CSP verification, deployment recording, and governance boundaries are measured in github-automation and validation-tool."
         },
         {
           "path": ".github/workflows/governance-validation.yml",
-          "reason": "Embedded GitHub Actions shell lacks source-level coverage collection."
+          "kind": "github-actions-workflow",
+          "reason": "Declarative GitHub Actions workflow YAML invoking measured validation-tool and github-automation suites."
         },
         {
           "path": ".github/workflows/required-pr-validation.yml",
-          "reason": "Embedded GitHub Actions shell lacks source-level coverage collection."
+          "kind": "github-actions-workflow",
+          "reason": "Declarative GitHub Actions workflow YAML verified by release.test.cjs and gate.test.mjs."
         },
         {
           "path": ".github/workflows/uptime-apex-monitor.yml",
-          "reason": "GitHub Actions workflow control logic lacks source-level coverage collection."
+          "kind": "github-actions-workflow",
+          "reason": "Declarative GitHub Actions workflow YAML invoking measured monitor executable."
         }
       ]
     },
@@ -214,6 +227,10 @@
       "reason": "Offline authorization fixture runner and assertions, not application behavior."
     },
     {
+      "path": "scripts/coverage/collect.mjs",
+      "reason": "Coverage collection support runner, not gate evaluation or shipped application behavior."
+    },
+    {
       "path": ".github/scripts/release.test.cjs",
       "reason": "Test-only source; its assertions are not product behavior."
     },
@@ -311,6 +328,10 @@
     },
     {
       "path": "www/tests/tech-and-llms.test.mjs",
+      "reason": "Test-only source; its assertions are not product behavior."
+    },
+    {
+      "path": "www/tests/verify-wcag-cls.test.mjs",
       "reason": "Test-only source; its assertions are not product behavior."
     }
   ]

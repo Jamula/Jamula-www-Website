@@ -23,6 +23,53 @@ const MONITOR_METADATA_KIND = "monitor-friend-assembly";
 // Deliberately accept only this declaration, not general C# or attribute arguments.
 const MONITOR_METADATA_PATTERN =
   /^[ \t\r\n]*using System\.Runtime\.CompilerServices;[ \t\r\n]*\[assembly:[ \t\r\n]*InternalsVisibleTo\("JamulaMonitor\.Tests"\)\][ \t\r\n]*(?![\s\S])/;
+const ASTRO_DECLARATIVE_KIND = "astro-template";
+const WORKFLOW_DECLARATIVE_KIND = "github-actions-workflow";
+const ALLOWED_ASTRO_SCRIPTS = [
+  '<script is:inline type="module" src="/analytics-consent.js"></script>',
+  '<script type="application/ld+json" set:html={structuredDataJson} />',
+];
+
+function hasAsciiPrefixIgnoreCase(value, prefix, startIndex) {
+  if (startIndex + prefix.length > value.length) return false;
+  for (let offset = 0; offset < prefix.length; offset++) {
+    let code = value.charCodeAt(startIndex + offset);
+    if (code >= 65 && code <= 90) code += 32;
+    if (code !== prefix.charCodeAt(offset)) return false;
+  }
+  return true;
+}
+
+function isValidAstroTemplateContent(content) {
+  if (typeof content !== "string" || content.trim().length === 0) return false;
+  const normalized = content.replaceAll("\r\n", "\n");
+  let index = 0;
+  while ((index = normalized.indexOf("<", index)) !== -1) {
+    if (hasAsciiPrefixIgnoreCase(normalized, "<script", index)) {
+      const matched = ALLOWED_ASTRO_SCRIPTS.find((allowed) =>
+        normalized.startsWith(allowed, index),
+      );
+      if (!matched) return false;
+      index += matched.length;
+      continue;
+    }
+    if (hasAsciiPrefixIgnoreCase(normalized, "</script", index)) {
+      return false;
+    }
+    index += 1;
+  }
+  return true;
+}
+
+function isValidWorkflowDeclarativeContent(content) {
+  return (
+    typeof content === "string" &&
+    content.trim().length > 0 &&
+    /^name:\s+\S/m.test(content) &&
+    /^on:\s*(?:\S|\r?\n)/m.test(content) &&
+    /^jobs:\r?\n/m.test(content)
+  );
+}
 
 function parseCobertura(xml) {
   const classes = [];
@@ -128,11 +175,13 @@ function parseCobertura(xml) {
 function sourcePath(value) {
   if (/^file:/i.test(value)) {
     const url = new URL(value);
-    if (url.search || url.hash) throw new Error("file URL has a query or fragment.");
+    if (url.search || url.hash)
+      throw new Error("file URL has a query or fragment.");
     const pathname = decodeURIComponent(url.pathname);
-    value = url.hostname && url.hostname !== "localhost"
-      ? `//${url.hostname}${pathname}`
-      : pathname.replace(/^\/([A-Za-z]:\/)/, "$1");
+    value =
+      url.hostname && url.hostname !== "localhost"
+        ? `//${url.hostname}${pathname}`
+        : pathname.replace(/^\/([A-Za-z]:\/)/, "$1");
   }
   value = value.replaceAll("\\", "/");
   const windows = /^[A-Za-z]:\//.test(value) || value.startsWith("//");
@@ -155,8 +204,14 @@ function resolveSource(value, root) {
   }
   const api = root.windows ? path.win32 : path.posix;
   const resolved = sourcePath(api.resolve(root.value, parsed.value));
-  const relative = api.relative(root.value, resolved.value).replaceAll("\\", "/");
-  if (relative === ".." || relative.startsWith("../") || api.isAbsolute(relative)) {
+  const relative = api
+    .relative(root.value, resolved.value)
+    .replaceAll("\\", "/");
+  if (
+    relative === ".." ||
+    relative.startsWith("../") ||
+    api.isAbsolute(relative)
+  ) {
     throw new Error(`source path is outside repository root: ${value}`);
   }
   return resolved;
@@ -165,13 +220,17 @@ function resolveSource(value, root) {
 function attributeClass(filename, sources, root) {
   const parsed = sourcePath(filename);
   // Absolute class filenames already identify their source; roots only qualify relative filenames.
-  const candidates = parsed.absolute || sources.length === 0
-    ? [resolveSource(filename, root).value]
-    : sources.map((source) => {
-      const sourceRoot = resolveSource(source, root);
-      const api = root.windows ? path.win32 : path.posix;
-      return resolveSource(api.resolve(sourceRoot.value, parsed.value), root).value;
-    });
+  const candidates =
+    parsed.absolute || sources.length === 0
+      ? [resolveSource(filename, root).value]
+      : sources.map((source) => {
+          const sourceRoot = resolveSource(source, root);
+          const api = root.windows ? path.win32 : path.posix;
+          return resolveSource(
+            api.resolve(sourceRoot.value, parsed.value),
+            root,
+          ).value;
+        });
   if (new Set(candidates).size !== 1) {
     throw new Error(`ambiguous source roots for: ${filename}`);
   }
@@ -198,10 +257,14 @@ function addClass(counts, measuredClass) {
 
 function selectCompiledSourceClasses(classes, rule, componentErrors, source) {
   const expectedModules = rule.modules;
-  const actualModules = [...new Set(classes.map((item) => item.package))].sort();
+  const actualModules = [
+    ...new Set(classes.map((item) => item.package)),
+  ].sort();
   if (
     actualModules.length !== expectedModules.length ||
-    [...expectedModules].sort().some((module, index) => module !== actualModules[index])
+    [...expectedModules]
+      .sort()
+      .some((module, index) => module !== actualModules[index])
   ) {
     componentErrors.push(
       `compiled source module identities do not match inventory: ${source}`,
@@ -230,9 +293,10 @@ function selectCompiledSourceClasses(classes, rule, componentErrors, source) {
     const entries = moduleClasses.get(module);
     if (
       entries.length !== canonical.length ||
-      entries.map((item) => item.name).sort().some(
-        (name, index) => name !== canonicalNames[index],
-      )
+      entries
+        .map((item) => item.name)
+        .sort()
+        .some((name, index) => name !== canonicalNames[index])
     ) {
       componentErrors.push(
         `compiled source class sets differ between modules: ${source}`,
@@ -241,8 +305,11 @@ function selectCompiledSourceClasses(classes, rule, componentErrors, source) {
     }
     for (const item of entries) {
       if (
-        item.lines.some((line) => !Number.isSafeInteger(line.number) || line.number < 1) ||
-        new Set(item.lines.map((line) => line.number)).size !== item.lines.length
+        item.lines.some(
+          (line) => !Number.isSafeInteger(line.number) || line.number < 1,
+        ) ||
+        new Set(item.lines.map((line) => line.number)).size !==
+          item.lines.length
       ) {
         componentErrors.push(
           `compiled source line identities are missing or duplicated: ${source} (${module}/${item.name})`,
@@ -285,7 +352,11 @@ function percentage(covered, valid) {
   return valid > 0 ? Number(((covered / valid) * 100).toFixed(2)) : null;
 }
 
-function summarize(counts, lineThresholdPercent, branchThresholdPercent = lineThresholdPercent) {
+function summarize(
+  counts,
+  lineThresholdPercent,
+  branchThresholdPercent = lineThresholdPercent,
+) {
   const linePercent = percentage(counts.linesCovered, counts.linesValid);
   const branchPercent = percentage(
     counts.branchesCovered,
@@ -299,7 +370,8 @@ function summarize(counts, lineThresholdPercent, branchThresholdPercent = lineTh
       linePercent !== null &&
       branchPercent !== null &&
       counts.linesCovered * 100 >= counts.linesValid * lineThresholdPercent &&
-      counts.branchesCovered * 100 >= counts.branchesValid * branchThresholdPercent,
+      counts.branchesCovered * 100 >=
+        counts.branchesValid * branchThresholdPercent,
   };
 }
 
@@ -310,7 +382,8 @@ export function evaluateCoverage(
   sourceContents = new Map(),
 ) {
   const root = sourcePath(rootPath);
-  if (!root.absolute) throw new Error("Repository root must be an absolute path.");
+  if (!root.absolute)
+    throw new Error("Repository root must be an absolute path.");
   const errors = [];
   const lineThresholdPercent =
     inventory?.lineThresholdPercent ?? inventory?.thresholdPercent;
@@ -348,6 +421,7 @@ export function evaluateCoverage(
       Array.isArray(component.sourceReports) ||
       !Array.isArray(component.compiledSources ?? []) ||
       !Array.isArray(component.validatedMetadata ?? []) ||
+      !Array.isArray(component.validatedDeclarative ?? []) ||
       !Array.isArray(component.unmeasured ?? [])
     ) {
       throw new Error("Coverage inventory contains an invalid component.");
@@ -359,7 +433,10 @@ export function evaluateCoverage(
     const measuredSources = [];
     const loadedReports = [];
     const validatedMetadata = [];
-    for (const [source, reportPath] of Object.entries(component.sourceReports)) {
+    const validatedDeclarative = [];
+    for (const [source, reportPath] of Object.entries(
+      component.sourceReports,
+    )) {
       if (
         !component.sources.includes(source) ||
         typeof reportPath !== "string" ||
@@ -390,13 +467,17 @@ export function evaluateCoverage(
         compiledSources.has(identity) ||
         !Array.isArray(modules) ||
         modules.length === 0 ||
-        modules.some((module) => typeof module !== "string" || !module.trim()) ||
+        modules.some(
+          (module) => typeof module !== "string" || !module.trim(),
+        ) ||
         new Set(modules).size !== modules.length ||
         (compiledSource.requireNoBranches !== undefined &&
           typeof compiledSource.requireNoBranches !== "boolean") ||
         (modules.length > 1 && compiledSource.requireNoBranches !== true);
       if (invalid) {
-        componentErrors.push("invalid compiled source identity classification.");
+        componentErrors.push(
+          "invalid compiled source identity classification.",
+        );
         if (identity) invalidCompiledSources.add(identity);
         continue;
       }
@@ -431,26 +512,32 @@ export function evaluateCoverage(
       if (
         metadataIdentity !== expectedMetadataIdentity ||
         seenSources.has(metadataIdentity) ||
-        inventory.components.some(
-          (item) => {
-            const assignedSources = Array.isArray(item.sources)
-              ? item.sources
-              : [];
-            const unmeasuredSources = Array.isArray(item.unmeasured)
-              ? item.unmeasured
-              : [];
-            return (
-              assignedSources.some(
-                (source) =>
-                  resolveSource(source, root).value === metadataIdentity,
-              ) ||
-              unmeasuredSources.some(
-                (source) =>
-                  resolveSource(source.path, root).value === metadataIdentity,
-              )
-            );
-          },
-        ) ||
+        inventory.components.some((item) => {
+          const assignedSources = Array.isArray(item.sources)
+            ? item.sources
+            : [];
+          const declarativeSources = Array.isArray(item.validatedDeclarative)
+            ? item.validatedDeclarative
+            : [];
+          const unmeasuredSources = Array.isArray(item.unmeasured)
+            ? item.unmeasured
+            : [];
+          return (
+            assignedSources.some(
+              (source) =>
+                resolveSource(source, root).value === metadataIdentity,
+            ) ||
+            declarativeSources.some(
+              (source) =>
+                typeof source?.path === "string" &&
+                resolveSource(source.path, root).value === metadataIdentity,
+            ) ||
+            unmeasuredSources.some(
+              (source) =>
+                resolveSource(source.path, root).value === metadataIdentity,
+            )
+          );
+        }) ||
         exclusions.some(
           (source) =>
             resolveSource(source.path, root).value === metadataIdentity,
@@ -473,6 +560,69 @@ export function evaluateCoverage(
         continue;
       }
       validatedMetadata.push({ ...metadata, validated: true });
+    }
+    for (const declarative of component.validatedDeclarative ?? []) {
+      const validAstro =
+        component.id === "website-browser" &&
+        declarative?.kind === ASTRO_DECLARATIVE_KIND &&
+        typeof declarative.path === "string" &&
+        /^www\/src\/.+\.astro$/.test(declarative.path);
+      const validWorkflow =
+        component.id === "github-automation" &&
+        declarative?.kind === WORKFLOW_DECLARATIVE_KIND &&
+        typeof declarative.path === "string" &&
+        /^\.github\/workflows\/[a-z0-9-]+\.ya?ml$/.test(declarative.path);
+      if (
+        (!validAstro && !validWorkflow) ||
+        typeof declarative?.reason !== "string" ||
+        !declarative.reason.trim()
+      ) {
+        componentErrors.push("unsupported declarative classification.");
+        continue;
+      }
+      const declarativeIdentity = resolveSource(declarative.path, root).value;
+      if (
+        seenSources.has(declarativeIdentity) ||
+        inventory.components.some((item) => {
+          const assignedSources = Array.isArray(item.sources)
+            ? item.sources
+            : [];
+          const unmeasuredSources = Array.isArray(item.unmeasured)
+            ? item.unmeasured
+            : [];
+          return (
+            assignedSources.some(
+              (source) =>
+                resolveSource(source, root).value === declarativeIdentity,
+            ) ||
+            unmeasuredSources.some(
+              (source) =>
+                resolveSource(source.path, root).value === declarativeIdentity,
+            )
+          );
+        }) ||
+        exclusions.some(
+          (source) =>
+            resolveSource(source.path, root).value === declarativeIdentity,
+        )
+      ) {
+        componentErrors.push(
+          `declarative source is assigned more than once: ${declarative.path}`,
+        );
+        continue;
+      }
+      seenSources.add(declarativeIdentity);
+      const content = sourceContents.get(declarative.path);
+      const validContent = validAstro
+        ? isValidAstroTemplateContent(content)
+        : isValidWorkflowDeclarativeContent(content);
+      if (!validContent) {
+        componentErrors.push(
+          `declarative content is missing or unsupported: ${declarative.path}`,
+        );
+        continue;
+      }
+      validatedDeclarative.push({ ...declarative, validated: true });
     }
     for (const reportPath of component.reports) {
       const xml = reports.get(reportPath);
@@ -503,9 +653,7 @@ export function evaluateCoverage(
       seenSources.add(resolvedSource);
 
       const expectedReport = component.sourceReports[source];
-      const report = loadedReports.find(
-        (item) => item.path === expectedReport,
-      );
+      const report = loadedReports.find((item) => item.path === expectedReport);
       if (!report) {
         componentErrors.push(`missing source measurement: ${source}`);
         continue;
@@ -556,8 +704,8 @@ export function evaluateCoverage(
 
     for (const report of loadedReports) {
       for (const measuredClass of report.classes) {
-        const source = component.sources.find((item) =>
-          measuredClass.source === resolveSource(item, root).value,
+        const source = component.sources.find(
+          (item) => measuredClass.source === resolveSource(item, root).value,
         );
         if (source) {
           const expectedReport = component.sourceReports[source];
@@ -568,8 +716,9 @@ export function evaluateCoverage(
           }
           continue;
         }
-        const excluded = exclusions.find((item) =>
-          measuredClass.source === resolveSource(item.path, root).value,
+        const excluded = exclusions.find(
+          (item) =>
+            measuredClass.source === resolveSource(item.path, root).value,
         );
         if (!excluded) {
           componentErrors.push(
@@ -610,6 +759,7 @@ export function evaluateCoverage(
       passed: summary.passed && componentErrors.length === 0,
       sources: measuredSources,
       validatedMetadata,
+      validatedDeclarative,
       unmeasured,
       errors: componentErrors,
     });
@@ -657,6 +807,11 @@ export function formatReport(report) {
         `${component.id} | validated non-executable metadata: ${metadata.path} (${metadata.kind}; no coverage counts)`,
       );
     }
+    for (const declarative of component.validatedDeclarative ?? []) {
+      lines.push(
+        `${component.id} | validated declarative source: ${declarative.path} (${declarative.kind}; no coverage counts)`,
+      );
+    }
   }
   const aggregate = report.aggregate;
   lines.push(
@@ -672,6 +827,40 @@ function printReport(report) {
   const output = formatReport(report);
   for (const line of output.lines) console.log(line);
   for (const error of output.errors) console.error(error);
+}
+
+export async function loadValidatedSourceContents(
+  inventory,
+  rootPath = repositoryRoot,
+) {
+  const root = sourcePath(rootPath);
+  const sourceContents = new Map();
+  if (
+    inventory.components.some(
+      (component) => component.validatedMetadata?.length,
+    )
+  ) {
+    sourceContents.set(
+      MONITOR_METADATA_PATH,
+      await readFile(path.resolve(rootPath, MONITOR_METADATA_PATH), "utf8"),
+    );
+  }
+  for (const component of inventory.components) {
+    for (const declarative of component.validatedDeclarative ?? []) {
+      if (typeof declarative?.path === "string" && declarative.path.trim()) {
+        resolveSource(declarative.path, root);
+        try {
+          sourceContents.set(
+            declarative.path,
+            await readFile(path.resolve(rootPath, declarative.path), "utf8"),
+          );
+        } catch (error) {
+          if (error.code !== "ENOENT") throw error;
+        }
+      }
+    }
+  }
+  return sourceContents;
 }
 
 async function main(args) {
@@ -698,20 +887,10 @@ async function main(args) {
     }
   }
 
-  const sourceContents = new Map();
-  if (
-    inventory.components.some(
-      (component) => component.validatedMetadata?.length,
-    )
-  ) {
-    sourceContents.set(
-      MONITOR_METADATA_PATH,
-      await readFile(
-        new URL("../monitor/InternalsVisibleTo.cs", import.meta.url),
-        "utf8",
-      ),
-    );
-  }
+  const sourceContents = await loadValidatedSourceContents(
+    inventory,
+    repositoryRoot,
+  );
   const report = evaluateCoverage(
     inventory,
     reports,

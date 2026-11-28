@@ -4,7 +4,11 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { evaluateCoverage, formatReport } from "./gate.mjs";
+import {
+  evaluateCoverage,
+  formatReport,
+  loadValidatedSourceContents,
+} from "./gate.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -587,21 +591,38 @@ test("CoverageGate_AttributesRelativeAstroConfigUsingCoberturaSourceRoot", async
     (item) => item.id === "website-browser",
   );
   assert.ok(website.sources.includes("www/astro.config.ts"));
-  assert.ok(
-    !website.unmeasured.some((item) => item.path === "www/astro.config.ts"),
+  const sourceContents = await loadValidatedSourceContents(
+    { components: [website] },
+    repositoryRoot,
   );
-  const configReport = classReport("astro.config.ts", [1, 0], [[1, 2]]).replace(
-    "<packages>",
-    `<sources><source>${repositoryRoot}www</source></sources><packages>`,
-  );
+  const configReport = [
+    `<coverage><sources><source>${repositoryRoot}www</source></sources><packages><package><classes>`,
+    `<class name="cfg" filename="astro.config.ts"><lines><line number="1" hits="1" branch="true" condition-coverage="100% (1/1)"/></lines></class>`,
+    `<class name="content" filename="src/content.config.ts"><lines><line number="1" hits="1" branch="true" condition-coverage="100% (1/1)"/></lines></class>`,
+    `<class name="llms" filename="src/pages/llms.txt.ts"><lines><line number="1" hits="1" branch="true" condition-coverage="100% (1/1)"/></lines></class>`,
+    `<class name="llmsFull" filename="src/pages/llms-full.txt.ts"><lines><line number="1" hits="1" branch="true" condition-coverage="100% (1/1)"/></lines></class>`,
+    `</classes></package></packages></coverage>`,
+  ].join("");
+  const websiteScriptsReport = [
+    `<coverage><packages><package><classes>`,
+    `<class name="perf" filename="www/scripts/measure-local-performance.mjs"><lines><line number="1" hits="1" branch="true" condition-coverage="100% (1/1)"/></lines></class>`,
+    `<class name="wcag" filename="www/scripts/verify-wcag-cls.mjs"><lines><line number="1" hits="1" branch="true" condition-coverage="100% (1/1)"/></lines></class>`,
+    `</classes></package></packages></coverage>`,
+  ].join("");
   const reports = new Map([
     [
       "website/cobertura-coverage.xml",
       classReport("www/public/analytics-consent.js", [1], [[1, 1]]),
     ],
     ["astro-config/cobertura-coverage.xml", configReport],
+    ["website-scripts/cobertura-coverage.xml", websiteScriptsReport],
   ]);
-  const result = evaluateCoverage(inventory([website]), reports);
+  const result = evaluateCoverage(
+    inventory([website]),
+    reports,
+    repositoryRoot,
+    sourceContents,
+  );
   const config = result.components[0].sources.find(
     (item) => item.path === "www/astro.config.ts",
   );
@@ -612,15 +633,10 @@ test("CoverageGate_AttributesRelativeAstroConfigUsingCoberturaSourceRoot", async
       config.branchesCovered,
       config.branchesValid,
     ],
-    [2, 3, 1, 2],
+    [1, 1, 1, 1],
   );
-  assert.equal(result.components[0].passed, false);
-  assert.equal(
-    result.components[0].unmeasured.filter((item) =>
-      item.path.endsWith(".astro"),
-    ).length,
-    9,
-  );
+  assert.equal(result.components[0].passed, true);
+  assert.equal(result.components[0].validatedDeclarative.length, 9);
   assert.ok(
     !result.errors.some((error) =>
       error.includes("unclassified report source"),
@@ -631,7 +647,12 @@ test("CoverageGate_AttributesRelativeAstroConfigUsingCoberturaSourceRoot", async
     "astro-config/cobertura-coverage.xml",
     configReport.replace(`${repositoryRoot}www`, `${repositoryRoot}other/www`),
   );
-  const wrongRoot = evaluateCoverage(inventory([website]), reports);
+  const wrongRoot = evaluateCoverage(
+    inventory([website]),
+    reports,
+    repositoryRoot,
+    sourceContents,
+  );
   assert.ok(
     wrongRoot.errors.some((error) =>
       error.includes("missing source measurement: www/astro.config.ts"),
@@ -644,12 +665,15 @@ test("CoverageGate_AttributesRelativeAstroConfigUsingCoberturaSourceRoot", async
   );
 });
 
-test("CoverageGate_KeepsAllAstroTemplatesAsUnmeasuredBlockers", async () => {
+test("CoverageGate_ValidatesDeclarativeAstroAndWorkflowSourcesAndRejectsMutations", async () => {
   const manifest = JSON.parse(
     await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
   );
   const website = manifest.components.find(
     (item) => item.id === "website-browser",
+  );
+  const automation = manifest.components.find(
+    (item) => item.id === "github-automation",
   );
   const expectedTemplates = [
     "www/src/components/AnalyticsConsent.astro",
@@ -663,38 +687,160 @@ test("CoverageGate_KeepsAllAstroTemplatesAsUnmeasuredBlockers", async () => {
     "www/src/pages/tech/index.astro",
   ];
   assert.deepEqual(
-    website.unmeasured
-      .filter((source) => source.path.endsWith(".astro"))
-      .map((source) => source.path)
-      .sort(),
+    website.validatedDeclarative.map((source) => source.path).sort(),
     [...expectedTemplates].sort(),
   );
   assert.ok(
-    expectedTemplates.every((source) => !website.sources.includes(source)),
+    expectedTemplates.every(
+      (source) =>
+        !website.sources.includes(source) &&
+        !manifest.excludedSources.some((excluded) => excluded.path === source),
+    ),
+  );
+  assert.equal(automation.validatedDeclarative.length, 5);
+  assert.ok(
+    automation.validatedDeclarative.every(
+      (entry) =>
+        entry.kind === "github-actions-workflow" &&
+        entry.path.startsWith(".github/workflows/") &&
+        !automation.sources.includes(entry.path),
+    ),
   );
 
-  const result = evaluateCoverage(
-    inventory([website]),
-    new Map([
-      [
-        "website/cobertura-coverage.xml",
-        classReport("www/public/analytics-consent.js", [1], [[1, 1]]),
-      ],
-      [
-        "astro-config/cobertura-coverage.xml",
-        classReport("www/astro.config.ts", [1], [[1, 1]]),
-      ],
-    ]),
+  const sourceContents = await loadValidatedSourceContents(
+    manifest,
+    repositoryRoot,
   );
-  assert.equal(result.passed, false);
-  for (const source of expectedTemplates) {
+  for (const validAstro of [
+    '<div>\u0130</div>\n<script is:inline type="module" src="/analytics-consent.js"></script><',
+  ]) {
+    const mutated = new Map(sourceContents);
+    mutated.set("www/src/pages/index.astro", validAstro);
+    const result = evaluateCoverage(
+      inventory([website]),
+      new Map(),
+      repositoryRoot,
+      mutated,
+    );
     assert.ok(
-      result.errors.some((error) =>
-        error.includes(`unmeasured source: ${source}`),
+      result.components[0].validatedDeclarative.some(
+        (entry) =>
+          entry.path === "www/src/pages/index.astro" && entry.validated,
       ),
-      source,
+      validAstro,
     );
   }
+  for (const invalidAstro of [
+    undefined,
+    "",
+    "<div>ok</div><script>window.__inline = 1;</script>",
+    "<div>ok</div><script>window.__inline = 1;</script >",
+    "<div>ok</div><script is:inline>alert(1)</script>",
+    '<SCRIPT is:inline type="module" src="/analytics-consent.js"></SCRIPT>',
+    `${"\u0130".repeat(23)}<script>window.__inline = 1;</script><script is:inline type="module" src="/analytics-consent.js"></script>`,
+    '<script type="application/ld+json" set:html={structuredDataJson} />window.__inline = 1;</script >',
+    "<div>ok</div></SCRIPT >",
+    '<script set:html={"window.x=1"} />',
+    '<script src="https://cdn.example/remote.js"></script>',
+    "<script src='/analytics-consent.js'>inline()</script>",
+    "<script unclosed",
+  ]) {
+    const mutated = new Map(sourceContents);
+    mutated.set("www/src/pages/index.astro", invalidAstro);
+    const result = evaluateCoverage(
+      inventory([website]),
+      new Map(),
+      repositoryRoot,
+      mutated,
+    );
+    assert.ok(
+      result.errors.some((error) =>
+        error.includes(
+          "declarative content is missing or unsupported: www/src/pages/index.astro",
+        ),
+      ),
+      String(invalidAstro),
+    );
+  }
+
+  for (const invalidWorkflow of [
+    undefined,
+    "",
+    "on:\n  pull_request:\njobs:\n  test:\n",
+    "name: Missing jobs\non: workflow_dispatch\n",
+    "name: Missing trigger\njobs:\n  test:\n",
+  ]) {
+    const mutated = new Map(sourceContents);
+    mutated.set(
+      ".github/workflows/required-pr-validation.yml",
+      invalidWorkflow,
+    );
+    const result = evaluateCoverage(
+      inventory([automation]),
+      new Map(),
+      repositoryRoot,
+      mutated,
+    );
+    assert.ok(
+      result.errors.some((error) =>
+        error.includes(
+          "declarative content is missing or unsupported: .github/workflows/required-pr-validation.yml",
+        ),
+      ),
+      String(invalidWorkflow),
+    );
+  }
+
+  const badDeclarativeComponent = {
+    ...component(
+      "website-browser",
+      ["www/public/analytics-consent.js"],
+      ["web.xml"],
+    ),
+    validatedDeclarative: [
+      {
+        path: "www/public/analytics-consent.js",
+        kind: "astro-template",
+        reason: "wrong ext",
+      },
+      {
+        path: "www/src/pages/index.astro",
+        kind: "unknown-kind",
+        reason: "bad kind",
+      },
+      { path: "www/src/pages/404.astro", kind: "astro-template", reason: " " },
+      {
+        path: "www/src/pages/privacy.astro",
+        kind: "astro-template",
+        reason: "dup",
+      },
+      {
+        path: "www/src/pages/privacy.astro",
+        kind: "astro-template",
+        reason: "dup2",
+      },
+    ],
+  };
+  const badResult = evaluateCoverage(
+    inventory([badDeclarativeComponent]),
+    new Map([
+      [
+        "web.xml",
+        classReport("www/public/analytics-consent.js", [1], [[1, 1]]),
+      ],
+    ]),
+    repositoryRoot,
+    sourceContents,
+  );
+  assert.equal(badResult.passed, false);
+  assert.match(
+    badResult.errors.join("\n"),
+    /unsupported declarative classification/,
+  );
+  assert.match(
+    badResult.errors.join("\n"),
+    /declarative source is assigned more than once/,
+  );
 });
 
 test("CoverageGate_FailsClosedWhenAstroConfigReportIsMissing", async () => {
@@ -960,10 +1106,17 @@ test("CoverageGate_InventoryClassifiesTrackedExecutableSources", async () => {
       );
     }
   }
+  assert.equal(manifest.lineThresholdPercent, 95);
+  assert.equal(manifest.branchThresholdPercent, 90);
+  assert.ok(
+    manifest.components.every((item) => (item.unmeasured ?? []).length === 0),
+    "no unmeasured blockers may remain in inventory.json",
+  );
   const entries = [
     ...manifest.components.flatMap((item) => [
       ...item.sources,
       ...(item.validatedMetadata ?? []).map((source) => source.path),
+      ...(item.validatedDeclarative ?? []).map((source) => source.path),
       ...(item.unmeasured ?? []).map((source) => source.path),
     ]),
     ...manifest.excludedSources.map((item) => item.path),
@@ -1002,26 +1155,28 @@ test("CoverageGate_InventoryClassifiesTrackedExecutableSources", async () => {
   );
 });
 
-test("CoverageGate_LeavesFakeCdpPerformanceDiagnosticUnmeasured", async () => {
+test("CoverageGate_MeasuresWebsiteScriptsAndFailsClosedWhenReportMissing", async () => {
   const manifest = JSON.parse(
     await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
   );
-  const sourcePath = "www/scripts/measure-local-performance.mjs";
   const website = manifest.components.find(
     (item) => item.id === "website-browser",
   );
-  const reportPath = "local-performance/cobertura-coverage.xml";
-  assert.ok(!website.sources.includes(sourcePath));
-  assert.ok(!website.reports.includes(reportPath));
-  const diagnostic = website.unmeasured.find(
-    (item) => item.path === sourcePath,
+  const reportPath = "website-scripts/cobertura-coverage.xml";
+  for (const sourcePath of [
+    "www/scripts/measure-local-performance.mjs",
+    "www/scripts/verify-wcag-cls.mjs",
+  ]) {
+    assert.ok(website.sources.includes(sourcePath));
+    assert.equal(website.sourceReports[sourcePath], reportPath);
+    assert.ok(
+      !manifest.excludedSources.some((item) => item.path === sourcePath),
+    );
+  }
+  const sourceContents = await loadValidatedSourceContents(
+    { components: [website] },
+    repositoryRoot,
   );
-  assert.ok(diagnostic);
-  assert.match(diagnostic.reason, /fake CDP tests/);
-  assert.match(diagnostic.reason, /browser-side logic/);
-  assert.match(diagnostic.reason, /v8-to-istanbul initializes lines outside/);
-  assert.match(diagnostic.reason, /no defensible denominator/);
-  assert.ok(!manifest.excludedSources.some((item) => item.path === sourcePath));
   const reports = new Map([
     [
       "website/cobertura-coverage.xml",
@@ -1032,21 +1187,30 @@ test("CoverageGate_LeavesFakeCdpPerformanceDiagnosticUnmeasured", async () => {
       sourceReport("astro.config.ts", [`${repositoryRoot}www`]),
     ],
   ]);
-  const result = evaluateCoverage(inventory([website]), reports);
+  const result = evaluateCoverage(
+    inventory([website]),
+    reports,
+    repositoryRoot,
+    sourceContents,
+  );
   assert.equal(result.passed, false);
   assert.ok(
     result.errors.some((error) =>
-      error.includes(`unmeasured source: ${sourcePath}`),
+      error.includes(`missing report: ${reportPath}`),
     ),
   );
-  const measuredAggregate = result.aggregate;
-
-  reports.set(reportPath, sourceReport(sourcePath, [repositoryRoot]));
-  const withMisleadingReport = evaluateCoverage(inventory([website]), reports);
-  assert.deepEqual(withMisleadingReport.aggregate, measuredAggregate);
   assert.ok(
-    withMisleadingReport.errors.some((error) =>
-      error.includes(`unmeasured source: ${sourcePath}`),
+    result.errors.some((error) =>
+      error.includes(
+        "missing source measurement: www/scripts/measure-local-performance.mjs",
+      ),
+    ),
+  );
+  assert.ok(
+    result.errors.some((error) =>
+      error.includes(
+        "missing source measurement: www/scripts/verify-wcag-cls.mjs",
+      ),
     ),
   );
 });

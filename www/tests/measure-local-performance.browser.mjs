@@ -25,12 +25,14 @@ const edgePath =
   process.env.EDGE_PATH ?? "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 
 function embeddedScript(name) {
-  const match = new RegExp(`const ${name} = \`([\\s\\S]*?)\`;`).exec(source);
+  const fnName =
+    name === "instrumentation" ? "installPerformanceObservers" : "extractPerformanceMetrics";
+  const match = new RegExp(`export function ${fnName}\\([\\s\\S]*?\\n\\}`).exec(source);
   assert.ok(match, `missing ${name} browser script`);
-  const codeOffset = match.index + match[0].indexOf("`") + 1;
-  const code = match[1];
-  assert.equal(source.slice(codeOffset, codeOffset + code.length), code);
-  return { code, codeOffset };
+  const bodyOffset = match.index + "export ".length;
+  const fnSource = match[0].slice("export ".length);
+  assert.equal(source.slice(bodyOffset, bodyOffset + fnSource.length), fnSource);
+  return { code: `(${fnSource})()`, codeOffset: bodyOffset };
 }
 
 function createExactSourceMap(code, codeOffset, sourceURL) {

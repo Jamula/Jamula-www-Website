@@ -636,6 +636,97 @@ static class SelfTests
             extraSelfTestArgument.ExitCode == 64
             && extraSelfTestArgument.Output.Contains("Usage: JamulaMonitor [--self-test]", StringComparison.Ordinal)
             && !extraSelfTestArgument.Output.Contains("DNS:", StringComparison.Ordinal));
+
+        using var prodHandler = (HttpClientHandler)Monitor.CreateProductionHandler();
+        assert("Monitor_ProductionHandlerDisablesAutoRedirect", !prodHandler.AllowAutoRedirect);
+
+        using var okErr = new StringWriter();
+        int delegatedExit = await MonitorCli.ExecuteAsync(
+            [],
+            _ => Task.FromResult(0),
+            _ => null,
+            TimeSpan.FromSeconds(5),
+            okErr);
+        assert("Cli_DefaultArgsDelegateToMonitorRunner", delegatedExit == 0 && okErr.ToString().Length == 0);
+
+        using var timeoutErr = new StringWriter();
+        int timeoutExit = await MonitorCli.ExecuteAsync(
+            [],
+            async ct =>
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+                return 0;
+            },
+            _ => null,
+            TimeSpan.FromMilliseconds(5),
+            timeoutErr);
+        assert("Cli_GlobalBudgetTimeoutReturns3AndLogsError",
+            timeoutExit == 3
+            && timeoutErr.ToString().Contains("Monitor timed out (110-second global budget exceeded).", StringComparison.Ordinal));
+
+        ProcessStartInfo? capturedPsi = null;
+        using var selfTestErr = new StringWriter();
+        int selfTestExit = await MonitorCli.ExecuteAsync(
+            ["--self-test"],
+            _ => Task.FromResult(99),
+            psi =>
+            {
+                capturedPsi = psi;
+                var stub = new ProcessStartInfo("dotnet", "--version")
+                {
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                return Process.Start(stub);
+            },
+            TimeSpan.FromSeconds(5),
+            selfTestErr);
+        assert("Cli_SelfTestDispatchesTestProjectRunner",
+            selfTestExit == 0
+            && capturedPsi is not null
+            && capturedPsi.ArgumentList.Contains("Release"));
+
+        using var nullProcErr = new StringWriter();
+        int nullProcExit = await MonitorCli.ExecuteAsync(
+            ["--self-test"],
+            _ => Task.FromResult(99),
+            _ => null,
+            TimeSpan.FromSeconds(5),
+            nullProcErr);
+        assert("Cli_SelfTestNullProcessReturns1",
+            nullProcExit == 1
+            && nullProcErr.ToString().Contains("Unable to start monitor self-test runner.", StringComparison.Ordinal));
+
+        using var win32Err = new StringWriter();
+        int win32Exit = await MonitorCli.ExecuteAsync(
+            ["--self-test"],
+            _ => Task.FromResult(99),
+            _ => throw new System.ComponentModel.Win32Exception("missing dotnet binary"),
+            TimeSpan.FromSeconds(5),
+            win32Err);
+        assert("Cli_SelfTestLaunchExceptionReturns1",
+            win32Exit == 1
+            && win32Err.ToString().Contains("missing dotnet binary", StringComparison.Ordinal));
+
+        using var invalidOpErr = new StringWriter();
+        int invalidOpExit = await MonitorCli.ExecuteAsync(
+            ["--self-test"],
+            _ => Task.FromResult(99),
+            _ => throw new InvalidOperationException("invalid start info"),
+            TimeSpan.FromSeconds(5),
+            invalidOpErr);
+        assert("Cli_SelfTestInvalidOperationReturns1",
+            invalidOpExit == 1
+            && invalidOpErr.ToString().Contains("invalid start info", StringComparison.Ordinal));
+
+        var missing404Title = await RunWebScenarioAsync(
+            (request, host) => request.AbsolutePath == Config.NotFoundPath
+                ? HtmlResponse(HttpStatusCode.NotFound, "<html><body>Return to the home page</body></html>")
+                : DefaultResponse(request, host),
+            ["jamula.net"]);
+        assert("NotFoundMissingTitleTag_IsRejected",
+            missing404Title.ExitCode == 10
+            && missing404Title.Output.Contains("404 experience", StringComparison.Ordinal));
     }
 
     private static async Task<(int ExitCode, string Output)> RunMonitorCliAsync(params string[] args)

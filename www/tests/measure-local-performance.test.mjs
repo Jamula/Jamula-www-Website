@@ -11,6 +11,8 @@ import test from "node:test";
 import {
   cleanupMeasurementResources,
   createMeasurementConnection,
+  extractPerformanceMetrics,
+  installPerformanceObservers,
   listenMeasurementServer,
   navigateMeasurementPage,
   runMeasurement,
@@ -109,7 +111,7 @@ function fakeMeasurementBrowser({
   let requestCheck;
   const respond = (message) => output.write(`${JSON.stringify(message)}\0`);
   const input = new Writable({
-    write(chunk, encoding, callback) {
+    write(chunk, _encoding, callback) {
       const message = JSON.parse(chunk.toString().slice(0, -1));
       calls.push(message);
       if (message.method === "Target.createBrowserContext") context++;
@@ -549,7 +551,7 @@ for (const { name, failureMode } of [
     const child = childProcessStub();
     const pipeError = Object.assign(new Error("debugging pipe failed"), { code: "EPIPE" });
     const input = new Writable({
-      write(chunk, encoding, callback) {
+      write(_chunk, _encoding, callback) {
         if (failureMode === "write") queueMicrotask(() => callback(pipeError));
         else callback();
       },
@@ -1139,4 +1141,79 @@ test("MeasurementLifecycle_PreservesOperationalErrorAndAttemptsRemainingCleanup"
   );
 
   assert.deepEqual(actions, ["server.close", "profile.remove"]);
+});
+
+test("MeasurementObserversAndMetrics_ExecuteAllBranchesAndClsBoundariesOffline", async () => {
+  const observers = [];
+  class FakePerformanceObserver {
+    constructor(callback) {
+      this.callback = callback;
+      observers.push(this);
+    }
+    observe(options) {
+      this.options = options;
+    }
+  }
+  const fakeWin = {};
+  installPerformanceObservers(fakeWin, FakePerformanceObserver);
+  assert.equal(observers.length, 2);
+  observers[0].callback({ getEntries: () => [{ startTime: 18 }, { startTime: 42 }] });
+  observers[1].callback({
+    getEntries: () => [
+      { hadRecentInput: true, startTime: 50, value: 0.9, sources: [] },
+      {
+        hadRecentInput: false,
+        startTime: 100,
+        value: 0.04,
+        sources: [{ node: { outerHTML: "x".repeat(220) } }, { node: null }],
+      },
+      { hadRecentInput: false, startTime: 600, value: 0.03, sources: [] },
+      { hadRecentInput: false, startTime: 2000, value: 0.02, sources: [] },
+    ],
+  });
+
+  const presentMetrics = extractPerformanceMetrics(fakeWin, {
+    getEntriesByType: (type) =>
+      type === "navigation"
+        ? [{ responseStart: 11, transferSize: 512 }]
+        : [{ name: "http://127.0.0.1/app.js", transferSize: 64 }],
+    getEntriesByName: () => [{ startTime: 25 }],
+  });
+  assert.equal(presentMetrics.lcp, 42);
+  assert.equal(presentMetrics.fcp, 25);
+  assert.equal(presentMetrics.ttfb, 11);
+  assert.equal(presentMetrics.documentTransfer, 512);
+  assert.equal(Number(presentMetrics.cls.toFixed(2)), 0.07);
+  assert.equal(presentMetrics.shifts[0].sources[0].length, 200);
+  assert.equal(presentMetrics.shifts[0].sources[1], null);
+
+  fakeWin.__measurement = {
+    lcp: null,
+    shifts: Array.from({ length: 11 }, (_, idx) => ({ time: 100 + idx * 500, value: 0.01 })),
+  };
+  const missingEntriesMetrics = extractPerformanceMetrics(fakeWin, {
+    getEntriesByType: () => [],
+    getEntriesByName: () => [],
+  });
+  assert.equal(missingEntriesMetrics.fcp, null);
+  assert.equal(missingEntriesMetrics.ttfb, null);
+  assert.equal(missingEntriesMetrics.documentTransfer, null);
+  assert.equal(Number(missingEntriesMetrics.cls.toFixed(2)), 0.1);
+
+  const server = createServer();
+  const root = await mkdtemp(join(tmpdir(), "jamula-perf-escape-"));
+  try {
+    const cliPath = fileURLToPath(
+      new URL("../scripts/measure-local-performance.mjs", import.meta.url)
+    );
+    const badCli = spawnSync(process.execPath, [cliPath], {
+      cwd: root,
+      env: { ...process.env, EDGE_PATH: join(root, "nonexistent-edge.exe") },
+      encoding: "utf8",
+    });
+    assert.equal(badCli.status, 1);
+  } finally {
+    server.close();
+    await rm(root, { recursive: true, force: true });
+  }
 });

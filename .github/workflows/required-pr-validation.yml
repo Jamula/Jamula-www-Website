@@ -134,7 +134,7 @@ jobs:
         run: >-
           node --experimental-test-coverage --test
           --test-coverage-include=public/analytics-consent.js
-          --test-coverage-lines=90 --test-coverage-branches=90
+          --test-coverage-lines=95 --test-coverage-branches=90
           tests/*.test.mjs
 
       - name: Build versionless preview website
@@ -158,19 +158,32 @@ jobs:
         run: >-
           node --experimental-test-coverage --test
           --test-coverage-include=public/analytics-consent.js
-          --test-coverage-lines=90 --test-coverage-branches=90
+          --test-coverage-lines=95 --test-coverage-branches=90
           tests/*.test.mjs
 
+      - name: Verify WCAG 2.2 AA, landmarks, and CLS in --network=none container
+        if: steps.changes.outputs.website == 'true'
+        working-directory: .
+        run: >-
+          docker run --rm --network=none --cap-drop=ALL
+          --security-opt=no-new-privileges
+          -v "$PWD:/work:ro" -w /work/www
+          mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
+          node scripts/verify-wcag-cls.mjs --dist /work/www/dist --require-network-none
+
       - name: Set up .NET SDK
-        if: steps.changes.outputs.monitor == 'true' || steps.changes.outputs.dotnet_tools == 'true'
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
-          global-json-file: scripts/monitor/global.json
+          global-json-file: global.json
 
-      - name: Verify .NET SDK
-        if: steps.changes.outputs.monitor == 'true' || steps.changes.outputs.dotnet_tools == 'true'
-        working-directory: scripts/monitor
-        run: dotnet --version
+      - name: Verify .NET SDK and install dotnet-coverage
+        shell: bash
+        working-directory: .
+        run: |
+          set -euo pipefail
+          dotnet --version
+          dotnet tool install --tool-path "$RUNNER_TEMP/dotnet-tools" dotnet-coverage --version 18.12.0
+          echo "DOTNET_COVERAGE_BIN=$RUNNER_TEMP/dotnet-tools/dotnet-coverage" >> "$GITHUB_ENV"
 
       - name: Build monitor
         if: steps.changes.outputs.monitor == 'true'
@@ -182,14 +195,16 @@ jobs:
         working-directory: scripts/monitor
         run: dotnet run --project JamulaMonitor.csproj --configuration Release --no-build -- --self-test
 
-      - name: Validate .NET 11 governance, MBR, and MCP suites
-        if: steps.changes.outputs.dotnet_tools == 'true'
+      - name: Collect Cobertura reports and enforce 95%/90% coverage gate
+        shell: bash
         working-directory: .
         run: |
-          dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release
-          dotnet run --project scripts/validation.cli.tests/JamulaValidation.Cli.Tests.csproj --configuration Release
-          dotnet run --project scripts/mbr/tests/JamulaMbr.Tests.csproj --configuration Release
-          node --test scripts/mbr/tests/ui.test.mjs
-          dotnet run --project scripts/mcp/tests/JamulaMcp.Tests.csproj --configuration Release
-          dotnet run --project accelerator/Authorization.Tests/JamulaAccelerator.Authorization.Tests.csproj --configuration Release
-          dotnet run --project accelerator/Telemetry.Tests/JamulaAccelerator.Telemetry.Tests.csproj --configuration Release
+          set -euo pipefail
+          dotnet run --project scripts/validation/JamulaValidation.csproj --configuration Release -- validate-governance .
+          node scripts/coverage/collect.mjs artifacts/coverage
+          {
+            echo "### First-party 95% line / 90% branch coverage gate"
+            echo '```'
+            node scripts/coverage/gate.mjs artifacts/coverage artifacts/coverage/summary.json
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
