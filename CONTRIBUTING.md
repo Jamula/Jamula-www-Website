@@ -6,7 +6,7 @@
 - Use an isolated pull-request branch or worktree based on protected `main`.
 - Assign one integration owner and one writer to each PR branch (they may be the same person). Contributors work in isolation and hand off changes; only the owning session writes the delivery branch.
 - `main` is the only persistent production source. Pull-request previews are isolated and are never promoted to production.
-- Prefer currently supported `.NET` (`.NET 11.0` / `net11.0` pinned in root [`global.json`](global.json), inheriting `<Nullable>enable</Nullable>`, `<ImplicitUsings>enable</ImplicitUsings>`, and `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` from [`scripts/Directory.Build.props`](scripts/Directory.Build.props), indexed in [`Jamula.slnx`](Jamula.slnx), with minimal/zero unnecessary third-party NuGet dependencies) and `Node.js` (`26.13.0` / npm `12.2.1` in CI) using ES modules (`.mjs`) or TypeScript (`.ts`). All legacy `.py` and `.cjs` scripts have been retired; do not introduce Python or CommonJS scripts, and keep workflow YAML thin by placing verification, retry, and configuration logic in tested, coverage-inventoried modules.
+- Prefer currently supported `.NET` (`.NET 11.0` / `net11.0` pinned in root [`global.json`](global.json), inheriting `<Nullable>enable</Nullable>`, `<ImplicitUsings>enable</ImplicitUsings>`, and `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` from [`Directory.Build.props`](Directory.Build.props), indexed in [`Jamula.slnx`](Jamula.slnx), with minimal/zero unnecessary third-party NuGet dependencies) and `Node.js` (`26.13.0` / npm `12.2.1` in CI) using ES modules (`.mjs`) or TypeScript (`.ts`). All legacy `.py` and `.cjs` scripts have been retired; do not introduce Python or CommonJS scripts, and keep workflow YAML thin by placing verification, retry, and configuration logic in tested, coverage-inventoried modules.
 - Every first-party executable component and the overall aggregate target at least `95%` line and `90%` branch coverage (`scripts/coverage/inventory.json`), and unmeasured sources remain tracked in [`scripts/coverage/README.md`](scripts/coverage/README.md); prioritize deterministic offline happy-path and failure-path tests.
 
 ## Website validation
@@ -85,7 +85,7 @@ Optional GitHub Sponsors support configured in `.github/FUNDING.yml` (`@cyrusjam
   - `dotnet run --project scripts/validation/JamulaValidation.csproj --configuration Release -- validate-governance .`
   - `dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release`
   - `dotnet run --project scripts/validation.cli.tests/JamulaValidation.Cli.Tests.csproj --configuration Release`
-  - `node --test .github/scripts/swa-preview.test.mjs .github/scripts/verify-preview.test.mjs .github/scripts/release.test.mjs`
+  - `node --test .github/scripts/swa-preview.test.mjs .github/scripts/verify-preview.test.mjs .github/scripts/release.test.mjs .github/scripts/uptime-alert.test.mjs`
 - When modifying tracked executable sources or `#109` coverage harnesses (`scripts/coverage/`), run `npm --prefix www ci` and `node --test "scripts/coverage/*.test.*"` (enforced on every PR by `Required PR Validation`), plus any component-specific collectors documented in [`scripts/coverage/README.md`](scripts/coverage/README.md).
 - For monitor or MBR changes, also run:
   - `dotnet run --project scripts/monitor/JamulaMonitor.csproj --configuration Release -- --self-test`

@@ -2,6 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+const EXPECTED_SECURITY_HEADERS = Object.freeze({
+  "X-Frame-Options": "DENY",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+});
+
 export function assertDeploymentConfig(configPath) {
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
   const csp = config.globalHeaders?.["Content-Security-Policy"];
@@ -18,28 +25,28 @@ export function assertDeploymentConfig(configPath) {
       "Built Static Web Apps configuration is missing the .txt MIME mapping.",
     );
   }
+  for (const [name, expected] of Object.entries(EXPECTED_SECURITY_HEADERS)) {
+    if (config.globalHeaders[name] !== expected) {
+      throw new Error(
+        `Built Static Web Apps configuration has unexpected ${name} header.`,
+      );
+    }
+  }
   return config;
 }
 
-const REQUIRED_CONFIG_HEADERS = [
-  "Content-Security-Policy",
-  "X-Frame-Options",
-  "X-Content-Type-Options",
-  "Referrer-Policy",
-  "Permissions-Policy",
-];
-
 export function assertLiveSecurityHeaders(configPath, headers) {
   const config = assertDeploymentConfig(configPath);
-  for (const name of REQUIRED_CONFIG_HEADERS) {
-    const expected = config.globalHeaders?.[name];
-    const observed = headers[name.toLowerCase()];
-    if (observed !== expected) {
-      if (name === "Content-Security-Policy") {
-        throw new Error(
-          "Live Content-Security-Policy does not match the built configuration.",
-        );
-      }
+  if (
+    headers["content-security-policy"] !==
+    config.globalHeaders["Content-Security-Policy"]
+  ) {
+    throw new Error(
+      "Live Content-Security-Policy does not match the built configuration.",
+    );
+  }
+  for (const [name, expected] of Object.entries(EXPECTED_SECURITY_HEADERS)) {
+    if (headers[name.toLowerCase()] !== expected) {
       throw new Error(`Unexpected ${name} header.`);
     }
   }

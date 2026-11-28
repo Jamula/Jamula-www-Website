@@ -537,16 +537,67 @@ test("CSP and deployment config verifiers validate staticwebapp.config.json and 
         }),
       /Unexpected X-Frame-Options header/,
     );
-    assert.throws(
-      () =>
-        assertLiveSecurityHeaders(configPath, {
-          ...validHeaders,
-          "strict-transport-security": "   ",
-        }),
-      /Strict-Transport-Security was not enforced/,
-    );
+    for (const hstsValue of [undefined, "   "]) {
+      assert.throws(
+        () =>
+          assertLiveSecurityHeaders(configPath, {
+            ...validHeaders,
+            "strict-transport-security": hstsValue,
+          }),
+        /Strict-Transport-Security was not enforced/,
+      );
+    }
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("security header verifiers fail closed when config and live response weaken or omit fixed headers", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-sec-headers-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const baseConfig = JSON.parse(fs.readFileSync(staticWebAppConfig, "utf8"));
+  const validConfigPath = path.join(directory, "valid-config.json");
+  const mutatedConfigPath = path.join(directory, "mutated-config.json");
+  fs.writeFileSync(validConfigPath, JSON.stringify(baseConfig));
+
+  for (const [headerName, invalidValue] of [
+    ["X-Frame-Options", "SAMEORIGIN"],
+    ["X-Frame-Options", undefined],
+    ["X-Content-Type-Options", "none"],
+    ["X-Content-Type-Options", undefined],
+    ["Referrer-Policy", "unsafe-url"],
+    ["Referrer-Policy", undefined],
+    ["Permissions-Policy", "camera=*"],
+    ["Permissions-Policy", undefined],
+  ]) {
+    const mutatedConfig = structuredClone(baseConfig);
+    if (invalidValue === undefined) {
+      delete mutatedConfig.globalHeaders[headerName];
+    } else {
+      mutatedConfig.globalHeaders[headerName] = invalidValue;
+    }
+    fs.writeFileSync(mutatedConfigPath, JSON.stringify(mutatedConfig));
+
+    const matchingLiveHeaders = Object.fromEntries(
+      Object.entries(mutatedConfig.globalHeaders).map(([k, v]) => [
+        k.toLowerCase(),
+        v,
+      ]),
+    );
+    matchingLiveHeaders["strict-transport-security"] = "max-age=31536000";
+
+    const configError = {
+      message: `Built Static Web Apps configuration has unexpected ${headerName} header.`,
+    };
+    assert.throws(() => assertDeploymentConfig(mutatedConfigPath), configError);
+    assert.throws(
+      () => assertLiveSecurityHeaders(mutatedConfigPath, matchingLiveHeaders),
+      configError,
+    );
+    assert.throws(
+      () => assertLiveSecurityHeaders(validConfigPath, matchingLiveHeaders),
+      { message: `Unexpected ${headerName} header.` },
+    );
   }
 });
 

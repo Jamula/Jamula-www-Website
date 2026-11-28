@@ -124,7 +124,7 @@ verification, retries, and partial-deployment recovery.
 ## Local development
 
 CI uses a single root [`global.json`](global.json) (`11.0.100`), shared MSBuild
-settings in [`scripts/Directory.Build.props`](scripts/Directory.Build.props),
+settings in [`Directory.Build.props`](Directory.Build.props),
 and the [`Jamula.slnx`](Jamula.slnx) solution alongside Node.js `26.13.0` and
 npm `12.2.1` (all first-party Node automation and tests use ES modules in `.mjs`
 or TypeScript in `.ts`). From the repository root:
@@ -172,7 +172,7 @@ dotnet run --project scripts/validation/JamulaValidation.csproj --configuration 
 dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release
 dotnet run --project scripts/validation.cli.tests/JamulaValidation.Cli.Tests.csproj --configuration Release
 dotnet run --project scripts/mcp/tests/JamulaMcp.Tests.csproj --configuration Release
-node --test .github/scripts/swa-preview.test.mjs .github/scripts/verify-preview.test.mjs .github/scripts/release.test.mjs
+node --test .github/scripts/swa-preview.test.mjs .github/scripts/verify-preview.test.mjs .github/scripts/release.test.mjs .github/scripts/uptime-alert.test.mjs
 ```
 
 For `#109` coverage-inventory and template checks (requires `npm --prefix www ci`
