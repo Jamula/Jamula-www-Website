@@ -64,31 +64,25 @@ public sealed class OperationTelemetry : IDisposable
 
         // Keep span and metric recording detached from untrusted request context.
         var parent = Activity.Current;
-        Activity? activity = null;
         try
         {
             Activity.Current = null;
-            activity = _activities.CreateActivity("accelerator.operation.completed", ActivityKind.Internal);
-            activity?.Start();
-            if (outcome == OperationOutcome.Failure)
+            using (var activity = _activities.CreateActivity("accelerator.operation.completed", ActivityKind.Internal))
             {
-                activity?.SetStatus(ActivityStatusCode.Error);
+                activity?.Start();
+                if (outcome == OperationOutcome.Failure)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error);
+                }
+                activity?.SetTag("outcome", outcomeLabel);
+                var tag = new KeyValuePair<string, object?>("outcome", outcomeLabel);
+                _completed.Add(1, tag);
+                _duration.Record(duration.TotalMilliseconds, tag);
             }
-            activity?.SetTag("outcome", outcomeLabel);
-            var tag = new KeyValuePair<string, object?>("outcome", outcomeLabel);
-            _completed.Add(1, tag);
-            _duration.Record(duration.TotalMilliseconds, tag);
         }
         finally
         {
-            try
-            {
-                activity?.Dispose();
-            }
-            finally
-            {
-                Activity.Current = parent;
-            }
+            Activity.Current = parent;
         }
     }
 
@@ -98,13 +92,9 @@ public sealed class OperationTelemetry : IDisposable
         try
         {
             Activity.Current = null;
-            try
+            using (_meter)
             {
                 _activities.Dispose();
-            }
-            finally
-            {
-                _meter.Dispose();
             }
         }
         finally
