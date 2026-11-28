@@ -1,21 +1,8 @@
 name: Uptime and Apex A-Record Monitor
 
-# PRE-CUTOVER STATE: This workflow is disabled in repository Settings → Actions →
-# Workflows ("disabled_manually").  The schedule trigger is present in source so
-# that a single "Enable workflow" click in Settings — after the apex A-record
-# cutover — makes both schedule and workflow_dispatch live immediately, with no
-# follow-up code PR required.
-#
-# GitHub's "disable workflow" flag is a repository setting independent of this YAML
-# file.  Merging this file to main does NOT silently re-enable the workflow; an
-# explicit enable action in the UI (or API) is still required.
-#
-# POST-CUTOVER procedure (issue #52 / #37):
-#   1. Perform the apex A-record change to 48.192.33.154.
-#   2. In repository Settings → Actions → Workflows, click "Enable workflow"
-#      for this file.
-#   3. Trigger a manual run immediately via workflow_dispatch.
-#   4. Confirm the run is green; do not close issue #37 until it is.
+# Workflow enablement is a repository setting independent of this YAML file.
+# If disabled, enable it only after the approved apex cutover, run it manually,
+# and confirm the result before closing the associated operational issue.
 
 on:
   schedule:
@@ -27,7 +14,7 @@ permissions:
 
 concurrency:
   group: uptime-apex-monitor
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   check:
@@ -75,3 +62,26 @@ jobs:
             echo "- \`jamula.net\` A record → approved Azure SWA IP verified"
             echo "- \`jamula.net\`, \`www.jamula.net\`, \`jamula.com\`, and \`www.jamula.com\` passed HTTPS, canonical URL, same-host HTTP upgrade, expected content, and 404 checks"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  alert:
+    name: Escalate scheduled monitor failure
+    needs: check
+    if: failure() && github.event_name == 'schedule' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Check out trusted alert logic
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Open or retain an actionable outage issue
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { escalate } = require("./.github/scripts/uptime-alert.cjs");
+            const url = `${process.env.GITHUB_SERVER_URL}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const result = await escalate(github, context.repo, url);
+            await core.summary.addRaw(`Monitor alert: ${result.html_url}`).write();

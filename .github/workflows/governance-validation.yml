@@ -54,6 +54,8 @@ jobs:
         run: node --test .github/scripts/verify-preview.test.cjs
       - name: Test release versioning and deployment boundary
         run: node --test .github/scripts/release.test.cjs
+      - name: Test scheduled monitor failure escalation
+        run: node --test .github/scripts/uptime-alert.test.cjs
       - name: Test preview artifact boundary
         working-directory: scripts/validation
         run: dotnet run --project ../validation.tests/JamulaValidation.Tests.csproj --configuration Release
