@@ -337,7 +337,8 @@ await RunAsync("McpHost_ServesReadyEndpointSecurityHeadersAndStreamableHttpMcpTo
         Check(health.Headers.TryGetValues("X-Content-Type-Options", out var nosniff) && nosniff.Contains("nosniff"), "expected nosniff header");
         Check(health.Headers.Contains("Content-Security-Policy"), "expected CSP header");
 
-        async Task<(HttpStatusCode Status, string Body, string? SessionId)> PostMcpAsync(string jsonRpc, string? sessionId = null)
+        async Task<(HttpStatusCode Status, string Body, string? SessionId)> PostMcpAsync(
+            string jsonRpc, string? sessionId = null, string? protocolVersion = null)
         {
             using var req = new HttpRequestMessage(HttpMethod.Post, "/mcp")
             {
@@ -348,6 +349,10 @@ await RunAsync("McpHost_ServesReadyEndpointSecurityHeadersAndStreamableHttpMcpTo
             if (!string.IsNullOrEmpty(sessionId))
             {
                 req.Headers.Add("Mcp-Session-Id", sessionId);
+            }
+            if (protocolVersion is not null)
+            {
+                req.Headers.Add("MCP-Protocol-Version", protocolVersion);
             }
 
             using var resp = await http.SendAsync(req);
@@ -399,6 +404,378 @@ await RunAsync("McpHost_ServesReadyEndpointSecurityHeadersAndStreamableHttpMcpTo
               (callInvalid.Body.Contains("\"isError\":true", StringComparison.Ordinal) ||
                callInvalid.Body.Contains("\"error\"", StringComparison.Ordinal)),
             "tools/call with out-of-range maxResults must surface an MCP error response");
+
+        var callWithLegacyMeta = await PostMcpAsync(
+            """{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_jamula_overview","arguments":{},"_meta":{"progressToken":"legacy"}}}""",
+            init.SessionId);
+        Check(callWithLegacyMeta.Status == HttpStatusCode.OK &&
+              callWithLegacyMeta.Body.Contains("AI Strategy", StringComparison.Ordinal),
+            "headerless legacy requests with unrelated metadata must remain supported");
+
+        var callWithLegacyVersion = await PostMcpAsync(
+            """{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"get_jamula_overview","arguments":{},"_meta":{"progressToken":"legacy"}}}""",
+            init.SessionId, "2025-03-26");
+        Check(callWithLegacyVersion.Status == HttpStatusCode.OK &&
+              callWithLegacyVersion.Body.Contains("AI Strategy", StringComparison.Ordinal),
+            "legacy requests with a version header and unrelated metadata must remain supported");
+
+        var legacyRequest = """{"jsonrpc":"2.0","id":8,"method":"tools/list","params":{}}""";
+        var atLimit = legacyRequest.PadRight(1024 * 1024, ' ');
+        var atLimitResponse = await PostMcpAsync(atLimit, init.SessionId);
+        Check(atLimitResponse.Status == HttpStatusCode.OK &&
+              atLimitResponse.Body.Contains("search_public_corpus", StringComparison.Ordinal),
+            "headerless legacy requests at the 1 MiB boundary must be accepted");
+        var atLimitLegacyVersion = await PostMcpAsync(atLimit, init.SessionId, "2025-03-26");
+        Check(atLimitLegacyVersion.Status == HttpStatusCode.OK &&
+              atLimitLegacyVersion.Body.Contains("search_public_corpus", StringComparison.Ordinal),
+            "legacy-version requests at the 1 MiB boundary must be accepted");
+
+        var overLimitResponse = await PostMcpAsync(atLimit + " ", init.SessionId);
+        Check(overLimitResponse.Status == HttpStatusCode.RequestEntityTooLarge,
+            "headerless legacy requests above the 1 MiB boundary must be rejected");
+        var overLimitLegacyVersion = await PostMcpAsync(atLimit + " ", init.SessionId, "2025-03-26");
+        Check(overLimitLegacyVersion.Status == HttpStatusCode.RequestEntityTooLarge,
+            "legacy-version requests above the 1 MiB boundary must be rejected");
+
+        using var chunkedRequest = new HttpRequestMessage(HttpMethod.Post, "/mcp")
+        {
+            Content = new StringContent(atLimit + " ", Encoding.UTF8, "application/json")
+        };
+        chunkedRequest.Headers.TransferEncodingChunked = true;
+        chunkedRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        chunkedRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+        using var chunkedResponse = await http.SendAsync(chunkedRequest);
+        Check(chunkedResponse.StatusCode == HttpStatusCode.RequestEntityTooLarge,
+            "chunked headerless requests above the 1 MiB boundary must be rejected");
+
+        var malformed = await PostMcpAsync("{");
+        Check(malformed.Status == HttpStatusCode.BadRequest &&
+              malformed.Body.Contains("\"error\"", StringComparison.Ordinal),
+            "malformed headerless JSON must retain the SDK's error response");
+
+        var modernNotification = await PostMcpAsync(
+            """{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}""");
+        Check(modernNotification.Status == HttpStatusCode.BadRequest,
+            "headerless notifications carrying modern metadata must be rejected");
+        using var modernNotificationJson = JsonDocument.Parse(modernNotification.Body);
+        Check(modernNotificationJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020 &&
+              (!modernNotificationJson.RootElement.TryGetProperty("id", out var notificationId) ||
+               notificationId.ValueKind == JsonValueKind.Null),
+            "a rejected notification must not acquire a fabricated request ID");
+
+        var logLevelOnly = await PostMcpAsync(
+            """{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"get_jamula_overview","arguments":{},"_meta":{"io.modelcontextprotocol/logLevel":"info"}}}""");
+        using var logLevelJson = JsonDocument.Parse(logLevelOnly.Body);
+        Check(logLevelOnly.Status == HttpStatusCode.BadRequest &&
+              logLevelJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "modern log-level metadata without a version header must be rejected");
+
+        var subscriptionOnly = await PostMcpAsync(
+            """{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"_meta":{"io.modelcontextprotocol/subscriptionId":"subscription"}}}""");
+        using var subscriptionJson = JsonDocument.Parse(subscriptionOnly.Body);
+        Check(subscriptionOnly.Status == HttpStatusCode.BadRequest &&
+              subscriptionJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "modern subscription metadata without a version header must be rejected");
+
+        var matchingLegacyMetadata = await PostMcpAsync(
+            """{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"get_jamula_overview","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2025-03-26"}}}""",
+            init.SessionId, "2025-03-26");
+        Check(matchingLegacyMetadata.Status == HttpStatusCode.OK &&
+              matchingLegacyMetadata.Body.Contains("AI Strategy", StringComparison.Ordinal),
+            "matching legacy header and version metadata must not be rejected");
+
+        foreach (var invalidVersion in new[] { "{}", "42" })
+        {
+            var invalidMetadata = await PostMcpAsync(
+                """{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"get_jamula_overview","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":VALUE}}}"""
+                    .Replace("VALUE", invalidVersion, StringComparison.Ordinal),
+                init.SessionId, "2025-03-26");
+            using var invalidMetadataJson = JsonDocument.Parse(invalidMetadata.Body);
+            Check(invalidMetadata.Status == HttpStatusCode.BadRequest &&
+                  invalidMetadataJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+                "non-string version metadata must not bypass legacy-header validation");
+        }
+    }
+    finally
+    {
+        await app.StopAsync();
+    }
+});
+
+await RunAsync("McpHost_SupportsCurrentStatelessProtocolAndRejectsInvalidMetadata", async () =>
+{
+    long toolInvocations = 0;
+    using var meterListener = new MeterListener
+    {
+        InstrumentPublished = (instrument, listener) =>
+        {
+            if (instrument.Meter.Name == McpTelemetry.InstrumentationName)
+            {
+                listener.EnableMeasurementEvents(instrument);
+            }
+        }
+    };
+    meterListener.SetMeasurementEventCallback<long>((instrument, measurement, _, _) =>
+    {
+        if (instrument.Name == "jamula.mcp.tool.invocations")
+        {
+            Interlocked.Add(ref toolInvocations, measurement);
+        }
+    });
+    meterListener.Start();
+
+    await using var app = McpHost.BuildLoopbackApp(realTechDir, port: 0);
+    await app.StartAsync();
+    try
+    {
+        var address = app.Services.GetRequiredService<IServer>()
+            .Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+        using var http = new HttpClient { BaseAddress = new Uri(address) };
+        var metadata = new Dictionary<string, object>
+        {
+            ["io.modelcontextprotocol/protocolVersion"] = "2026-07-28",
+            ["io.modelcontextprotocol/clientInfo"] = new { name = "current-protocol-test", version = "1.0.0" },
+            ["io.modelcontextprotocol/clientCapabilities"] = new { }
+        };
+
+        async Task<(HttpStatusCode Status, string Body, bool HasSession)> PostAsync(
+            object id, string method, string? toolName = null, object? arguments = null,
+            string? headerName = null, string? headerMethod = null,
+            string protocolVersion = "2026-07-28", string? metadataVersion = null,
+            bool includeVersionHeader = true, bool includeMethodHeader = true,
+            bool includeNameHeader = true, bool includeProtocolMetadata = true,
+            bool includeClientInfo = true, bool includeClientCapabilities = true,
+            bool includeCustomParameterHeader = false)
+        {
+            var requestMetadata = new Dictionary<string, object>(metadata);
+            if (includeProtocolMetadata)
+            {
+                requestMetadata["io.modelcontextprotocol/protocolVersion"] = metadataVersion ?? protocolVersion;
+            }
+            else
+            {
+                requestMetadata.Remove("io.modelcontextprotocol/protocolVersion");
+            }
+            if (!includeClientInfo)
+            {
+                requestMetadata.Remove("io.modelcontextprotocol/clientInfo");
+            }
+            if (!includeClientCapabilities)
+            {
+                requestMetadata.Remove("io.modelcontextprotocol/clientCapabilities");
+            }
+            var parameters = new Dictionary<string, object> { ["_meta"] = requestMetadata };
+            if (toolName is not null)
+            {
+                parameters["name"] = toolName;
+                parameters["arguments"] = arguments ?? new { };
+            }
+
+            var payload = JsonSerializer.Serialize(new { jsonrpc = "2.0", id, method, @params = parameters });
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json")
+            };
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+            if (includeVersionHeader)
+            {
+                Check(request.Headers.TryAddWithoutValidation("MCP-Protocol-Version", protocolVersion),
+                    "the test must send its requested protocol-version header");
+            }
+            if (includeMethodHeader)
+            {
+                request.Headers.Add("Mcp-Method", headerMethod ?? method);
+            }
+            if (includeNameHeader && (headerName ?? toolName) is { } name)
+            {
+                request.Headers.Add("Mcp-Name", name);
+            }
+            if (includeCustomParameterHeader)
+            {
+                request.Headers.Add("Mcp-Param-Test", "value");
+            }
+
+            using var response = await http.SendAsync(request);
+            return (response.StatusCode, await response.Content.ReadAsStringAsync(),
+                response.Headers.Contains("Mcp-Session-Id"));
+        }
+
+        var discovery = await PostAsync(1, "server/discover");
+        Check(discovery.Status == HttpStatusCode.OK &&
+              discovery.Body.Contains("jamula-public-mcp", StringComparison.Ordinal) &&
+              discovery.Body.Contains("2026-07-28", StringComparison.Ordinal) &&
+              !discovery.HasSession,
+            "current protocol discovery must report the server and version without a session");
+
+        var tools = await PostAsync(2, "tools/list");
+        Check(tools.Status == HttpStatusCode.OK &&
+              tools.Body.Contains("search_public_corpus", StringComparison.Ordinal) &&
+              !tools.HasSession,
+            "current protocol must list tools without an initialization handshake");
+
+        var search = await PostAsync(3, "tools/call", "search_public_corpus",
+            new { query = "secretless preview", maxResults = 2 });
+        Check(search.Status == HttpStatusCode.OK &&
+              search.Body.Contains("matchCount", StringComparison.Ordinal) &&
+              search.Body.Contains("evidence-gated-static-delivery", StringComparison.Ordinal) &&
+              !search.HasSession,
+            "current protocol must invoke a public tool without a session");
+
+        var invocationsBeforeRejections = Interlocked.Read(ref toolInvocations);
+        Check(invocationsBeforeRejections == 1, "the valid search must be observed by the tool counter");
+        var mismatchedName = await PostAsync(4, "tools/call", "get_jamula_overview",
+            headerName: "list_tech_notes");
+        using var mismatchedNameJson = JsonDocument.Parse(mismatchedName.Body);
+        Check(mismatchedName.Status == HttpStatusCode.BadRequest &&
+              mismatchedNameJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "mismatched Mcp-Name must be rejected before the tool executes");
+
+        var mismatchedMethod = await PostAsync(5, "tools/call", "get_jamula_overview",
+            headerMethod: "tools/list");
+        using var mismatchedMethodJson = JsonDocument.Parse(mismatchedMethod.Body);
+        Check(mismatchedMethod.Status == HttpStatusCode.BadRequest &&
+              mismatchedMethodJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "mismatched Mcp-Method must be rejected before the tool executes");
+
+        var mismatchedVersion = await PostAsync(6, "tools/call", "get_jamula_overview",
+            metadataVersion: "2025-11-25");
+        using var mismatchedVersionJson = JsonDocument.Parse(mismatchedVersion.Body);
+        Check(mismatchedVersion.Status == HttpStatusCode.BadRequest &&
+              mismatchedVersionJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "mismatched protocol version must be rejected before the tool executes");
+
+        var legacyHeaderModernMetadata = await PostAsync(17, "tools/call", "get_jamula_overview",
+            protocolVersion: "2025-03-26", metadataVersion: "2026-07-28");
+        Check(legacyHeaderModernMetadata.Status == HttpStatusCode.BadRequest &&
+              legacyHeaderModernMetadata.Body.StartsWith('{'),
+            $"legacy header with modern metadata must produce a JSON error; got {(int)legacyHeaderModernMetadata.Status}");
+        using var legacyHeaderModernMetadataJson = JsonDocument.Parse(legacyHeaderModernMetadata.Body);
+        Check(legacyHeaderModernMetadataJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "a legacy version header must not bypass modern metadata validation");
+
+        var unsupportedVersion = await PostAsync(7, "server/discover", protocolVersion: "1900-01-01");
+        using var unsupportedVersionJson = JsonDocument.Parse(unsupportedVersion.Body);
+        Check(unsupportedVersion.Status == HttpStatusCode.BadRequest &&
+              unsupportedVersionJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32022 &&
+              unsupportedVersionJson.RootElement.GetProperty("error").GetProperty("data").GetProperty("supported")
+                  .EnumerateArray().Any(version => version.GetString() == "2026-07-28"),
+            "unsupported protocol version must return supported versions");
+
+        var missingVersion = await PostAsync(8, "tools/call", "get_jamula_overview",
+            includeVersionHeader: false);
+        Check(missingVersion.Status == HttpStatusCode.BadRequest,
+            $"modern request without MCP-Protocol-Version must be rejected; got {(int)missingVersion.Status}");
+        using var missingVersionJson = JsonDocument.Parse(missingVersion.Body);
+        Check(missingVersionJson.RootElement.GetProperty("id").GetInt32() == 8 &&
+              missingVersionJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "missing MCP-Protocol-Version must return HeaderMismatch");
+
+        var missingAllHeaders = await PostAsync(9, "tools/call", "get_jamula_overview",
+            includeVersionHeader: false, includeMethodHeader: false, includeNameHeader: false);
+        using var missingAllHeadersJson = JsonDocument.Parse(missingAllHeaders.Body);
+        Check(missingAllHeaders.Status == HttpStatusCode.BadRequest &&
+              missingAllHeadersJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "modern metadata without any mirrored headers must be rejected");
+
+        var missingVersionAndMetadata = await PostAsync(10, "tools/call", "get_jamula_overview",
+            includeVersionHeader: false, includeProtocolMetadata: false,
+            includeClientInfo: false, includeClientCapabilities: false);
+        using var missingVersionAndMetadataJson = JsonDocument.Parse(missingVersionAndMetadata.Body);
+        Check(missingVersionAndMetadata.Status == HttpStatusCode.BadRequest &&
+              missingVersionAndMetadataJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "modern mirrored headers without a version header must be rejected");
+
+        var missingDiscoveryHeaders = await PostAsync(11, "server/discover",
+            includeVersionHeader: false, includeMethodHeader: false, includeProtocolMetadata: false,
+            includeClientInfo: false, includeClientCapabilities: false);
+        using var missingDiscoveryHeadersJson = JsonDocument.Parse(missingDiscoveryHeaders.Body);
+        Check(missingDiscoveryHeaders.Status == HttpStatusCode.BadRequest &&
+              missingDiscoveryHeadersJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "headerless modern discovery must be rejected even when metadata is missing");
+
+        var missingMethod = await PostAsync(12, "tools/call", "get_jamula_overview",
+            includeMethodHeader: false);
+        var missingName = await PostAsync(13, "tools/call", "get_jamula_overview",
+            includeNameHeader: false);
+        using var missingMethodJson = JsonDocument.Parse(missingMethod.Body);
+        using var missingNameJson = JsonDocument.Parse(missingName.Body);
+        Check(missingMethod.Status == HttpStatusCode.BadRequest &&
+              missingMethodJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020 &&
+              missingName.Status == HttpStatusCode.BadRequest &&
+              missingNameJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "modern requests must include their method and tool-name headers");
+
+        var emptyVersion = await PostAsync("empty-version", "tools/call", "get_jamula_overview",
+            protocolVersion: "", metadataVersion: "2026-07-28");
+        using var emptyVersionJson = JsonDocument.Parse(emptyVersion.Body);
+        Check(emptyVersion.Status == HttpStatusCode.BadRequest &&
+              emptyVersionJson.RootElement.GetProperty("id").GetString() == "empty-version" &&
+              emptyVersionJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "an empty version header must be rejected with the original string request ID");
+
+        var clientInfoOnly = await PostAsync(14, "tools/call", "get_jamula_overview",
+            includeVersionHeader: false, includeMethodHeader: false, includeNameHeader: false,
+            includeProtocolMetadata: false, includeClientCapabilities: false);
+        using var clientInfoOnlyJson = JsonDocument.Parse(clientInfoOnly.Body);
+        Check(clientInfoOnly.Status == HttpStatusCode.BadRequest &&
+              clientInfoOnlyJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "modern client-info metadata alone must not bypass the missing-version guard");
+
+        var clientCapabilitiesOnly = await PostAsync(15, "tools/call", "get_jamula_overview",
+            includeVersionHeader: false, includeMethodHeader: false, includeNameHeader: false,
+            includeProtocolMetadata: false, includeClientInfo: false);
+        using var clientCapabilitiesOnlyJson = JsonDocument.Parse(clientCapabilitiesOnly.Body);
+        Check(clientCapabilitiesOnly.Status == HttpStatusCode.BadRequest &&
+              clientCapabilitiesOnlyJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "modern client-capabilities metadata alone must not bypass the missing-version guard");
+
+        var customHeaderOnly = await PostAsync(16, "tools/call", "get_jamula_overview",
+            includeVersionHeader: false, includeMethodHeader: false, includeNameHeader: false,
+            includeProtocolMetadata: false, includeClientInfo: false, includeClientCapabilities: false,
+            includeCustomParameterHeader: true);
+        using var customHeaderOnlyJson = JsonDocument.Parse(customHeaderOnly.Body);
+        Check(customHeaderOnly.Status == HttpStatusCode.BadRequest &&
+              customHeaderOnlyJson.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32020,
+            "a modern custom parameter header without a version must be rejected");
+
+        foreach (var protocolVersion in new string?[] { null, "2025-03-26" })
+        {
+            foreach (var (payload, id) in new[]
+            {
+                ("""{"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"get_jamula_overview","name":"list_tech_notes","arguments":{}}}""", "21"),
+                ("""{"jsonrpc":"2.0","id":"duplicate-meta","method":"tools/call","params":{"name":"get_jamula_overview","arguments":{},"_meta":{"progressToken":"one","progressToken":"two"}}}""", "\"duplicate-meta\""),
+                ("""{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"_meta":{"progressToken":"one","progressToken":"two"}}}""", (string?)null)
+            })
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
+                {
+                    Content = new StringContent(payload, Encoding.UTF8, "application/json")
+                };
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+                if (protocolVersion is not null)
+                {
+                    request.Headers.Add("MCP-Protocol-Version", protocolVersion);
+                }
+
+                using var response = await http.SendAsync(request);
+                var body = await response.Content.ReadAsStringAsync();
+                Check(response.StatusCode == HttpStatusCode.BadRequest,
+                    $"duplicate params or metadata must return 400, got {(int)response.StatusCode}");
+                using var json = JsonDocument.Parse(body);
+                Check(response.Content.Headers.ContentType?.MediaType == "application/json" &&
+                      (id is null
+                          ? !json.RootElement.TryGetProperty("id", out var responseId) ||
+                            responseId.ValueKind == JsonValueKind.Null
+                          : json.RootElement.GetProperty("id").GetRawText() == id) &&
+                      json.RootElement.GetProperty("error").GetProperty("code").GetInt32() == -32600,
+                    "duplicate params or metadata must return Invalid Request with the original ID");
+            }
+        }
+
+        Check(Interlocked.Read(ref toolInvocations) == invocationsBeforeRejections,
+            "invalid protocol requests must not invoke a tool");
     }
     finally
     {

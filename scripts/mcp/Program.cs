@@ -1,13 +1,20 @@
 using System.Globalization;
 using System.Net;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using JamulaMcp;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using ModelContextProtocol;
+using ModelContextProtocol.Protocol;
 
 return await McpHost.RunMainAsync(args);
 
 public static class McpHost
 {
+    private const string FirstMetadataProtocolVersion = "2026-07-28";
+    private const int MaxLegacyRequestBytes = 1024 * 1024;
+
     public static async Task<int> RunMainAsync(
         string[] args,
         CancellationToken cancellationToken = default,
@@ -103,6 +110,17 @@ public static class McpHost
                 return;
             }
 
+            var protocolVersion = request.Headers["MCP-Protocol-Version"].ToString();
+            // ISO-dated legacy versions need inspection before the SDK selects legacy behavior.
+            if (HttpMethods.IsPost(request.Method) &&
+                request.Path.StartsWithSegments("/mcp") &&
+                request.HasJsonContentType() &&
+                string.CompareOrdinal(protocolVersion, FirstMetadataProtocolVersion) < 0)
+            {
+                await HandleLegacyMcpRequestAsync(context, next, protocolVersion);
+                return;
+            }
+
             await next();
         });
 
@@ -110,6 +128,118 @@ public static class McpHost
             Results.Json(new { status = "ready", entries = loaded.Entries.Count }));
         app.MapMcp("/mcp");
         return app;
+    }
+
+    private static async Task HandleLegacyMcpRequestAsync(
+        HttpContext context, Func<Task> next, string protocolVersion)
+    {
+        var request = context.Request;
+        if (request.ContentLength > MaxLegacyRequestBytes)
+        {
+            context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+            await context.Response.WriteAsync("Legacy or headerless MCP request exceeds the size limit.");
+            return;
+        }
+
+        var originalBody = request.Body;
+        await using var bufferedBody = new MemoryStream();
+        var chunk = new byte[8192];
+        int read;
+        while ((read = await originalBody.ReadAsync(chunk, context.RequestAborted)) != 0)
+        {
+            if (bufferedBody.Length + read > MaxLegacyRequestBytes)
+            {
+                context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+                await context.Response.WriteAsync("Legacy or headerless MCP request exceeds the size limit.");
+                return;
+            }
+            bufferedBody.Write(chunk, 0, read);
+        }
+
+        bufferedBody.Position = 0;
+        request.Body = bufferedBody;
+        try
+        {
+            JsonRpcMessage? message = null;
+            try
+            {
+                message = await request.ReadFromJsonAsync(
+                    McpJsonUtilities.ProtocolOptions.GetTypeInfo<JsonRpcMessage>(),
+                    context.RequestAborted);
+            }
+            catch (JsonException)
+            {
+                // Replay malformed input so the SDK returns its standard JSON-RPC error.
+            }
+
+            var parameters = message switch
+            {
+                JsonRpcRequest rpcRequest => rpcRequest.Params,
+                JsonRpcNotification notification => notification.Params,
+                _ => null
+            };
+            var declaresModernHeaders = request.Headers.ContainsKey("Mcp-Method") ||
+                request.Headers.ContainsKey("Mcp-Name") ||
+                request.Headers.Keys.Any(key => key.StartsWith("Mcp-Param-", StringComparison.OrdinalIgnoreCase));
+            var isDiscovery = message is JsonRpcRequest { Method: "server/discover" };
+            var errorCode = (int)McpErrorCode.HeaderMismatch;
+            string? errorMessage = null;
+            try
+            {
+                var metadata = (parameters as JsonObject)?["_meta"] as JsonObject;
+                var declaresModernMetadata = metadata is not null &&
+                    (metadata.ContainsKey(MetaKeys.ProtocolVersion) ||
+                     metadata.ContainsKey(MetaKeys.ClientInfo) ||
+                     metadata.ContainsKey(MetaKeys.ClientCapabilities) ||
+                     metadata.ContainsKey(MetaKeys.LogLevel) ||
+                     metadata.ContainsKey(MetaKeys.SubscriptionId));
+                var versionMismatch = protocolVersion.Length != 0 &&
+                    metadata?.ContainsKey(MetaKeys.ProtocolVersion) == true &&
+                    (metadata[MetaKeys.ProtocolVersion] is not JsonValue versionValue ||
+                     !versionValue.TryGetValue<string>(out var metadataVersion) ||
+                     !string.Equals(protocolVersion, metadataVersion, StringComparison.Ordinal));
+                if ((protocolVersion.Length == 0 &&
+                     (declaresModernMetadata || declaresModernHeaders || isDiscovery)) ||
+                    versionMismatch)
+                {
+                    errorMessage = "The MCP-Protocol-Version header is missing or does not match request metadata.";
+                }
+            }
+            catch (ArgumentException)
+            {
+                // JsonObject materializes its keys lazily and rejects duplicates here.
+                errorCode = (int)McpErrorCode.InvalidRequest;
+                errorMessage = "Request parameters or metadata contain duplicate keys.";
+            }
+
+            if (errorMessage is not null)
+            {
+                var error = new JsonRpcError
+                {
+                    Id = message is JsonRpcRequest rpcRequest ? rpcRequest.Id : default,
+                    Error = new JsonRpcErrorDetail
+                    {
+                        Code = errorCode,
+                        Message = errorMessage
+                    }
+                };
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                context.Response.ContentType = "application/json";
+                await JsonSerializer.SerializeAsync(
+                    context.Response.Body,
+                    error,
+                    McpJsonUtilities.ProtocolOptions.GetTypeInfo<JsonRpcError>(),
+                    context.RequestAborted);
+                return;
+            }
+
+            bufferedBody.Position = 0;
+            await next();
+        }
+        finally
+        {
+            request.Body = originalBody;
+        }
     }
 
     public static bool AllowsRequest(string? host, string origin, string fetchSite, string expectedHost) =>
