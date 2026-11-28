@@ -12,9 +12,9 @@ Unless a path is identified below or carries its own notice, Jamula-authored web
 
 Third-party files remain under their original licenses. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and [`docs/legal/license-inventory.md`](docs/legal/license-inventory.md).
 
-- Squad-generated or adapted integration files (currently pinned at `@bradygaster/squad-cli@2.0.0` in `.mcp.json`, including Squad templates, workflows, agent definitions, and Squad-originated skills under `.squad/` and `.github/`) remain under their original MIT terms; earlier `0.12.0` and `1.1.0` states are retained in repository history. See `THIRD_PARTY_NOTICES.md` for current paths and source history.
 - `.github/skills/cloud-solution-architect/` remains subject to Microsoft's MIT license.
-- Website npm packages in `www/package.json` / `www/package-lock.json` are governed by their respective upstream open-source licenses; `.NET 10` utilities under `scripts/` use the .NET Base Class Library with no third-party NuGet packages.
+- Historical Squad integration files (`@bradygaster/squad-cli` `0.12.0`, `1.1.0`, and `2.0.0`, plus adapted `msitarzewski/agency-agents` charters) have been retired from the active tree and remain in repository history under their original MIT terms; see `THIRD_PARTY_NOTICES.md`.
+- Website npm packages in `www/package.json` / `www/package-lock.json` and `scripts/mcp/JamulaMcp.csproj` NuGet references (`ModelContextProtocol.AspNetCore` and `Microsoft.Extensions.AI.Abstractions`, both MIT) are governed by their respective upstream open-source licenses; `.NET 11` utilities under `scripts/{validation,monitor,mbr}/` use the .NET Base Class Library with no third-party NuGet packages.
 
 ## Reserved Jamula content
 

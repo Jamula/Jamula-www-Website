@@ -65,20 +65,3 @@ www/node_modules/
 www/dist/
 www/.astro/
 .impeccable/hook.cache.json
-# Squad: ignore runtime state (logs, inbox, sessions)
-# Note: .squad/casting/* is identity and MUST be committed to main, not ignored
-.squad/orchestration-log/
-.squad/log/
-.squad/decisions/inbox/
-.squad/sessions/
-.squad/.scratch/
-.squad/.cache/
-# Squad: state owned by squad-state branch (two-layer/orphan backend)
-.squad/decisions.md
-.squad/agents/*/history.md
-.squad/memory/
-.squad/identity/
-# /Squad: state owned by squad-state branch
-# Squad: SubSquad activation file (local to this machine)
-.squad-workstream
-.squad/backend/
