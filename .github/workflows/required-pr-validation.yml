@@ -90,7 +90,7 @@ jobs:
         working-directory: .
         run: npm --prefix www ci
 
-      - name: Test coverage gate and Squad templates
+      - name: Test coverage gate
         working-directory: .
         run: node --test "scripts/coverage/*.test.*"
 

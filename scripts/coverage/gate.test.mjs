@@ -312,8 +312,10 @@ test("CoverageGate_RejectsSimilarlyNamedOutsideSourceRoots", () => {
     "C:\\repository\\www",
     "D:\\repo\\www",
   ]) {
-    const xml = classReport("astro.config.ts", [1], [[1, 1]])
-      .replace("<packages>", `<sources><source>${sourceRoot}</source></sources><packages>`);
+    const xml = classReport("astro.config.ts", [1], [[1, 1]]).replace(
+      "<packages>",
+      `<sources><source>${sourceRoot}</source></sources><packages>`,
+    );
     const result = evaluateCoverage(
       inventory([component("config", ["www/astro.config.ts"], ["config.xml"])]),
       new Map([["config.xml", xml]]),
@@ -321,7 +323,12 @@ test("CoverageGate_RejectsSimilarlyNamedOutsideSourceRoots", () => {
     );
     assert.equal(result.passed, false, sourceRoot);
     assert.deepEqual(result.components[0].sources, [], sourceRoot);
-    assert.ok(result.errors.some((error) => error.includes("missing source measurement: www/astro.config.ts")), sourceRoot);
+    assert.ok(
+      result.errors.some((error) =>
+        error.includes("missing source measurement: www/astro.config.ts"),
+      ),
+      sourceRoot,
+    );
   }
 });
 
@@ -333,25 +340,55 @@ test("CoverageGate_ResolvesLegitimatePathsAgainstExplicitRepositoryRoot", () => 
     ["/checkout/repo", "astro.config.ts", ["www", "./www/"]],
     ["/checkout/repo", "../www/astro.config.ts", ["www"]],
     ["/checkout/repo", "/checkout/repo/www/astro.config.ts", ["/unrelated"]],
-    ["/checkout/repo space", "astro.config.ts", ["file:///checkout/repo%20space/www"]],
-    ["/checkout/repo space", "file:///checkout/repo%20space/www/astro.config.ts", []],
+    [
+      "/checkout/repo space",
+      "astro.config.ts",
+      ["file:///checkout/repo%20space/www"],
+    ],
+    [
+      "/checkout/repo space",
+      "file:///checkout/repo%20space/www/astro.config.ts",
+      [],
+    ],
     ["C:\\checkout\\repo", "www\\astro.config.ts", []],
     ["C:\\checkout\\repo", "astro.config.ts", ["www"]],
     ["C:\\checkout\\repo", "astro.config.ts", ["C:/CHECKOUT/REPO/www"]],
     ["C:\\checkout\\repo", "C:\\checkout\\repo\\www\\astro.config.ts", []],
     ["C:\\checkout\\repo", "file:///C:/checkout/repo/www/astro.config.ts", []],
-    ["C:\\checkout\\repo", "astro.config.ts", ["file://localhost/C:/checkout/repo/www"]],
-    ["\\\\server\\share\\repo", "astro.config.ts", ["\\\\server\\share\\repo\\www"]],
-    ["\\\\server\\share\\repo", "file://server/share/repo/www/astro.config.ts", []],
+    [
+      "C:\\checkout\\repo",
+      "astro.config.ts",
+      ["file://localhost/C:/checkout/repo/www"],
+    ],
+    [
+      "\\\\server\\share\\repo",
+      "astro.config.ts",
+      ["\\\\server\\share\\repo\\www"],
+    ],
+    [
+      "\\\\server\\share\\repo",
+      "file://server/share/repo/www/astro.config.ts",
+      [],
+    ],
   ]) {
     const result = evaluateCoverage(
       inventory([component("config", ["www/astro.config.ts"], ["config.xml"])]),
       new Map([["config.xml", sourceReport(filename, sources)]]),
       root,
     );
-    assert.equal(result.passed, true, JSON.stringify({ root, filename, sources, errors: result.errors }));
+    assert.equal(
+      result.passed,
+      true,
+      JSON.stringify({ root, filename, sources, errors: result.errors }),
+    );
     assert.deepEqual(
-      result.components[0].sources.map((source) => [source.path, source.linesCovered, source.linesValid, source.branchesCovered, source.branchesValid]),
+      result.components[0].sources.map((source) => [
+        source.path,
+        source.linesCovered,
+        source.linesValid,
+        source.branchesCovered,
+        source.branchesValid,
+      ]),
       [["www/astro.config.ts", 2, 2, 1, 1]],
     );
   }
@@ -366,27 +403,57 @@ test("CoverageGate_RejectsAmbiguousEscapingAndUnsupportedPaths", () => {
     ["/checkout/repo", "../other/www/astro.config.ts", []],
     ["/checkout/repo", "/other/www/astro.config.ts", ["www"]],
     ["/checkout/repo", "/checkout/repository/www/astro.config.ts", []],
-    ["/checkout/repo", "/checkout/repo/www/../../../../www/astro.config.ts", []],
+    [
+      "/checkout/repo",
+      "/checkout/repo/www/../../../../www/astro.config.ts",
+      [],
+    ],
     ["/checkout/repo", "astro.config.ts", ["C:\\checkout\\repo\\www"]],
     ["/checkout/repo", "WWW/astro.config.ts", []],
     ["C:\\checkout\\repo", "/checkout/repo/www/astro.config.ts", []],
     ["C:\\checkout\\repo", "C: www/astro.config.ts", []],
     ["C:\\checkout\\repo", "https://example.test/www/astro.config.ts", []],
-    ["C:\\checkout\\repo", "file:///C:/checkout/repo/www/astro.config.ts?query", []],
-    ["C:\\checkout\\repo", "file:///C:/checkout/repo/www/astro.config.ts#fragment", []],
+    [
+      "C:\\checkout\\repo",
+      "file:///C:/checkout/repo/www/astro.config.ts?query",
+      [],
+    ],
+    [
+      "C:\\checkout\\repo",
+      "file:///C:/checkout/repo/www/astro.config.ts#fragment",
+      [],
+    ],
     ["C:\\checkout\\repo", "file:///C:/checkout/repo/www/%ZZ", []],
     ["C:\\checkout\\repo", "file://[invalid", []],
-    ["\\\\server\\share\\repo", "\\\\other\\share\\repo\\www\\astro.config.ts", []],
+    [
+      "\\\\server\\share\\repo",
+      "\\\\other\\share\\repo\\www\\astro.config.ts",
+      [],
+    ],
   ]) {
     const result = evaluateCoverage(
       inventory([component("config", ["www/astro.config.ts"], ["config.xml"])]),
       new Map([["config.xml", sourceReport(filename, sources)]]),
       root,
     );
-    assert.equal(result.passed, false, JSON.stringify({ root, filename, sources }));
+    assert.equal(
+      result.passed,
+      false,
+      JSON.stringify({ root, filename, sources }),
+    );
     assert.deepEqual(result.components[0].sources, []);
-    assert.ok(result.errors.some((error) => error.includes("missing source measurement: www/astro.config.ts")));
-    assert.ok(result.errors.some((error) => error.includes("config.xml") || error.includes("unclassified report source")));
+    assert.ok(
+      result.errors.some((error) =>
+        error.includes("missing source measurement: www/astro.config.ts"),
+      ),
+    );
+    assert.ok(
+      result.errors.some(
+        (error) =>
+          error.includes("config.xml") ||
+          error.includes("unclassified report source"),
+      ),
+    );
   }
   assert.throws(
     () => evaluateCoverage(inventory([]), new Map(), "relative/repo"),
@@ -395,10 +462,9 @@ test("CoverageGate_RejectsAmbiguousEscapingAndUnsupportedPaths", () => {
 });
 
 test("CoverageGate_UsesCdataCoberturaSourceRoots", () => {
-  const localReport = sourceReport(
-    "astro.config.ts",
-    ["/checkout/repo/www"],
-  ).replace(
+  const localReport = sourceReport("astro.config.ts", [
+    "/checkout/repo/www",
+  ]).replace(
     "<source>/checkout/repo/www</source>",
     "<source><![CDATA[/checkout/repo/www]]></source>",
   );
@@ -407,12 +473,14 @@ test("CoverageGate_UsesCdataCoberturaSourceRoots", () => {
     new Map([["config.xml", localReport]]),
     "/checkout/repo",
   );
-  assert.equal(localResult.components[0].sources[0].path, "www/astro.config.ts");
-
-  const outsideReport = sourceReport(
+  assert.equal(
+    localResult.components[0].sources[0].path,
     "www/astro.config.ts",
-    ["/other/checkout"],
-  ).replace(
+  );
+
+  const outsideReport = sourceReport("www/astro.config.ts", [
+    "/other/checkout",
+  ]).replace(
     "<source>/other/checkout</source>",
     "<source><![CDATA[/other/checkout]]></source>",
   );
@@ -449,7 +517,9 @@ test("CoverageGate_DoesNotUseOutsidePathsAsExplicitExclusions", () => {
 test("CoverageGate_RejectsCanonicalSourceAliasesWithoutDoubleCounting", () => {
   for (const alias of ["www/./astro.config.ts", "WWW/ASTRO.CONFIG.TS"]) {
     const result = evaluateCoverage(
-      inventory([component("config", ["www/astro.config.ts", alias], ["config.xml"])]),
+      inventory([
+        component("config", ["www/astro.config.ts", alias], ["config.xml"]),
+      ]),
       new Map([["config.xml", sourceReport("www/astro.config.ts", [])]]),
       "C:\\repo",
     );
@@ -510,30 +580,68 @@ test("CoverageGate_UsesClassLinesWithoutDoubleCountingMethodLines", () => {
 });
 
 test("CoverageGate_AttributesRelativeAstroConfigUsingCoberturaSourceRoot", async () => {
-  const manifest = JSON.parse(await readFile(new URL("./inventory.json", import.meta.url), "utf8"));
-  const website = manifest.components.find((item) => item.id === "website-browser");
+  const manifest = JSON.parse(
+    await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
+  );
+  const website = manifest.components.find(
+    (item) => item.id === "website-browser",
+  );
   assert.ok(website.sources.includes("www/astro.config.ts"));
-  assert.ok(!website.unmeasured.some((item) => item.path === "www/astro.config.ts"));
-  const configReport = classReport("astro.config.ts", [1, 0], [[1, 2]])
-    .replace("<packages>", `<sources><source>${repositoryRoot}www</source></sources><packages>`);
+  assert.ok(
+    !website.unmeasured.some((item) => item.path === "www/astro.config.ts"),
+  );
+  const configReport = classReport("astro.config.ts", [1, 0], [[1, 2]]).replace(
+    "<packages>",
+    `<sources><source>${repositoryRoot}www</source></sources><packages>`,
+  );
   const reports = new Map([
-    ["website/cobertura-coverage.xml", classReport("www/public/analytics-consent.js", [1], [[1, 1]])],
+    [
+      "website/cobertura-coverage.xml",
+      classReport("www/public/analytics-consent.js", [1], [[1, 1]]),
+    ],
     ["astro-config/cobertura-coverage.xml", configReport],
   ]);
   const result = evaluateCoverage(inventory([website]), reports);
-  const config = result.components[0].sources.find((item) => item.path === "www/astro.config.ts");
+  const config = result.components[0].sources.find(
+    (item) => item.path === "www/astro.config.ts",
+  );
   assert.deepEqual(
-    [config.linesCovered, config.linesValid, config.branchesCovered, config.branchesValid],
+    [
+      config.linesCovered,
+      config.linesValid,
+      config.branchesCovered,
+      config.branchesValid,
+    ],
     [2, 3, 1, 2],
   );
   assert.equal(result.components[0].passed, false);
-  assert.equal(result.components[0].unmeasured.filter((item) => item.path.endsWith(".astro")).length, 9);
-  assert.ok(!result.errors.some((error) => error.includes("unclassified report source")));
+  assert.equal(
+    result.components[0].unmeasured.filter((item) =>
+      item.path.endsWith(".astro"),
+    ).length,
+    9,
+  );
+  assert.ok(
+    !result.errors.some((error) =>
+      error.includes("unclassified report source"),
+    ),
+  );
 
-  reports.set("astro-config/cobertura-coverage.xml", configReport.replace(`${repositoryRoot}www`, `${repositoryRoot}other/www`));
+  reports.set(
+    "astro-config/cobertura-coverage.xml",
+    configReport.replace(`${repositoryRoot}www`, `${repositoryRoot}other/www`),
+  );
   const wrongRoot = evaluateCoverage(inventory([website]), reports);
-  assert.ok(wrongRoot.errors.some((error) => error.includes("missing source measurement: www/astro.config.ts")));
-  assert.ok(wrongRoot.errors.some((error) => error.includes("unclassified report source: astro.config.ts")));
+  assert.ok(
+    wrongRoot.errors.some((error) =>
+      error.includes("missing source measurement: www/astro.config.ts"),
+    ),
+  );
+  assert.ok(
+    wrongRoot.errors.some((error) =>
+      error.includes("unclassified report source: astro.config.ts"),
+    ),
+  );
 });
 
 test("CoverageGate_KeepsAllAstroTemplatesAsUnmeasuredBlockers", async () => {
@@ -590,16 +698,33 @@ test("CoverageGate_KeepsAllAstroTemplatesAsUnmeasuredBlockers", async () => {
 });
 
 test("CoverageGate_FailsClosedWhenAstroConfigReportIsMissing", async () => {
-  const manifest = JSON.parse(await readFile(new URL("./inventory.json", import.meta.url), "utf8"));
-  const website = manifest.components.find((item) => item.id === "website-browser");
+  const manifest = JSON.parse(
+    await readFile(new URL("./inventory.json", import.meta.url), "utf8"),
+  );
+  const website = manifest.components.find(
+    (item) => item.id === "website-browser",
+  );
   const result = evaluateCoverage(
     inventory([website]),
-    new Map([["website/cobertura-coverage.xml", classReport("www/public/analytics-consent.js", [1], [[1, 1]])]]),
+    new Map([
+      [
+        "website/cobertura-coverage.xml",
+        classReport("www/public/analytics-consent.js", [1], [[1, 1]]),
+      ],
+    ]),
   );
   assert.equal(result.passed, false);
   assert.equal(result.components[0].passed, false);
-  assert.ok(result.errors.some((error) => error.includes("missing report: astro-config/cobertura-coverage.xml")));
-  assert.ok(result.errors.some((error) => error.includes("missing source measurement: www/astro.config.ts")));
+  assert.ok(
+    result.errors.some((error) =>
+      error.includes("missing report: astro-config/cobertura-coverage.xml"),
+    ),
+  );
+  assert.ok(
+    result.errors.some((error) =>
+      error.includes("missing source measurement: www/astro.config.ts"),
+    ),
+  );
 });
 
 test("CoverageGate_FailsWhenEitherComponentMetricIsBelowThreshold", () => {
@@ -857,9 +982,7 @@ test("CoverageGate_InventoryClassifiesTrackedExecutableSources", async () => {
   const executable = [...tracked].filter(
     (file) =>
       /\.(?:cjs|mjs|js|cs|ts|astro|ps1|sh)$/.test(file) ||
-      /^(?:\.github\/workflows|\.squad\/templates\/workflows)\/.*\.ya?ml$/.test(
-        file,
-      ),
+      /^\.github\/workflows\/.*\.ya?ml$/.test(file),
   );
   assert.deepEqual(
     executable.filter((file) => !entries.includes(file)),
@@ -890,7 +1013,9 @@ test("CoverageGate_LeavesFakeCdpPerformanceDiagnosticUnmeasured", async () => {
   const reportPath = "local-performance/cobertura-coverage.xml";
   assert.ok(!website.sources.includes(sourcePath));
   assert.ok(!website.reports.includes(reportPath));
-  const diagnostic = website.unmeasured.find((item) => item.path === sourcePath);
+  const diagnostic = website.unmeasured.find(
+    (item) => item.path === sourcePath,
+  );
   assert.ok(diagnostic);
   assert.match(diagnostic.reason, /fake CDP tests/);
   assert.match(diagnostic.reason, /browser-side logic/);
@@ -910,7 +1035,9 @@ test("CoverageGate_LeavesFakeCdpPerformanceDiagnosticUnmeasured", async () => {
   const result = evaluateCoverage(inventory([website]), reports);
   assert.equal(result.passed, false);
   assert.ok(
-    result.errors.some((error) => error.includes(`unmeasured source: ${sourcePath}`)),
+    result.errors.some((error) =>
+      error.includes(`unmeasured source: ${sourcePath}`),
+    ),
   );
   const measuredAggregate = result.aggregate;
 
@@ -951,10 +1078,12 @@ test("CoverageGate_DeduplicatesIdenticalLinkedSourceAcrossExpectedAssemblies", (
     lines: [{ number: 21, hits: 1, branch: { covered: 10, valid: 10 } }],
   };
   const report = compiledSourceReport(
-    ["Admin", "Finance", "Tech"].map((name) => ({
-      name,
-      classes: hostClasses,
-    })).concat([{ name: "Gateway", classes: [gatewayClass] }]),
+    ["Admin", "Finance", "Tech"]
+      .map((name) => ({
+        name,
+        classes: hostClasses,
+      }))
+      .concat([{ name: "Gateway", classes: [gatewayClass] }]),
   );
   const result = evaluateCoverage(
     inventory([
@@ -1329,7 +1458,10 @@ test("CoverageGate_CLIReportsUsageAndWritesFailClosedSummary", async () => {
 test("CoverageGate_RequiredPrValidationRunsCoverageTestsUnconditionally", async () => {
   const workflow = (
     await readFile(
-      new URL("../../.github/workflows/required-pr-validation.yml", import.meta.url),
+      new URL(
+        "../../.github/workflows/required-pr-validation.yml",
+        import.meta.url,
+      ),
       "utf8",
     )
   ).replace(/\r\n/g, "\n");
@@ -1343,7 +1475,7 @@ test("CoverageGate_RequiredPrValidationRunsCoverageTestsUnconditionally", async 
   const setupNode = findStep("Set up Node.js");
   const installNpm = findStep("Install verified npm");
   const installDeps = findStep("Install website dependencies");
-  const runCoverageTests = findStep("Test coverage gate and Squad templates");
+  const runCoverageTests = findStep("Test coverage gate");
 
   assert.doesNotMatch(steps[0], /^\s+if:/m);
   assert.ok(setupNode.index < installNpm.index);
