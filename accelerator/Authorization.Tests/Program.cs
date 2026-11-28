@@ -43,6 +43,10 @@ foreach (var role in roles)
     await Check(policy, new ClaimsPrincipal(Identity(false, role)), false, $"{role}: unauthenticated role");
     await Check(policy, new ClaimsPrincipal(new[] { Identity(true), Identity(false, role) }), false,
         $"{role}: role on a different unauthenticated identity");
+    await Check(policy, new ClaimsPrincipal(new[] { Identity(true), Identity(true, role) }), false,
+        $"{role}: role on a different authenticated identity");
+    await Check(policy, new ClaimsPrincipal(new[] { Identity(true, role), Identity(true) }), false,
+        $"{role}: matching role with another authenticated identity");
     await Check(policy, new ClaimsPrincipal(Identity(true, role.ToUpperInvariant())), false,
         $"{role}: differently cased role");
     await Check(policy, new ClaimsPrincipal(new ClaimsIdentity(

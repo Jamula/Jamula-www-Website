@@ -27,8 +27,10 @@ public static class CustomerPolicies
 
     private static void RequireRole(AuthorizationPolicyBuilder policy, string role)
     {
-        policy.RequireAssertion(context => context.User.Identities.Any(identity =>
-            identity.IsAuthenticated &&
-            identity.HasClaim(identity.RoleClaimType, role)));
+        policy.RequireAssertion(context =>
+        {
+            var identities = context.User.Identities.Where(identity => identity.IsAuthenticated).Take(2).ToArray();
+            return identities.Length == 1 && identities[0].HasClaim(identities[0].RoleClaimType, role);
+        });
     }
 }

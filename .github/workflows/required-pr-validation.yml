@@ -192,3 +192,4 @@ jobs:
           node --test scripts/mbr/tests/ui.test.mjs
           dotnet run --project scripts/mcp/tests/JamulaMcp.Tests.csproj --configuration Release
           dotnet run --project accelerator/Authorization.Tests/JamulaAccelerator.Authorization.Tests.csproj --configuration Release
+          dotnet run --project accelerator/Telemetry.Tests/JamulaAccelerator.Telemetry.Tests.csproj --configuration Release
