@@ -76,6 +76,10 @@ flowchart TB
   - [`scripts/monitor/`](scripts/monitor/) — zero-dependency `.NET 11` scheduled
     apex DNS A-record, HTTP-to-HTTPS same-host upgrade, HTTPS 200 content,
     canonical link, and Jamula custom 404 drift monitor (`JamulaMonitor`).
+    Scheduled failures open one GitHub issue with the failing run link; further
+    failures reuse it until an operator verifies recovery and closes it. Alert
+    delivery requires Actions permission to create issues and repository
+    notification subscriptions; a failed alert job must itself be investigated.
   - [`scripts/mbr/`](scripts/mbr/) — local loopback `.NET 11` Monthly Business
     Review dashboard (`JamulaMbr`).
   - [`scripts/mcp/`](scripts/mcp/) — `.NET 11` caller-brings-LLM read-only Model

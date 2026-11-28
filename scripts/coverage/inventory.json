@@ -75,6 +75,7 @@
         ".github/scripts/production-deployment.cjs",
         ".github/scripts/release.cjs",
         ".github/scripts/swa-preview.cjs",
+        ".github/scripts/uptime-alert.cjs",
         ".github/scripts/verify-preview.cjs",
         ".github/scripts/verify-swa-csp.cjs"
       ],
@@ -82,6 +83,7 @@
         ".github/scripts/production-deployment.cjs": "automation/cobertura-coverage.xml",
         ".github/scripts/release.cjs": "automation/cobertura-coverage.xml",
         ".github/scripts/swa-preview.cjs": "automation/cobertura-coverage.xml",
+        ".github/scripts/uptime-alert.cjs": "automation/cobertura-coverage.xml",
         ".github/scripts/verify-preview.cjs": "automation/cobertura-coverage.xml",
         ".github/scripts/verify-swa-csp.cjs": "automation/cobertura-coverage.xml"
       },
@@ -189,6 +191,10 @@
     },
     {
       "path": ".github/scripts/swa-preview.test.cjs",
+      "reason": "Test-only source; its assertions are not product behavior."
+    },
+    {
+      "path": ".github/scripts/uptime-alert.test.cjs",
       "reason": "Test-only source; its assertions are not product behavior."
     },
     {
