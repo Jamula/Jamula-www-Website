@@ -8,6 +8,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "playwright";
 
 export const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
+export const COLOR_SCHEMES = ["light", "dark"];
 export const MAX_CLS = 0.1;
 export const REQUIRED_ROUTES = ["/", "/privacy/", "/tech/", "/404.html"];
 export const VIEWPORTS = [
@@ -213,6 +214,18 @@ function assertLandmarksStable(route, viewportName, before, after) {
   }
 }
 
+async function auditColorSchemes(page, createAxeBuilder, viewportName, route, stateLabel) {
+  for (const colorScheme of COLOR_SCHEMES) {
+    await page.emulateMedia({ colorScheme });
+    const axe = await createAxeBuilder(page).withTags(WCAG_TAGS).analyze();
+    if (axe.violations.length > 0) {
+      throw new Error(
+        `${viewportName} ${route} (${colorScheme}, ${stateLabel}) WCAG 2.2 AA violations: ${JSON.stringify(axe.violations)}`
+      );
+    }
+  }
+}
+
 export async function runVerification({
   distRoot = path.resolve("dist"),
   requireNetworkNone = false,
@@ -234,38 +247,51 @@ export async function runVerification({
   try {
     browser = await launchBrowser();
     for (const viewport of VIEWPORTS) {
-      const context = await browser.newContext({
-        viewport: { width: viewport.width, height: viewport.height },
-        isMobile: viewport.isMobile,
-        hasTouch: viewport.hasTouch,
-        deviceScaleFactor: viewport.deviceScaleFactor,
-        colorScheme: "light",
-      });
-      context.on("request", (request) => {
-        const url = request.url();
-        if (!url.startsWith(`${server.origin}/`)) {
-          externalRequests.push(url);
-        }
-      });
-      await context.addInitScript(installClsObserver);
+      for (const route of routes) {
+        const context = await browser.newContext({
+          viewport: { width: viewport.width, height: viewport.height },
+          isMobile: viewport.isMobile,
+          hasTouch: viewport.hasTouch,
+          deviceScaleFactor: viewport.deviceScaleFactor,
+          colorScheme: "light",
+        });
+        try {
+          context.on("request", (request) => {
+            const url = request.url();
+            if (!url.startsWith(`${server.origin}/`)) {
+              externalRequests.push(url);
+            }
+          });
+          await context.addInitScript(installClsObserver);
 
-      try {
-        for (const route of routes) {
           const page = await context.newPage();
           try {
             await page.emulateMedia({ colorScheme: "light" });
             await page.goto(`${server.origin}${route}`, { waitUntil: "load" });
-            const lightAxe = await createAxeBuilder(page).withTags(WCAG_TAGS).analyze();
-            if (lightAxe.violations.length > 0) {
+
+            const consentPanel = page.locator("#analytics-consent");
+            const rejectButton = page.locator("#analytics-reject");
+            if (!(await consentPanel.isVisible()) || !(await rejectButton.isVisible())) {
               throw new Error(
-                `${viewport.name} ${route} (light) WCAG 2.2 AA violations: ${JSON.stringify(lightAxe.violations)}`
+                `${viewport.name} ${route}: expected #analytics-consent and #analytics-reject to be visible before dismissal.`
               );
             }
 
+            await auditColorSchemes(
+              page,
+              createAxeBuilder,
+              viewport.name,
+              route,
+              "consent-visible"
+            );
+
+            await page.emulateMedia({ colorScheme: "light" });
             const before = await page.evaluate(readClsAndLandmarks);
-            const rejectButton = page.locator("#analytics-reject");
-            if (await rejectButton.isVisible()) {
-              await rejectButton.click();
+            await rejectButton.click();
+            if (await consentPanel.isVisible()) {
+              throw new Error(
+                `${viewport.name} ${route}: expected #analytics-consent to be hidden after dismissal.`
+              );
             }
             const after = await page.evaluate(readClsAndLandmarks);
 
@@ -276,13 +302,13 @@ export async function runVerification({
               );
             }
 
-            await page.emulateMedia({ colorScheme: "dark" });
-            const darkAxe = await createAxeBuilder(page).withTags(WCAG_TAGS).analyze();
-            if (darkAxe.violations.length > 0) {
-              throw new Error(
-                `${viewport.name} ${route} (dark) WCAG 2.2 AA violations: ${JSON.stringify(darkAxe.violations)}`
-              );
-            }
+            await auditColorSchemes(
+              page,
+              createAxeBuilder,
+              viewport.name,
+              route,
+              "consent-dismissed"
+            );
 
             results.push({
               viewport: viewport.name,
@@ -294,9 +320,9 @@ export async function runVerification({
           } finally {
             await page.close();
           }
+        } finally {
+          await context.close();
         }
-      } finally {
-        await context.close();
       }
     }
 

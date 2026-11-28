@@ -64,7 +64,7 @@ static class MonitorCli
         Func<ProcessStartInfo, Process?> startProcess,
         TextWriter errorOutput)
     {
-        string projectPath = Path.GetFullPath(Path.Combine(
+        string projectPath = Path.GetFullPath(Path.Join(
             AppContext.BaseDirectory, "..", "..", "..", "tests", "JamulaMonitor.Tests.csproj"));
         var startInfo = new ProcessStartInfo("dotnet")
         {

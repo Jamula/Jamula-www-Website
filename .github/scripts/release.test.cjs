@@ -642,7 +642,7 @@ test("release wiring preserves isolation, serialization and publication ordering
   assert.match(attest, /uses: actions\/attest-build-provenance@/);
   assert.match(
     attest,
-    /subject-digest: \$\{\{ needs\.build\.outputs\.artifact_digest \}\}/,
+    /subject-digest: sha256:\$\{\{ needs\.build\.outputs\.artifact_digest \}\}/,
   );
   assert.doesNotMatch(attest, /secrets\.|environment:/);
   assert.match(publish, /needs: \[prepare, build, deploy, deploy-com\]/);

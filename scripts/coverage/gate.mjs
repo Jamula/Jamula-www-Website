@@ -30,17 +30,33 @@ const ALLOWED_ASTRO_SCRIPTS = [
   '<script type="application/ld+json" set:html={structuredDataJson} />',
 ];
 
+function hasAsciiPrefixIgnoreCase(value, prefix, startIndex) {
+  if (startIndex + prefix.length > value.length) return false;
+  for (let offset = 0; offset < prefix.length; offset++) {
+    let code = value.charCodeAt(startIndex + offset);
+    if (code >= 65 && code <= 90) code += 32;
+    if (code !== prefix.charCodeAt(offset)) return false;
+  }
+  return true;
+}
+
 function isValidAstroTemplateContent(content) {
   if (typeof content !== "string" || content.trim().length === 0) return false;
   const normalized = content.replaceAll("\r\n", "\n");
-  const lower = normalized.toLowerCase();
   let index = 0;
-  while ((index = lower.indexOf("<script", index)) !== -1) {
-    const matched = ALLOWED_ASTRO_SCRIPTS.find((allowed) =>
-      normalized.startsWith(allowed, index),
-    );
-    if (!matched) return false;
-    index += matched.length;
+  while ((index = normalized.indexOf("<", index)) !== -1) {
+    if (hasAsciiPrefixIgnoreCase(normalized, "<script", index)) {
+      const matched = ALLOWED_ASTRO_SCRIPTS.find((allowed) =>
+        normalized.startsWith(allowed, index),
+      );
+      if (!matched) return false;
+      index += matched.length;
+      continue;
+    }
+    if (hasAsciiPrefixIgnoreCase(normalized, "</script", index)) {
+      return false;
+    }
+    index += 1;
   }
   return true;
 }

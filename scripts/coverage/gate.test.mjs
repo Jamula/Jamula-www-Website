@@ -711,12 +711,35 @@ test("CoverageGate_ValidatesDeclarativeAstroAndWorkflowSourcesAndRejectsMutation
     manifest,
     repositoryRoot,
   );
+  for (const validAstro of [
+    '<div>\u0130</div>\n<script is:inline type="module" src="/analytics-consent.js"></script><',
+  ]) {
+    const mutated = new Map(sourceContents);
+    mutated.set("www/src/pages/index.astro", validAstro);
+    const result = evaluateCoverage(
+      inventory([website]),
+      new Map(),
+      repositoryRoot,
+      mutated,
+    );
+    assert.ok(
+      result.components[0].validatedDeclarative.some(
+        (entry) =>
+          entry.path === "www/src/pages/index.astro" && entry.validated,
+      ),
+      validAstro,
+    );
+  }
   for (const invalidAstro of [
     undefined,
     "",
     "<div>ok</div><script>window.__inline = 1;</script>",
     "<div>ok</div><script>window.__inline = 1;</script >",
     "<div>ok</div><script is:inline>alert(1)</script>",
+    '<SCRIPT is:inline type="module" src="/analytics-consent.js"></SCRIPT>',
+    `${"\u0130".repeat(23)}<script>window.__inline = 1;</script><script is:inline type="module" src="/analytics-consent.js"></script>`,
+    '<script type="application/ld+json" set:html={structuredDataJson} />window.__inline = 1;</script >',
+    "<div>ok</div></SCRIPT >",
     '<script set:html={"window.x=1"} />',
     '<script src="https://cdn.example/remote.js"></script>',
     "<script src='/analytics-consent.js'>inline()</script>",

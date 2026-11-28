@@ -33,21 +33,30 @@ function fetchLocal(url) {
   });
 }
 
+function pageHtml(title) {
+  return [
+    "<!doctype html>",
+    `<html lang="en"><head><title>${title}</title></head><body>`,
+    "<header>Header</header>",
+    '<main id="main-content">Main</main>',
+    "<footer>",
+    '<section id="analytics-consent" hidden>',
+    '<button id="analytics-reject" type="button">Reject analytics</button>',
+    "</section>",
+    "</footer>",
+    "</body></html>",
+  ].join("");
+}
+
 async function createFakeDist() {
   const root = await mkdtemp(path.join(tmpdir(), "jamula-wcag-dist-"));
   await mkdir(path.join(root, "privacy"), { recursive: true });
   await mkdir(path.join(root, "tech", "note"), { recursive: true });
-  await writeFile(path.join(root, "index.html"), "<!doctype html><title>Home</title>");
-  await writeFile(
-    path.join(root, "privacy", "index.html"),
-    "<!doctype html><title>Privacy</title>"
-  );
-  await writeFile(path.join(root, "tech", "index.html"), "<!doctype html><title>Tech</title>");
-  await writeFile(
-    path.join(root, "tech", "note", "index.html"),
-    "<!doctype html><title>Note</title>"
-  );
-  await writeFile(path.join(root, "404.html"), "<!doctype html><title>404</title>");
+  await writeFile(path.join(root, "index.html"), pageHtml("Home"));
+  await writeFile(path.join(root, "privacy", "index.html"), pageHtml("Privacy"));
+  await writeFile(path.join(root, "tech", "index.html"), pageHtml("Tech"));
+  await writeFile(path.join(root, "tech", "note", "index.html"), pageHtml("Note"));
+  await writeFile(path.join(root, "404.html"), pageHtml("404"));
   await writeFile(path.join(root, "style.css"), "html { scrollbar-gutter: stable; }");
   await writeFile(path.join(root, "asset.bin"), "binary");
   return root;
@@ -196,11 +205,12 @@ test("discoverRoutes and startDistServer serve static routes and block path trav
 });
 
 function createFakePlaywright({
-  lightViolations = [],
-  darkViolations = [],
+  violationsFor = () => [],
   beforeEval,
   afterEval,
-  rejectVisible = true,
+  consentVisibleOnLoad,
+  rejectVisibleOnLoad,
+  hideConsentOnReject = true,
   emitExternalRequest = false,
 } = {}) {
   const defaultSnapshot = {
@@ -212,12 +222,17 @@ function createFakePlaywright({
       footer: { x: 16, width: 960 },
     },
   };
+  let contextsCreated = 0;
+  let contextsClosed = 0;
   let clickedReject = 0;
+  const audits = [];
 
   const launchBrowser = async () => ({
-    async newContext() {
+    async newContext(contextOptions) {
+      contextsCreated++;
       const requestListeners = [];
-      let currentScheme = "light";
+      const localStorage = new Map();
+      let currentScheme = contextOptions.colorScheme ?? "light";
       return {
         on(event, handler) {
           if (event === "request") requestListeners.push(handler);
@@ -225,25 +240,50 @@ function createFakePlaywright({
         async addInitScript() {},
         async newPage() {
           let evalCount = 0;
+          let currentRoute = "";
+          let panelVisible = false;
+          let rejectVisible = false;
           return {
             async emulateMedia({ colorScheme }) {
               currentScheme = colorScheme;
             },
             async goto(url) {
+              currentRoute = new URL(url).pathname;
               for (const handler of requestListeners) {
                 handler({ url: () => url });
                 if (emitExternalRequest) {
                   handler({ url: () => "https://evil.example/Font.woff2" });
                 }
               }
+              const response = await fetchLocal(url);
+              const unsettledInContext = !localStorage.has("jamula.analytics-consent");
+              panelVisible =
+                consentVisibleOnLoad ??
+                (unsettledInContext && response.body.includes('id="analytics-consent"'));
+              rejectVisible =
+                rejectVisibleOnLoad ??
+                (panelVisible && response.body.includes('id="analytics-reject"'));
             },
-            locator() {
-              return {
-                isVisible: async () => rejectVisible,
-                click: async () => {
-                  clickedReject++;
-                },
-              };
+            locator(selector) {
+              if (selector === "#analytics-consent") {
+                return {
+                  isVisible: async () => panelVisible,
+                };
+              }
+              if (selector === "#analytics-reject") {
+                return {
+                  isVisible: async () => panelVisible && rejectVisible,
+                  click: async () => {
+                    assert.equal(panelVisible && rejectVisible, true);
+                    clickedReject++;
+                    localStorage.set("jamula.analytics-consent", "rejected");
+                    if (hideConsentOnReject) {
+                      panelVisible = false;
+                    }
+                  },
+                };
+              }
+              throw new Error(`Unexpected locator selector: ${selector}`);
             },
             async evaluate() {
               evalCount++;
@@ -253,9 +293,14 @@ function createFakePlaywright({
             },
             async close() {},
             currentScheme: () => currentScheme,
+            currentRoute: () => currentRoute,
+            currentViewportWidth: () => contextOptions.viewport.width,
+            isPanelVisible: () => panelVisible,
           };
         },
-        async close() {},
+        async close() {
+          contextsClosed++;
+        },
       };
     },
     async close() {},
@@ -265,17 +310,33 @@ function createFakePlaywright({
     withTags(tags) {
       assert.ok(tags.includes("wcag22aa"));
       return {
-        analyze: async () => ({
-          violations: page.currentScheme() === "dark" ? darkViolations : lightViolations,
-        }),
+        analyze: async () => {
+          const audit = {
+            viewportWidth: page.currentViewportWidth(),
+            route: page.currentRoute(),
+            colorScheme: page.currentScheme(),
+            panelVisible: page.isPanelVisible(),
+          };
+          audits.push(audit);
+          return {
+            violations: violationsFor(audit),
+          };
+        },
       };
     },
   });
 
-  return { launchBrowser, createAxeBuilder, getClickedReject: () => clickedReject };
+  return {
+    launchBrowser,
+    createAxeBuilder,
+    getContextsCreated: () => contextsCreated,
+    getContextsClosed: () => contextsClosed,
+    getClickedReject: () => clickedReject,
+    getAudits: () => audits,
+  };
 }
 
-test("runVerification passes clean WCAG/CLS/landmarks and rejects violations, shifts, and external egress", async () => {
+test("runVerification audits both themes before and after consent dismissal in fresh per-route contexts", async () => {
   const dist = await createFakeDist();
   try {
     const logs = [];
@@ -299,28 +360,73 @@ test("runVerification passes clean WCAG/CLS/landmarks and rejects violations, sh
     });
     assert.equal(summary.checks, 10);
     assert.equal(summary.externalRequests, 0);
-    assert.ok(clean.getClickedReject() > 0);
+    assert.equal(clean.getContextsCreated(), 10);
+    assert.equal(clean.getContextsClosed(), 10);
+    assert.equal(clean.getClickedReject(), 10);
     assert.equal(logs.length, 1);
 
-    const hiddenConsent = createFakePlaywright({ rejectVisible: false });
-    await runVerification({
-      distRoot: dist,
-      launchBrowser: hiddenConsent.launchBrowser,
-      createAxeBuilder: hiddenConsent.createAxeBuilder,
-      log: () => {},
-    });
-    assert.equal(hiddenConsent.getClickedReject(), 0);
+    const audits = clean.getAudits();
+    assert.equal(audits.length, 40);
+    for (let index = 0; index < audits.length; index += 4) {
+      const routeAudits = audits.slice(index, index + 4);
+      assert.deepEqual(
+        routeAudits.map(({ colorScheme, panelVisible }) => ({ colorScheme, panelVisible })),
+        [
+          { colorScheme: "light", panelVisible: true },
+          { colorScheme: "dark", panelVisible: true },
+          { colorScheme: "light", panelVisible: false },
+          { colorScheme: "dark", panelVisible: false },
+        ]
+      );
+    }
 
     for (const [scenario, options, expectedPattern] of [
       [
-        "light WCAG failure",
-        { lightViolations: [{ id: "color-contrast" }] },
-        /light.*WCAG 2\.2 AA violations/,
+        "hidden consent panel before dismissal",
+        { consentVisibleOnLoad: false },
+        /expected #analytics-consent and #analytics-reject to be visible before dismissal/,
       ],
       [
-        "dark WCAG failure",
-        { darkViolations: [{ id: "link-name" }] },
-        /dark.*WCAG 2\.2 AA violations/,
+        "hidden reject button before dismissal",
+        { rejectVisibleOnLoad: false },
+        /expected #analytics-consent and #analytics-reject to be visible before dismissal/,
+      ],
+      [
+        "consent panel still visible after dismissal",
+        { hideConsentOnReject: false },
+        /expected #analytics-consent to be hidden after dismissal/,
+      ],
+      [
+        "light WCAG failure while consent panel is visible",
+        {
+          violationsFor: ({ colorScheme, panelVisible }) =>
+            colorScheme === "light" && panelVisible ? [{ id: "color-contrast" }] : [],
+        },
+        /\(light, consent-visible\) WCAG 2\.2 AA violations/,
+      ],
+      [
+        "dark WCAG failure while consent panel is visible",
+        {
+          violationsFor: ({ colorScheme, panelVisible }) =>
+            colorScheme === "dark" && panelVisible ? [{ id: "color-contrast" }] : [],
+        },
+        /\(dark, consent-visible\) WCAG 2\.2 AA violations/,
+      ],
+      [
+        "light WCAG failure after consent dismissal",
+        {
+          violationsFor: ({ colorScheme, panelVisible }) =>
+            colorScheme === "light" && !panelVisible ? [{ id: "aria-valid-attr-value" }] : [],
+        },
+        /\(light, consent-dismissed\) WCAG 2\.2 AA violations/,
+      ],
+      [
+        "dark WCAG failure after consent dismissal",
+        {
+          violationsFor: ({ colorScheme, panelVisible }) =>
+            colorScheme === "dark" && !panelVisible ? [{ id: "link-name" }] : [],
+        },
+        /\(dark, consent-dismissed\) WCAG 2\.2 AA violations/,
       ],
       [
         "CLS budget exceeded",
