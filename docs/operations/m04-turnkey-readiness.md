@@ -37,7 +37,8 @@ is not a passed gate.
   says account data-center assignment depends on signup geolocation and that
   free accounts must upgrade to change location; some processing can occur
   outside the assigned location. Its [export guide](https://knowledge.hubspot.com/account-management/export-your-content-and-data)
-  lists multiple data types but warns that not all account data can be merged.
+  lists multiple data types and says there is no way to merge all data between
+  HubSpot accounts; complete export is a separate, unverified question.
   [Permanent contact deletion](https://knowledge.hubspot.com/privacy-and-consent/how-do-i-perform-a-gdpr-delete-in-hubspot)
   is individual, may take up to 30 days to purge, and can leave other data
   requiring separate handling. The [cancellation guide](https://knowledge.hubspot.com/account/how-do-i-cancel-my-hubspot-account)
@@ -63,10 +64,13 @@ is not a passed gate.
   says new workspaces start with a 14-day Pro trial, Free data is visible and
   editable by all workspace users, and automatic enrichment is included. The
   [services agreement](https://attio.com/legal/services-agreement) permits
-  internal business use and describes renewal notice requirements. Attio's
+  internal business use subject to its reasonable-use terms and describes
+  renewal notice requirements. Attio's
   [September 2026 DPA](https://attio.com/legal/attio-data-processing-addendum)
   provides 30 days of post-termination export and deletion on request within
   30 days if it still holds the customer personal data, subject to its terms.
+  This deletion term covers customer personal data; the DPA treats account
+  data and certain operational data separately under Attio's controller role.
   The [workspace export](https://attio.com/help/reference/imports-exports/back-up-your-workspace-data)
   excludes emails; meetings require an API export. Demonstrate complete
   required communication-history export, compatible least-privilege controls,
@@ -81,9 +85,15 @@ is not a passed gate.
   Jamula's existing entitlement or incremental cost. The
   [Teams Bookings admin guide](https://learn.microsoft.com/en-us/microsoftteams/bookings-app-admin)
   requires Exchange Online and appropriate Teams meeting licenses for staff;
-  it also says SMS notifications are on by default for the described feature.
+  it also says SMS notifications are a Teams Premium feature, available in the
+  US, UK and Canada, with the described setting on by default.
   Microsoft publishes a [November 2026 DPA](https://www.microsoft.com/licensing/docs/view/Microsoft-Products-and-Services-Data-Protection-Addendum-DPA),
-  but the applicable tenant agreement and geography are unverified. The
+  but the applicable tenant agreement and geography are unverified. Except for
+  free trials and LinkedIn services, its termination provision describes
+  retaining remaining online-service customer data in a limited-function
+  account for 90 days, then disabling the account and deleting customer and
+  personal data within a further 90 days, unless the DPA authorizes retention.
+  This is not a subject-deletion SLA. The
   [Shared Bookings report](https://learn.microsoft.com/en-us/microsoft-365/bookings/reporting-info)
   exports four-month TSV views, not proof of a complete exit export.
   [Deleting a shared page](https://learn.microsoft.com/en-us/microsoft-365/bookings/delete-calendar)
@@ -105,12 +115,13 @@ is not a passed gate.
   a booking does not notify attendees. Verify complete structured export,
   account closure, actual regions, recording defaults, and target compatibility.
 
-Zoho's account-termination schedule and Cal.com's post-termination schedule
-are materially longer than the ordinary-processor **30-day proposed target**
-in [data lifecycle](../privacy/data-lifecycle.md#retention-and-deletion).
-They do not by themselves establish the individual-request SLA or legal
-noncompliance. Obtain provider-specific evidence and a qualified counsel
-disposition; do not silently waive the target or characterize either as passed.
+Microsoft's, Zoho's, and Cal.com's account-termination schedules, and Zoho's
+ordinary deleted-record behavior, can exceed the ordinary-processor **30-day
+proposed target** in [data lifecycle](../privacy/data-lifecycle.md#retention-and-deletion).
+They do not by themselves establish the individual-request SLA, applicable
+tenant terms, or legal noncompliance. Obtain provider-specific evidence and a
+qualified counsel disposition; do not silently waive the target or
+characterize any candidate as passed.
 
 ## Proposed CRM and scheduling operating procedure
 
@@ -122,14 +133,18 @@ disposition; do not silently waive the target or characterize either as passed.
 2. With separately authorized disposable resources and synthetic data, verify
    least-privilege seats and administrator MFA, purpose versus channel consent,
    suppression and withdrawal, contact/deal/activity and consent export,
-   booking/calendar conflict behavior, subject deletion and backup behavior,
-   outage and rollback. Record actual observed results and unresolved gaps;
-   never infer success from a vendor page. No real customer data or live
-   connections are authorized by this document.
+   booking/calendar conflict behavior, subject deletion and provider-exposed
+   restore/recycle behavior, outage and rollback. Test Jamula-controlled backup
+   restores separately; vendor-held backup evidence must come from the provider.
+   Record actual observed results and unresolved gaps; never infer success from
+   a vendor page. No real customer data or live connections are authorized by
+   this document.
 3. Before any booking page is made available, verify recording and transcription
-   are off by default, review SMS and AI/enrichment settings, and test keyboard,
-   screen-reader, zoom/reflow, time-zone, and accessible equivalent fallback.
-   Collect only the approved minimum; CRM presence is not marketing consent.
+   are off by default; review SMS, AI/enrichment, and calendar, CRM and payment
+   integrations, leaving unapproved features and connections disabled. Test
+   keyboard, screen-reader, zoom/reflow, time-zone, and accessible equivalent
+   fallback. Collect only the approved minimum; CRM presence is not marketing
+   consent.
 4. #186 proposes `hello@jamula.net`, but the
    [approved current inquiry path](../content/public-claims-register.md) is
    `spam@jamula.net` with plain-text fallback. `hello@jamula.net` existence and
@@ -155,12 +170,20 @@ close an existing account or delete data now.
    destination. Record omissions and keep the gate blocked if required data
    cannot be exported; do not treat Attio's workspace CSV or Bookings' TSV as
    complete merely because it downloaded.
-3. For an individual request, identify and remove or restrict only the
-   applicable person's records in every approved system, including connected
-   calendars, CRM copies, exports, and processors. Track exceptions, retries,
-   backup expiry, and provider confirmation; preserve only authorized
-   suppression, financial/audit records, or counsel-approved holds. Confirm
-   that a restored backup cannot reintroduce deleted data. A provider's
+3. For an individual request, identify the applicable person's records in
+   every approved system, including connected calendars, CRM copies, exports,
+   processors, and ancillary content. Where deletion is authorized and no
+   applicable hold prevents it, use the provider's permanent-delete or purge
+   path, including that person's restorable/recycle records where supported;
+   never empty a shared recycle bin wholesale. Search for residuals, record
+   purge windows, and obtain provider confirmation. Restriction, an inaccessible
+   soft-deleted copy, or an unconfirmed purge is not completed deletion.
+   Preserve only authorized suppression, financial/audit records, or
+   counsel-approved holds, and track exceptions and retries. Remove eligible
+   data from Jamula-controlled exports. For Jamula-controlled backups, test
+   isolated restore and tombstone replay so deleted data cannot return to
+   service. For vendor-held backups, record the applicable expiry and request
+   written provider evidence; keep missing evidence open and escalate it. An
    account-termination schedule is not an individual-request SLA.
 4. For full exit, reconcile the final export and outstanding bookings, cancel
    future appointments with appropriate notice, revoke authorized integrations,
@@ -217,8 +240,10 @@ brand or qualified QSA/ISA, and broker reviews required by the
 [professional gates](../legal/phase-review-gates.md). Before accepting value,
 also obtain CPA review and Cyrus's provider, accounting, roles, terms, spending,
 and exact-version approvals. A hosted flow is not proof of PCI exemption.
-Assign an operator and independent reviewer/backup, and define restricted
-storage, exception ownership, and a response deadline before the runbook is used.
+Assign an operator, a reviewer independent of the reconciler, and backup
+coverage; define restricted storage, exception ownership, and a response
+deadline before the runbook is used. If independent review is unavailable,
+escalate rather than claiming sign-off.
 
 1. On each business day, the operator obtains the approved processor activity
    and accounting records for the same account, mode, currency, and defined
@@ -235,11 +260,15 @@ storage, exception ownership, and a response deadline before the runbook is used
    [payout reconciliation report](https://docs.stripe.com/reports/payout-reconciliation)
    and itemized rows grouped by `automatic_payout_id`. Its reporting window
    is based on when the payout affects Stripe's balance, not bank arrival.
-   Sum the included signed net amounts, compare them to the payout, then
-   match the payout to a bank deposit using available references, account,
-   currency, amount, and timing. If a bank statement lacks a payout ID, require
-   enough independent evidence to establish a unique match; never match solely
-   on amount or date.
+   In an authorized test, establish the report version, time zone, and exactly
+   which itemized rows contribute to its payout total; keep this unverified
+   until tested. Sum the included signed net amounts, compare them to the
+   payout, then match the payout to a bank deposit using available references,
+   account, currency, amount, and timing. Review failed/returned payouts and
+   ending balances separately and count reversals once; do not mark a failed
+   payout as settled. If a bank statement lacks a payout ID, require enough
+   independent evidence to establish a unique match; never match solely on
+   amount or date.
 4. For manual or instant payouts, Stripe cannot automatically attribute each
    payout to transactions. Use the [balance summary report](https://docs.stripe.com/reports/balance)
    to reconcile the whole balance: opening balance plus signed non-payout
