@@ -20,8 +20,7 @@ jobs:
   check:
     name: Apex DNS and approved hostname health
     runs-on: ubuntu-latest
-    # .NET 11 STS; install the SDK from global.json.
-    # All dotnet steps run from scripts/monitor/ so global.json is on the discovery path.
+    # .NET 11 STS; install the SDK from root global.json.
     timeout-minutes: 5
     steps:
       - name: Check out repository
@@ -32,7 +31,7 @@ jobs:
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
-          global-json-file: scripts/monitor/global.json
+          global-json-file: global.json
 
       - name: Verify .NET SDK
         working-directory: scripts/monitor
@@ -81,7 +80,11 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const { escalate } = require("./.github/scripts/uptime-alert.cjs");
+            const path = require("node:path");
+            const { pathToFileURL } = require("node:url");
+            const { escalate } = await import(
+              pathToFileURL(path.resolve(".github/scripts/uptime-alert.mjs")).href,
+            );
             const url = `${process.env.GITHUB_SERVER_URL}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const result = await escalate(github, context.repo, url);
             await core.summary.addRaw(`Monitor alert: ${result.html_url}`).write();

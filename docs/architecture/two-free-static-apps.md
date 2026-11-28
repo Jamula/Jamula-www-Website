@@ -159,7 +159,7 @@ new names. A workflow condition alone is not a credential boundary. This
 document records the required configuration, not the current secret state;
 verify repository settings before asserting migration completion.
 
-Validate the boundary with `node --test .github/scripts/swa-preview.test.cjs`
+Validate the boundary with `node --test .github/scripts/swa-preview.test.mjs`
 and `dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release`.
 
 Node.js live preview verification retries only timeouts, temporary DNS failures,
@@ -172,8 +172,10 @@ fail immediately. The missing-route probe accepts only the expected 404 body.
 Retries are read-only verification requests, never deployment uploads or workflow
 reruns. The exact selected-PR URL check still runs before any network verification;
 a production URL or wrong PR identity must never be treated as a readiness issue.
-Run `node --test .github/scripts/verify-preview.test.cjs` for the
-focused retry checks.
+Run `node --test .github/scripts/verify-preview.test.mjs` for the
+focused retry checks, and `node --test .github/scripts/release.test.mjs` for
+release selection and consolidated `production-deployment.mjs verify` checks across
+the `.net` and `.com` apps.
 
 These tests do not establish live deployment or cleanup behavior. For that,
 inspect successful Actions runs for the exact default-branch workflow revision

@@ -38,8 +38,8 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           website_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)www/')"
-          monitor_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)scripts/monitor/')"
-          dotnet_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)scripts/validation/' ':(top)scripts/validation.tests/' ':(top)scripts/validation.cli.tests/' ':(top)scripts/mbr/' ':(top)scripts/mcp/' ':(top)accelerator/' ':(top)www/src/content/tech/')"
+          monitor_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)scripts/monitor/' ':(top)global.json' ':(top)Directory.Build.props')"
+          dotnet_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)scripts/validation/' ':(top)scripts/validation.tests/' ':(top)scripts/validation.cli.tests/' ':(top)scripts/mbr/' ':(top)scripts/mcp/' ':(top)accelerator/' ':(top)www/src/content/tech/' ':(top)global.json' ':(top)Directory.Build.props' ':(top)Jamula.slnx')"
           if [[ -n "$website_files" ]]; then
             echo "website=true" >> "$GITHUB_OUTPUT"
             echo "Website validation required."

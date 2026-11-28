@@ -41,7 +41,10 @@ flowchart LR
   [Woven Plane design system](../DESIGN.md), build-time [`/tech/`](../www/src/pages/tech/index.astro)
   Astro Content Collections, and static [`/llms.txt`](../www/src/pages/llms.txt.ts) /
   [`/llms-full.txt`](../www/src/pages/llms-full.txt.ts) indexes, plus `.NET 11`
-  governance, monitoring, MBR, and read-only MCP tooling under `scripts/`; local
+  governance, monitoring, MBR, and read-only MCP tooling under `scripts/`
+  (pinned by root [`global.json`](../global.json), [`Directory.Build.props`](../Directory.Build.props),
+  and [`Jamula.slnx`](../Jamula.slnx)) and native ESM CI verifiers under
+  `.github/scripts/*.mjs`; local
   development and release commands are in the root [README](../README.md).
 - The production deployment workflow
   ([`.github/workflows/azure-static-web-apps.yml`](../.github/workflows/azure-static-web-apps.yml))

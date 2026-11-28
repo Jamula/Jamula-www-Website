@@ -1,11 +1,24 @@
-const assert = require("node:assert/strict");
-const { test } = require("node:test");
-const fs = require("node:fs");
-const path = require("node:path");
-const { spawnSync } = require("node:child_process");
-const { selectRelease, metadata, verifyMetadata } = require("./release.cjs");
-const { api, execute } = require("./production-deployment.cjs");
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import childProcess, { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import {
+  selectRelease,
+  metadata,
+  verifyMetadata,
+  runReleaseCli,
+} from "./release.mjs";
+import {
+  api,
+  execute,
+  verifyProductionSite,
+  PRODUCTION_URLS,
+} from "./production-deployment.mjs";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const sha = "a".repeat(40);
 const oldSha = "b".repeat(40);
 const tag = (version, revision = oldSha) => ({
@@ -169,7 +182,7 @@ test("selection detects changed release history including moved tags", () => {
   assert.notEqual(before.fingerprint, moved.fingerprint);
 });
 
-test("deployment records associate release and actual SHA with both app statuses", () => {
+test("deployment records associate release and actual SHA with both app statuses and finish helper", () => {
   for (const app of ["net", "com"])
     for (const change of ["material", "fix"]) {
       const calls = [];
@@ -193,12 +206,27 @@ test("deployment records associate release and actual SHA with both app statuses
         output += value;
       });
       execute(
-        "status",
-        ["42", "success", `https://${app}.example`],
-        env,
+        "finish",
+        [],
+        {
+          ...env,
+          DEPLOYMENT_ID: "42",
+          VERIFY_OUTCOME: "success",
+          DEPLOYED_URL: `https://${app}.example`,
+        },
         request,
       );
-      execute("status", ["42", "failure", ""], env, request);
+      execute(
+        "finish",
+        [],
+        {
+          ...env,
+          DEPLOYMENT_ID: "42",
+          VERIFY_OUTCOME: "failure",
+          DEPLOYED_URL: `https://${app}.example`,
+        },
+        request,
+      );
       assert.equal(output, "id=42\n");
       assert.equal(calls[0].endpoint, "repos/test/repo/deployments");
       assert.equal(calls[0].body.ref, sha);
@@ -413,39 +441,29 @@ test("deployment record stops on create, invalid ID, and output failures", () =>
   }
 });
 
-test("deployment record GitHub adapter posts JSON and propagates command failures", () => {
-  const script = `
-    const calls = [], output = [];
-    require("node:child_process").execFileSync = (command, args, options) => {
-      calls.push({ command, args, options });
-      if (calls.length === 3) throw new Error("gh failed");
-      return calls.length === 1 ? " 42\\n" : "\\n";
-    };
-    const { execute } = require(process.argv[1]);
-    const env = {
-      GITHUB_REPOSITORY: "test/repo",
-      GITHUB_SERVER_URL: "https://github.com",
-      DEPLOYMENT_SHA: "a".repeat(40),
-      RELEASE_VERSION: "0.1.0",
-      GITHUB_RUN_ID: "2",
-      RELEASE_ATTEMPT: "1",
-      CHANGE_TYPE: "fix",
-      DEPLOYMENT_APP: "net",
-      GITHUB_OUTPUT: "out",
-    };
-    execute("start", [], env, undefined, (file, value) => output.push([file, value]));
-    let error;
-    try { execute("status", ["42", "failure"], env); } catch (e) { error = e.message; }
-    process.stdout.write(JSON.stringify({ calls, output, error }));
-  `;
-  const result = spawnSync(
-    process.execPath,
-    ["-e", script, path.join(__dirname, "production-deployment.cjs")],
-    { encoding: "utf8" },
+test("deployment record GitHub adapter posts JSON and propagates command failures", (t) => {
+  const calls = [];
+  const output = [];
+  t.mock.method(childProcess, "execFileSync", (command, args, options) => {
+    calls.push({ command, args, options });
+    if (calls.length === 3) throw new Error("gh failed");
+    return calls.length === 1 ? " 42\n" : "\n";
+  });
+  const env = {
+    GITHUB_REPOSITORY: "test/repo",
+    GITHUB_SERVER_URL: "https://github.com",
+    DEPLOYMENT_SHA: sha,
+    RELEASE_VERSION: "0.1.0",
+    GITHUB_RUN_ID: "2",
+    RELEASE_ATTEMPT: "1",
+    CHANGE_TYPE: "fix",
+    DEPLOYMENT_APP: "net",
+    GITHUB_OUTPUT: "out",
+  };
+  execute("start", [], env, undefined, (file, value) =>
+    output.push([file, value]),
   );
-  assert.ifError(result.error);
-  assert.equal(result.status, 0, result.stderr);
-  const { calls, output, error } = JSON.parse(result.stdout);
+  assert.throws(() => execute("status", ["42", "failure"], env), /gh failed/);
   assert.deepEqual(output, [["out", "id=42\n"]]);
   assert.equal(calls.length, 3);
   assert.equal(calls[0].command, "gh");
@@ -490,18 +508,271 @@ test("deployment record GitHub adapter posts JSON and propagates command failure
   });
   assert.equal(calls[1].options.encoding, "utf8");
   assert.deepEqual(calls[1].options.stdio, ["pipe", "pipe", "inherit"]);
-  assert.equal(error, "gh failed");
 });
 
-test("deployment record CLI rejects unknown commands without contacting GitHub", () => {
-  const result = spawnSync(
+test("deployment record CLI rejects unknown commands and verify errors without contacting GitHub", () => {
+  const unknown = spawnSync(
     process.execPath,
-    [path.join(__dirname, "production-deployment.cjs"), "unknown"],
+    [path.join(__dirname, "production-deployment.mjs"), "unknown"],
     { encoding: "utf8" },
   );
-  assert.ifError(result.error);
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /Unknown deployment command/);
+  assert.ifError(unknown.error);
+  assert.equal(unknown.status, 1);
+  assert.match(unknown.stderr, /Unknown deployment command/);
+
+  const badVerify = spawnSync(
+    process.execPath,
+    [path.join(__dirname, "production-deployment.mjs"), "verify"],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        DEPLOYMENT_APP: "net",
+        DEPLOYED_URL: "https://evil.example",
+      },
+    },
+  );
+  assert.ifError(badVerify.error);
+  assert.equal(badVerify.status, 1);
+  assert.match(badVerify.stderr, /unexpected URL/);
+});
+
+test("verifyProductionSite enforces readiness, release metadata, headers, robots, and 404 contracts", async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "prod-verify-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const configSource = path.join(
+    __dirname,
+    "../../www/public/staticwebapp.config.json",
+  );
+  const configPath = path.join(directory, "staticwebapp.config.json");
+  const config = JSON.parse(fs.readFileSync(configSource, "utf8"));
+  fs.writeFileSync(configPath, JSON.stringify(config));
+
+  const validHeaders = Object.fromEntries(
+    Object.entries(config.globalHeaders).map(([k, v]) => [k.toLowerCase(), v]),
+  );
+  validHeaders["strict-transport-security"] = "max-age=31536000";
+
+  for (const app of ["net", "com"]) {
+    const url = PRODUCTION_URLS[app];
+    const summaryPath = path.join(directory, `${app}-summary.md`);
+    const env = {
+      DEPLOYMENT_APP: app,
+      DEPLOYED_URL: `${url}/`,
+      RELEASE_VERSION: "0.1.0",
+      DEPLOYMENT_SHA: sha,
+      GITHUB_RUN_ID: "7",
+      RELEASE_ATTEMPT: "2",
+      ARTIFACT_DIGEST: "sha256:abc",
+      GITHUB_STEP_SUMMARY: summaryPath,
+    };
+    const delays = [];
+    let homeCalls = 0;
+    let metaCalls = 0;
+    await verifyProductionSite(env, {
+      configPath,
+      sleep: async (ms) => delays.push(ms),
+      request: async (target) => {
+        if (target === `${url}/`) {
+          homeCalls += 1;
+          if (homeCalls === 1) throw new Error("warming up");
+          return {
+            status: 200,
+            headers: validHeaders,
+            body: Buffer.from("<title>Jamula</title>"),
+          };
+        }
+        if (target === `${url}/release.json?run=7-2`) {
+          metaCalls += 1;
+          if (metaCalls === 1) {
+            return {
+              status: 200,
+              headers: {},
+              body: Buffer.from(
+                JSON.stringify({
+                  version: "0.0.9",
+                  revision: sha,
+                  run: "7",
+                  attempt: "2",
+                }),
+              ),
+            };
+          }
+          return {
+            status: 200,
+            headers: {},
+            body: Buffer.from(
+              JSON.stringify({
+                version: "0.1.0",
+                revision: sha,
+                run: "7",
+                attempt: "2",
+              }),
+            ),
+          };
+        }
+        if (target === `${url}/robots.txt`) {
+          return {
+            status: 200,
+            headers: { "content-type": "text/plain; charset=utf-8" },
+            body: Buffer.alloc(0),
+          };
+        }
+        assert.equal(target, `${url}/__jamula_missing_route__`);
+        return {
+          status: 404,
+          headers: {},
+          body: Buffer.from("Page not found"),
+        };
+      },
+    });
+    assert.deepEqual(delays, [10000, 10000]);
+    const summary = fs.readFileSync(summaryPath, "utf8");
+    assert.match(summary, /Verified Azure deployment/);
+    assert.ok(summary.includes(sha));
+  }
+
+  const baseEnv = {
+    DEPLOYMENT_APP: "net",
+    DEPLOYED_URL: PRODUCTION_URLS.net,
+    RELEASE_VERSION: "0.1.0",
+    DEPLOYMENT_SHA: sha,
+    GITHUB_RUN_ID: "7",
+    RELEASE_ATTEMPT: "2",
+    ARTIFACT_DIGEST: "sha256:abc",
+    GITHUB_STEP_SUMMARY: path.join(directory, "fail-summary.md"),
+  };
+
+  await assert.rejects(
+    verifyProductionSite({ ...baseEnv, DEPLOYMENT_APP: "bad" }, { configPath }),
+    /Invalid production deployment app/,
+  );
+  await assert.rejects(
+    verifyProductionSite(
+      { ...baseEnv, DEPLOYED_URL: PRODUCTION_URLS.com },
+      { configPath },
+    ),
+    /unexpected URL/,
+  );
+  await assert.rejects(
+    verifyProductionSite(baseEnv, {
+      configPath,
+      sleep: async () => {},
+      request: async () => ({
+        status: 503,
+        headers: {},
+        body: Buffer.alloc(0),
+      }),
+    }),
+    /home page did not become ready/,
+  );
+  await assert.rejects(
+    verifyProductionSite(baseEnv, {
+      configPath,
+      sleep: async () => {},
+      request: async (target) =>
+        target.includes("release.json")
+          ? { status: 404, headers: {}, body: Buffer.alloc(0) }
+          : {
+              status: 200,
+              headers: validHeaders,
+              body: Buffer.from("<title>Jamula</title>"),
+            },
+    }),
+    /Live release metadata did not match/,
+  );
+
+  const okMeta = Buffer.from(
+    JSON.stringify({ version: "0.1.0", revision: sha, run: "7", attempt: "2" }),
+  );
+  for (const [override, expected] of [
+    [
+      (target, callCount) =>
+        target.endsWith("/") && callCount > 1
+          ? { status: 500, headers: validHeaders, body: Buffer.alloc(0) }
+          : null,
+      /home page did not return 200/,
+    ],
+    [
+      (target, callCount) =>
+        target.endsWith("/") && callCount > 1
+          ? {
+              status: 200,
+              headers: validHeaders,
+              body: Buffer.from("<title>Wrong</title>"),
+            }
+          : null,
+      /unexpected title/,
+    ],
+    [
+      (target) =>
+        target.endsWith("/robots.txt")
+          ? { status: 404, headers: {}, body: Buffer.alloc(0) }
+          : null,
+      /robots\.txt did not return 200/,
+    ],
+    [
+      (target) =>
+        target.endsWith("/robots.txt")
+          ? {
+              status: 200,
+              headers: { "content-type": "text/html" },
+              body: Buffer.alloc(0),
+            }
+          : null,
+      /Unexpected robots\.txt Content-Type/,
+    ],
+    [
+      (target) =>
+        target.endsWith("/__jamula_missing_route__")
+          ? { status: 200, headers: {}, body: Buffer.from("Page not found") }
+          : null,
+      /missing route did not return 404/,
+    ],
+    [
+      (target) =>
+        target.endsWith("/__jamula_missing_route__")
+          ? { status: 404, headers: {}, body: Buffer.from("Generic error") }
+          : null,
+      /expected 404 page/,
+    ],
+  ]) {
+    let calls = 0;
+    await assert.rejects(
+      verifyProductionSite(baseEnv, {
+        configPath,
+        sleep: async () => {},
+        request: async (target) => {
+          calls += 1;
+          const custom = override(target, calls);
+          if (custom) return custom;
+          if (target.includes("release.json")) {
+            return { status: 200, headers: {}, body: okMeta };
+          }
+          if (target.endsWith("/robots.txt")) {
+            return {
+              status: 200,
+              headers: { "content-type": "text/plain" },
+              body: Buffer.alloc(0),
+            };
+          }
+          if (target.endsWith("/__jamula_missing_route__")) {
+            return {
+              status: 404,
+              headers: {},
+              body: Buffer.from("Page not found"),
+            };
+          }
+          return {
+            status: 200,
+            headers: validHeaders,
+            body: Buffer.from("<title>Jamula</title>"),
+          };
+        },
+      }),
+      expected,
+    );
+  }
 });
 
 test("live metadata must match version, revision and build run attempt", () => {
@@ -522,17 +793,18 @@ test("live metadata must match version, revision and build run attempt", () => {
   assert.throws(() => verifyMetadata(null, expected));
 });
 
-test("release CLI selects history from paginated JSON files", () => {
-  const directory = fs.mkdtempSync(path.join(process.cwd(), "release-cli-"));
+test("release CLI selects history from paginated JSON files and optionally writes GITHUB_OUTPUT", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "release-cli-"));
   try {
     const tagsFile = path.join(directory, "tags.json");
     const releasesFile = path.join(directory, "releases.json");
+    const outputFile = path.join(directory, "github-output.txt");
     fs.writeFileSync(tagsFile, JSON.stringify([[tag("0.1.0")]]));
     fs.writeFileSync(releasesFile, JSON.stringify([[release("0.1.0")]]));
     const result = spawnSync(
       process.execPath,
       [
-        path.join(__dirname, "release.cjs"),
+        path.join(__dirname, "release.mjs"),
         "select",
         tagsFile,
         releasesFile,
@@ -545,20 +817,30 @@ test("release CLI selects history from paginated JSON files", () => {
     const selection = JSON.parse(result.stdout);
     assert.equal(selection.version, "0.1.1");
     assert.equal(selection.releaseSha, oldSha);
+
+    const logs = [];
+    runReleaseCli(
+      ["select", tagsFile, releasesFile, "material", sha, outputFile],
+      fs.appendFileSync,
+      (line) => logs.push(line),
+    );
+    assert.equal(logs.length, 1);
+    const outputText = fs.readFileSync(outputFile, "utf8");
+    assert.match(outputText, /^version=0\.1\.1\nselection=\{.*\}\n$/);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
 
 test("release CLI writes and verifies exact deployment metadata", () => {
-  const directory = fs.mkdtempSync(path.join(process.cwd(), "release-cli-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "release-cli-"));
   const metadataFile = path.join(directory, "release.json");
   try {
     const command = (name) =>
       spawnSync(
         process.execPath,
         [
-          path.join(__dirname, "release.cjs"),
+          path.join(__dirname, "release.mjs"),
           name,
           metadataFile,
           "0.1.0",
@@ -590,20 +872,20 @@ test("release CLI writes and verifies exact deployment metadata", () => {
 test("release CLI rejects unknown commands and malformed history JSON", () => {
   const unknown = spawnSync(
     process.execPath,
-    [path.join(__dirname, "release.cjs"), "unknown"],
+    [path.join(__dirname, "release.mjs"), "unknown"],
     { encoding: "utf8" },
   );
   assert.equal(unknown.status, 1);
   assert.match(unknown.stderr, /Unknown release command/);
 
-  const directory = fs.mkdtempSync(path.join(process.cwd(), "release-cli-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "release-cli-"));
   try {
     const invalidFile = path.join(directory, "invalid.json");
     fs.writeFileSync(invalidFile, "{");
     const malformed = spawnSync(
       process.execPath,
       [
-        path.join(__dirname, "release.cjs"),
+        path.join(__dirname, "release.mjs"),
         "select",
         invalidFile,
         invalidFile,
@@ -674,7 +956,8 @@ test("release wiring preserves isolation, serialization and publication ordering
         body.indexOf("Deploy prebuilt site"),
     );
     assert.ok(
-      body.indexOf("Deploy prebuilt site") < body.indexOf("release.cjs verify"),
+      body.indexOf("Deploy prebuilt site") <
+        body.indexOf("production-deployment.mjs verify"),
     );
     assert.match(body, /deployments: write/);
     assert.match(body, /if: always\(\) && steps\.record\.outputs\.id != ''/);
@@ -706,14 +989,14 @@ test("publication fails before writing on stale identity, main or history", () =
     ["changed history", { TEST_HISTORY: "1" }, [false, false]],
     ["release creation failure", { TEST_FAILURE: "1" }, [true, false]],
   ]) {
-    const directory = fs.mkdtempSync(path.join(process.cwd(), "release-test-"));
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "release-test-"));
     try {
       fs.mkdirSync(path.join(directory, ".github/scripts"), {
         recursive: true,
       });
       fs.copyFileSync(
-        path.join(__dirname, "release.cjs"),
-        path.join(directory, ".github/scripts/release.cjs"),
+        path.join(__dirname, "release.mjs"),
+        path.join(directory, ".github/scripts/release.mjs"),
       );
       const shell = `
         curl() {

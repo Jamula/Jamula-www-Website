@@ -1,20 +1,36 @@
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const { test } = require("node:test");
-const { spawnSync } = require("node:child_process");
-const vm = require("node:vm");
-const {
+import assert from "node:assert/strict";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { test } from "node:test";
+import { spawnSync } from "node:child_process";
+import vm from "node:vm";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import {
   selectPreview,
   writePreviewEvent,
   previewEnvironment,
-} = require("./swa-preview.cjs");
-const { assertConfiguredCsp } = require("./verify-swa-csp.cjs");
+  runPreviewGate,
+  runPreviewRecheck,
+} from "./swa-preview.mjs";
+import {
+  assertConfiguredCsp,
+  assertDeploymentConfig,
+  assertLiveSecurityHeaders,
+} from "./verify-swa-csp.mjs";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const staticWebAppConfig = path.join(
+  __dirname,
+  "../../www/public/staticwebapp.config.json",
+);
 
 function fixture() {
   const repo = { owner: "Jamula", repo: "Jamula-www-Website" };
   const repository = { full_name: `${repo.owner}/${repo.repo}` };
+  const archiveBytes = Buffer.from("zip-archive-bytes");
+  const digest = `sha256:${crypto.createHash("sha256").update(archiveBytes).digest("hex")}`;
   const run = {
     id: 123,
     workflow_id: 456,
@@ -37,8 +53,8 @@ function fixture() {
       id: 789,
       name: `swa-site-${run.head_sha}`,
       expired: false,
-      digest: `sha256:${"b".repeat(64)}`,
-      size_in_bytes: 1024,
+      digest,
+      size_in_bytes: archiveBytes.length,
       workflow_run: { id: run.id, head_sha: run.head_sha },
     },
   ];
@@ -51,6 +67,8 @@ function fixture() {
             path: ".github/workflows/azure-static-web-apps.yml",
           },
         }),
+        getWorkflowRun: async () => ({ data: run }),
+        downloadArtifact: async () => ({ data: archiveBytes }),
         listWorkflowRunArtifacts: "artifacts",
       },
       pulls: { get: async () => ({ data: pr }), listFiles: "files" },
@@ -59,7 +77,7 @@ function fixture() {
     paginate: async (method) =>
       ({ artifacts, files, prs: [{ number: pr.number }] })[method],
   };
-  return { github, repo, run, pr, artifacts, files };
+  return { github, repo, repository, run, pr, artifacts, files, archiveBytes };
 }
 
 test("selects exactly the current SHA-bound artifact", async () => {
@@ -339,7 +357,111 @@ test("deployment event rejects unselected actions", () => {
   }
 });
 
-test("CSP verifier requires one non-empty policy in the built configuration", () => {
+test("runPreviewGate handles upload, close, skip, size limit, and digest verification", async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-gate-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const eventDestination = path.join(directory, "event.json");
+  const archiveDestination = path.join(directory, "site.zip");
+
+  const makeHarness = (f) => {
+    const outputs = {};
+    const summaries = [];
+    const core = {
+      setOutput: (name, value) => {
+        outputs[name] = value;
+      },
+      summary: {
+        addRaw: (text) => ({
+          write: async () => {
+            summaries.push(text);
+          },
+        }),
+      },
+    };
+    const context = {
+      repo: f.repo,
+      payload: { workflow_run: { id: f.run.id }, repository: f.repository },
+    };
+    return { outputs, summaries, core, context };
+  };
+
+  const uploadFixture = fixture();
+  const uploadHarness = makeHarness(uploadFixture);
+  await runPreviewGate({
+    github: uploadFixture.github,
+    context: uploadHarness.context,
+    core: uploadHarness.core,
+    eventDestination,
+    archiveDestination,
+  });
+  assert.equal(uploadHarness.outputs.action, "upload");
+  assert.equal(uploadHarness.outputs.number, 74);
+  assert.equal(uploadHarness.outputs.sha, uploadFixture.run.head_sha);
+  assert.equal(uploadHarness.outputs.digest, uploadFixture.artifacts[0].digest);
+  assert.deepEqual(
+    fs.readFileSync(archiveDestination),
+    uploadFixture.archiveBytes,
+  );
+
+  const closeFixture = fixture();
+  closeFixture.pr.state = "closed";
+  const closeHarness = makeHarness(closeFixture);
+  await runPreviewGate({
+    github: closeFixture.github,
+    context: closeHarness.context,
+    core: closeHarness.core,
+    eventDestination,
+    archiveDestination: path.join(directory, "unused.zip"),
+  });
+  assert.equal(closeHarness.outputs.action, "close");
+
+  const skipFixture = fixture();
+  skipFixture.run.event = "push";
+  const skipHarness = makeHarness(skipFixture);
+  await runPreviewGate({
+    github: skipFixture.github,
+    context: skipHarness.context,
+    core: skipHarness.core,
+    eventDestination,
+    archiveDestination,
+  });
+  assert.equal(skipHarness.outputs.action, "skip");
+  assert.equal(skipHarness.summaries.length, 1);
+
+  const mismatchFixture = fixture();
+  mismatchFixture.github.rest.actions.downloadArtifact = async () => ({
+    data: Buffer.from("tampered"),
+  });
+  const mismatchHarness = makeHarness(mismatchFixture);
+  await assert.rejects(
+    runPreviewGate({
+      github: mismatchFixture.github,
+      context: mismatchHarness.context,
+      core: mismatchHarness.core,
+      eventDestination,
+      archiveDestination,
+    }),
+    /digest does not match/,
+  );
+
+  const hugeFixture = fixture();
+  hugeFixture.github.rest.actions.downloadArtifact = async () => ({
+    data: Buffer.alloc(100 * 1024 * 1024 + 1),
+  });
+  const hugeHarness = makeHarness(hugeFixture);
+  await assert.rejects(
+    runPreviewGate({
+      github: hugeFixture.github,
+      context: hugeHarness.context,
+      core: hugeHarness.core,
+      eventDestination,
+      archiveDestination,
+    }),
+    /exceeds the size limit/,
+  );
+});
+
+test("CSP and deployment config verifiers validate staticwebapp.config.json and live headers", () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-csp-"));
   const configPath = path.join(directory, "config.json");
   const headersPath = path.join(directory, "headers.txt");
@@ -356,13 +478,130 @@ test("CSP verifier requires one non-empty policy in the built configuration", ()
         () => assertConfiguredCsp(configPath, headersPath),
         /configuration has no CSP/,
       );
+      assert.throws(
+        () => assertDeploymentConfig(configPath),
+        /configuration has no CSP/,
+      );
+    }
+
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        globalHeaders: { "Content-Security-Policy": "default-src 'self'" },
+      }),
+    );
+    assert.throws(
+      () => assertDeploymentConfig(configPath),
+      /missing the 404 response override/,
+    );
+
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        responseOverrides: { 404: { statusCode: 404 } },
+        globalHeaders: { "Content-Security-Policy": "default-src 'self'" },
+      }),
+    );
+    assert.throws(
+      () => assertDeploymentConfig(configPath),
+      /missing the \.txt MIME mapping/,
+    );
+
+    const fullConfig = JSON.parse(fs.readFileSync(staticWebAppConfig, "utf8"));
+    fs.writeFileSync(configPath, JSON.stringify(fullConfig));
+    assert.deepEqual(assertDeploymentConfig(configPath), fullConfig);
+
+    const validHeaders = Object.fromEntries(
+      Object.entries(fullConfig.globalHeaders).map(([k, v]) => [
+        k.toLowerCase(),
+        v,
+      ]),
+    );
+    validHeaders["strict-transport-security"] = "max-age=31536000";
+    assert.doesNotThrow(() =>
+      assertLiveSecurityHeaders(configPath, validHeaders),
+    );
+    assert.throws(
+      () =>
+        assertLiveSecurityHeaders(configPath, {
+          ...validHeaders,
+          "content-security-policy": "default-src 'self'",
+        }),
+      /does not match the built configuration/,
+    );
+    assert.throws(
+      () =>
+        assertLiveSecurityHeaders(configPath, {
+          ...validHeaders,
+          "x-frame-options": "SAMEORIGIN",
+        }),
+      /Unexpected X-Frame-Options header/,
+    );
+    for (const hstsValue of [undefined, "   "]) {
+      assert.throws(
+        () =>
+          assertLiveSecurityHeaders(configPath, {
+            ...validHeaders,
+            "strict-transport-security": hstsValue,
+          }),
+        /Strict-Transport-Security was not enforced/,
+      );
     }
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
 
-test("CSP verifier CLI checks exact policy and reports argument or file errors", () => {
+test("security header verifiers fail closed when config and live response weaken or omit fixed headers", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-sec-headers-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const baseConfig = JSON.parse(fs.readFileSync(staticWebAppConfig, "utf8"));
+  const validConfigPath = path.join(directory, "valid-config.json");
+  const mutatedConfigPath = path.join(directory, "mutated-config.json");
+  fs.writeFileSync(validConfigPath, JSON.stringify(baseConfig));
+
+  for (const [headerName, invalidValue] of [
+    ["X-Frame-Options", "SAMEORIGIN"],
+    ["X-Frame-Options", undefined],
+    ["X-Content-Type-Options", "none"],
+    ["X-Content-Type-Options", undefined],
+    ["Referrer-Policy", "unsafe-url"],
+    ["Referrer-Policy", undefined],
+    ["Permissions-Policy", "camera=*"],
+    ["Permissions-Policy", undefined],
+  ]) {
+    const mutatedConfig = structuredClone(baseConfig);
+    if (invalidValue === undefined) {
+      delete mutatedConfig.globalHeaders[headerName];
+    } else {
+      mutatedConfig.globalHeaders[headerName] = invalidValue;
+    }
+    fs.writeFileSync(mutatedConfigPath, JSON.stringify(mutatedConfig));
+
+    const matchingLiveHeaders = Object.fromEntries(
+      Object.entries(mutatedConfig.globalHeaders).map(([k, v]) => [
+        k.toLowerCase(),
+        v,
+      ]),
+    );
+    matchingLiveHeaders["strict-transport-security"] = "max-age=31536000";
+
+    const configError = {
+      message: `Built Static Web Apps configuration has unexpected ${headerName} header.`,
+    };
+    assert.throws(() => assertDeploymentConfig(mutatedConfigPath), configError);
+    assert.throws(
+      () => assertLiveSecurityHeaders(mutatedConfigPath, matchingLiveHeaders),
+      configError,
+    );
+    assert.throws(
+      () => assertLiveSecurityHeaders(validConfigPath, matchingLiveHeaders),
+      { message: `Unexpected ${headerName} header.` },
+    );
+  }
+});
+
+test("CSP verifier CLI checks deployment config, exact policy, and argument or file errors", () => {
   const config = JSON.parse(fs.readFileSync(staticWebAppConfig, "utf8"));
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-csp-"));
   const configPath = path.join(directory, "config.json");
@@ -371,13 +610,20 @@ test("CSP verifier CLI checks exact policy and reports argument or file errors",
   const runVerifier = (...args) =>
     spawnSync(
       process.execPath,
-      [path.join(__dirname, "verify-swa-csp.cjs"), ...args],
+      [path.join(__dirname, "verify-swa-csp.mjs"), ...args],
       { encoding: "utf8" },
     );
   try {
     const usage = runVerifier();
     assert.equal(usage.status, 1);
-    assert.match(usage.stderr, /Usage: verify-swa-csp\.cjs/);
+    assert.match(usage.stderr, /Usage: verify-swa-csp\.mjs/);
+
+    const extraArgs = runVerifier(configPath, headersPath, "extra");
+    assert.equal(extraArgs.status, 1);
+    assert.match(extraArgs.stderr, /Usage: verify-swa-csp\.mjs/);
+
+    const configOnly = runVerifier(configPath);
+    assert.equal(configOnly.status, 0, configOnly.stderr);
 
     fs.writeFileSync(
       headersPath,
@@ -522,14 +768,13 @@ test("workflow routes both operations through the validated explicit environment
     /GITHUB_(EVENT_NAME|EVENT_PATH|REF|HEAD_REF|BASE_REF|SHA):/,
   );
   assert.ok(
-    workflow.indexOf("previewEnvironment(selection") <
-      workflow.indexOf("downloadArtifact"),
+    workflow.indexOf("runPreviewGate({ github, context, core })") <
+      workflow.indexOf("Extract only static files"),
   );
   assert.ok(
-    workflow.indexOf('core.setOutput("environment", previewEnvironment') <
+    workflow.indexOf("runPreviewRecheck({") <
       workflow.indexOf("Require trusted deployment token"),
   );
-  assert.match(workflow, /pr\.head\.ref === saved\.pull_request\.head\.ref/);
   assert.match(
     workflow,
     /if \[\[ "\$PREVIEW_ACTION" == "close" \]\]; then\n\s+cp \.preview\/event\.json "\$GITHUB_EVENT_PATH"/,
@@ -537,20 +782,11 @@ test("workflow routes both operations through the validated explicit environment
   assert.match(workflow, /\$\{DEPLOYED_URL%\/\}" != "\$expected/);
 });
 
-test("last-minute PR recheck withholds deployment for every changed identity surface", async () => {
-  const workflow = fs
-    .readFileSync(
-      path.join(__dirname, "../workflows/azure-static-web-apps-preview.yml"),
-      "utf8",
-    )
-    .replace(/\r\n/g, "\n");
-  const block = workflow
-    .split("      - name: Recheck current PR before deployment")[1]
-    .split("      - name: Require trusted deployment token")[0];
-  const script = block
-    .split("          script: |\n")[1]
-    .replace(/^            /gm, "")
-    .replace("${{ steps.gate.outputs.action }}", "upload");
+test("last-minute PR recheck withholds deployment for every changed identity surface", async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-recheck-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const eventPath = path.join(directory, "event.json");
+
   const mutations = [
     null,
     (pr) => {
@@ -581,29 +817,22 @@ test("last-minute PR recheck withholds deployment for every changed identity sur
   for (const mutate of mutations) {
     const f = fixture();
     const saved = structuredClone({ number: f.pr.number, pull_request: f.pr });
+    fs.writeFileSync(eventPath, JSON.stringify(saved));
     if (mutate) mutate(f.pr);
     const outputs = {};
-    const context = {
-      repo: f.repo,
-      payload: {},
-    };
+    const context = { repo: f.repo, payload: {} };
     const core = {
       setOutput: (name, value) => {
         outputs[name] = value;
       },
       summary: { addRaw: () => ({ write: async () => {} }) },
     };
-    await vm.runInNewContext(`(async () => { ${script} })()`, {
+    await runPreviewRecheck({
       github: f.github,
       context,
       core,
-      require: (name) => {
-        if (name === "node:fs") {
-          return { readFileSync: () => JSON.stringify(saved) };
-        }
-        assert.equal(name, "./trusted/.github/scripts/swa-preview.cjs");
-        return { previewEnvironment };
-      },
+      action: "upload",
+      eventPath,
     });
     assert.equal(outputs.deploy, mutate === null);
     assert.equal(outputs.environment, mutate === null ? "74" : undefined);
@@ -626,16 +855,14 @@ const productionJobs = Object.fromEntries(
   ].map((match) => [match[1], match[2]]),
 );
 
-const staticWebAppConfig = path.join(
-  __dirname,
-  "../../www/public/staticwebapp.config.json",
-);
-
 test("trusted preview validator resolves the downloaded archive and deployment output", () => {
-  const workflow = fs.readFileSync(
-    path.join(__dirname, "../workflows/azure-static-web-apps-preview.yml"),
-    "utf8",
-  ).replace(/\r\n/g, "\n");
+  const workflow = fs
+    .readFileSync(
+      path.join(__dirname, "../workflows/azure-static-web-apps-preview.yml"),
+      "utf8",
+    )
+    .replace(/\r\n/g, "\n");
+  assert.match(workflow, /global-json-file: trusted\/global\.json/);
   const step = workflow.match(
     /- name: Extract only static files and verify trusted configuration\n([\s\S]*?)(?=\n      - name:)/,
   )?.[1];
@@ -648,16 +875,18 @@ test("trusted preview validator resolves the downloaded archive and deployment o
   );
   assert.ok(args, "expected the trusted validator and its three quoted paths");
   const workspace = path.resolve(__dirname, "../..");
-  const resolveArgument = (arg) => path.resolve(
-    workspace,
-    cwd,
-    arg.replace(/^\$GITHUB_WORKSPACE(?=\/|$)/, workspace),
-  );
-  const archive = workflow.match(/fs\.writeFileSync\("([^"]+)", bytes\)/)?.[1];
+  const resolveArgument = (arg) =>
+    path.resolve(
+      workspace,
+      cwd,
+      arg.replace(/^\$GITHUB_WORKSPACE(?=\/|$)/, workspace),
+    );
   const deployment = workflow.match(/^\s+app_location: (.+)$/m)?.[1];
-  assert.equal(archive, ".preview/site.zip");
   assert.equal(deployment, "www/dist");
-  assert.equal(resolveArgument(args[1]), path.resolve(workspace, archive));
+  assert.equal(
+    resolveArgument(args[1]),
+    path.resolve(workspace, ".preview/site.zip"),
+  );
   assert.equal(resolveArgument(args[2]), path.resolve(workspace, deployment));
   assert.equal(
     resolveArgument(args[3]),
@@ -667,7 +896,10 @@ test("trusted preview validator resolves the downloaded archive and deployment o
     /- name: Verify isolated live preview\n([\s\S]*)$/,
   )?.[1];
   assert.ok(verifyStep);
-  assert.match(verifyStep, /node trusted\/\.github\/scripts\/verify-preview\.cjs "\$DEPLOYED_URL"/);
+  assert.match(
+    verifyStep,
+    /node trusted\/\.github\/scripts\/verify-preview\.mjs "\$DEPLOYED_URL"/,
+  );
   assert.doesNotMatch(verifyStep, /^\s+working-directory:/m);
 });
 
@@ -794,7 +1026,10 @@ test("live CSP verifier propagates malformed configuration and file errors", (t)
     code: "ENOENT",
   });
   fs.writeFileSync(configPath, "{");
-  assert.throws(() => assertConfiguredCsp(configPath, headersPath), SyntaxError);
+  assert.throws(
+    () => assertConfiguredCsp(configPath, headersPath),
+    SyntaxError,
+  );
   fs.writeFileSync(
     configPath,
     JSON.stringify({
@@ -831,57 +1066,8 @@ test("live CSP verifier handles header casing, whitespace, and malformed respons
   });
 });
 
-test("live CSP verifier command reports success, usage, and verification errors", (t) => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-csp-cli-"));
-  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
-  const configPath = path.join(directory, "config.json");
-  const headersPath = path.join(directory, "headers.txt");
-  const verifier = path.join(__dirname, "verify-swa-csp.cjs");
-  fs.writeFileSync(
-    configPath,
-    JSON.stringify({
-      globalHeaders: { "Content-Security-Policy": "default-src 'self'" },
-    }),
-  );
-  fs.writeFileSync(
-    headersPath,
-    "HTTP/2 200\nContent-Security-Policy: default-src 'self'\n",
-  );
-  const run = (...args) =>
-    spawnSync(process.execPath, [verifier, ...args], { encoding: "utf8" });
-  const success = run(configPath, headersPath);
-  assert.equal(success.status, 0);
-  assert.equal(success.stderr, "");
-  const usage = run(configPath);
-  assert.equal(usage.status, 1);
-  assert.equal(
-    usage.stderr.trim(),
-    "Usage: verify-swa-csp.cjs <staticwebapp.config.json> <curl-headers>",
-  );
-  fs.writeFileSync(headersPath, "HTTP/2 200\nContent-Security-Policy: stale\n");
-  const mismatch = run(configPath, headersPath);
-  assert.equal(mismatch.status, 1);
-  assert.equal(
-    mismatch.stderr.trim(),
-    "Live Content-Security-Policy does not match the built configuration.",
-  );
-});
-
-test("both production verifiers compare live CSP against the built config", () => {
-  for (const name of ["deploy", "deploy-com"]) {
-    assert.match(
-      productionJobs[name],
-      /node \.github\/scripts\/verify-swa-csp\.cjs \\\n\s+www\/dist\/staticwebapp\.config\.json "\$headers"/,
-    );
-    assert.doesNotMatch(
-      productionJobs[name],
-      /expect_header "Content-Security-Policy"/,
-    );
-  }
-});
-
 for (const name of ["deploy", "deploy-com"]) {
-  test(`${name} wires exact verifier checkout before artifact download and runs in isolation`, () => {
+  test(`${name} wires exact verifier sparse-checkout before artifact download and runs in isolation`, async () => {
     const steps = [
       ...productionJobs[name].matchAll(
         /^      - name: (.+)\n([\s\S]*?)(?=^      - name: |(?![\s\S]))/gm,
@@ -909,8 +1095,21 @@ for (const name of ["deploy", "deploy-com"]) {
     );
     assert.match(steps[0].body, /ref: \$\{\{ env\.DEPLOYMENT_SHA \}\}/);
     assert.match(steps[0].body, /persist-credentials: false/);
-    assert.match(steps[0].body, /\.github\/scripts\/verify-swa-csp\.cjs/);
     assert.match(steps[0].body, /sparse-checkout-cone-mode: false/);
+
+    const sparseFiles = steps[0].body
+      .split("sparse-checkout: |\n")[1]
+      .split("          sparse-checkout-cone-mode:")[0]
+      .trim()
+      .split("\n")
+      .map((line) => line.trim());
+    assert.deepEqual(sparseFiles, [
+      ".github/scripts/verify-swa-csp.mjs",
+      ".github/scripts/verify-preview.mjs",
+      ".github/scripts/release.mjs",
+      ".github/scripts/production-deployment.mjs",
+    ]);
+
     assert.match(
       steps[2].body,
       /uses: actions\/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333/,
@@ -928,183 +1127,115 @@ for (const name of ["deploy", "deploy-com"]) {
         `azure_static_web_apps_api_token: \\$\\{\\{ secrets\\.SWA_${name === "deploy" ? "NET" : "COM"}_DEPLOYMENT_TOKEN \\}\\}`,
       ),
     );
+    assert.match(
+      steps[7].body,
+      /run: node \.github\/scripts\/production-deployment\.mjs verify/,
+    );
+    assert.match(
+      steps[8].body,
+      /run: node \.github\/scripts\/production-deployment\.mjs finish/,
+    );
 
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "swa-isolated-"));
     try {
-      // Model the two source actions in a fresh runner, not the build workspace.
-      const revision = spawnSync("git", ["rev-parse", "HEAD"], {
-        cwd: __dirname,
-        encoding: "utf8",
-      });
-      assert.equal(revision.status, 0, revision.stderr);
-      const verifier = spawnSync(
-        "git",
-        [
-          "show",
-          `${revision.stdout.trim()}:.github/scripts/verify-swa-csp.cjs`,
-        ],
-        { cwd: __dirname, encoding: "utf8" },
-      );
-      assert.equal(verifier.status, 0, verifier.stderr);
-      fs.mkdirSync(path.join(directory, ".github/scripts"), {
-        recursive: true,
-      });
-      fs.writeFileSync(
-        path.join(directory, ".github/scripts/verify-swa-csp.cjs"),
-        verifier.stdout,
-      );
-      fs.copyFileSync(
-        path.join(__dirname, "release.cjs"),
-        path.join(directory, ".github/scripts/release.cjs"),
-      );
+      const workspaceRoot = path.resolve(__dirname, "../..");
+      for (const relativeFile of sparseFiles) {
+        const destination = path.join(directory, relativeFile);
+        fs.mkdirSync(path.dirname(destination), { recursive: true });
+        fs.copyFileSync(path.join(workspaceRoot, relativeFile), destination);
+      }
       assert.equal(fs.existsSync(path.join(directory, "www/public")), false);
       fs.mkdirSync(path.join(directory, "www/dist"), { recursive: true });
       const config = JSON.parse(fs.readFileSync(staticWebAppConfig, "utf8"));
       config.globalHeaders["Content-Security-Policy"] += "; object-src 'none'";
-      fs.writeFileSync(
-        path.join(directory, "www/dist/staticwebapp.config.json"),
-        JSON.stringify(config),
+      const builtConfigPath = path.join(
+        directory,
+        "www/dist/staticwebapp.config.json",
       );
-      fs.writeFileSync(
-        path.join(directory, "home-headers.txt"),
-        "HTTP/2 200\r\n" +
-          Object.entries(config.globalHeaders)
-            .map(([header, value]) => `${header}: ${value}\r\n`)
-            .join(""),
+      fs.writeFileSync(builtConfigPath, JSON.stringify(config));
+
+      const configCheck = spawnSync(
+        process.execPath,
+        [
+          ".github/scripts/verify-swa-csp.mjs",
+          "www/dist/staticwebapp.config.json",
+        ],
+        { cwd: directory, encoding: "utf8" },
       );
-      fs.writeFileSync(
-        path.join(directory, "old-headers.txt"),
-        "HTTP/2 200\r\nContent-Security-Policy: default-src 'self'\r\n",
+      assert.equal(configCheck.status, 0, configCheck.stderr);
+
+      const isolatedModule = await import(
+        pathToFileURL(
+          path.join(directory, ".github/scripts/production-deployment.mjs"),
+        ).href
       );
-      const scripts = steps
-        .filter(
-          (step) =>
-            /        run:/.test(step.body) &&
-            !["Record production deployment", "Record deployment result"].includes(
-              step.name,
-            ),
-        )
-        .map((step) =>
-          step.body
-            .split(/        run: (?:\|\n)?/)[1]
-            .replace(/^          /gm, ""),
-        )
-        .join("\n");
-      const shellScript = `
-          gh() { printf '%s\\n' "$DEPLOYMENT_SHA"; }
-          curl() {
-            local headers="" output="" url=""
-            while [[ $# -gt 0 ]]; do
-              case "$1" in
-                --dump-header) headers="$2"; shift 2 ;;
-                --output) output="$2"; shift 2 ;;
-                --proto|--write-out) shift 2 ;;
-                https://*) url="$1"; shift ;;
-                *) shift ;;
-              esac
-            done
-            case "$url" in
-              */release.json?*) release_ready=true; printf '{"version":"%s","revision":"%s","run":"1","attempt":"1"}\\n' "\${TEST_VERSION:-0.1.0}" "$DEPLOYMENT_SHA" > "$output" ;;
-              */robots.txt) printf 'HTTP/2 200\\r\\nContent-Type: text/plain\\r\\n' > "$headers" ;;
-              */__jamula_missing_route__) printf 'Page not found' > "$output"; printf '404' ;;
-              */)
-                if [[ "\${release_ready:-false}" == true ]]; then
-                  cp home-headers.txt "$headers"
-                  if [[ "\${TEST_BROKEN_HEADERS:-false}" == true ]]; then
-                    sed -i 's/X-Frame-Options: DENY/X-Frame-Options: SAMEORIGIN/' "$headers"
-                  fi
-                else
-                  cp old-headers.txt "$headers"
-                fi
-                printf '<title>Jamula</title>' > "$output" ;;
-              *) return 93 ;;
-            esac
-          }
-          ${scripts}
-          `;
-      const result = spawnSync("bash", ["-c", shellScript], {
-        cwd: directory,
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          DEPLOYMENT_TOKEN: "disposable-test-token",
-          DEPLOYMENT_SHA: revision.stdout.trim(),
-          DEPLOYED_URL:
-            name === "deploy"
-              ? "https://ashy-beach-033c7d01e.7.azurestaticapps.net"
-              : "https://red-cliff-0ee064a1e.2.azurestaticapps.net",
-          RELEASE_VERSION: "0.1.0",
-          RELEASE_ATTEMPT: "1",
-          GITHUB_RUN_ID: "1",
-          GITHUB_REPOSITORY: "test/repo",
-          ARTIFACT_DIGEST: "disposable-artifact-digest",
-          GITHUB_EVENT_NAME: "push",
-          GITHUB_STEP_SUMMARY: "summary.txt",
-        },
-      });
-      assert.ifError(result.error);
-      assert.equal(result.status, 0, result.stderr);
-      const summary = fs.readFileSync(
-        path.join(directory, "summary.txt"),
-        "utf8",
+      const appKey = name === "deploy" ? "net" : "com";
+      const expectedUrl = isolatedModule.PRODUCTION_URLS[appKey];
+      const sha = "a".repeat(40);
+      const headers = Object.fromEntries(
+        Object.entries(config.globalHeaders).map(([k, v]) => [
+          k.toLowerCase(),
+          v,
+        ]),
       );
-      assert.match(summary, /Verified Azure deployment/);
-      assert.ok(summary.includes(revision.stdout.trim()));
-      assert.match(summary, /disposable-artifact-digest/);
-      const broken = spawnSync("bash", ["-c", shellScript], {
-        cwd: directory,
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          DEPLOYMENT_TOKEN: "disposable-test-token",
-          DEPLOYMENT_SHA: revision.stdout.trim(),
-          DEPLOYED_URL:
-            name === "deploy"
-              ? "https://ashy-beach-033c7d01e.7.azurestaticapps.net"
-              : "https://red-cliff-0ee064a1e.2.azurestaticapps.net",
-          RELEASE_VERSION: "0.1.0",
-          RELEASE_ATTEMPT: "1",
-          GITHUB_RUN_ID: "1",
-          GITHUB_REPOSITORY: "test/repo",
-          GITHUB_EVENT_NAME: "workflow_dispatch",
-          GITHUB_STEP_SUMMARY: "broken-summary.txt",
-          TEST_BROKEN_HEADERS: "true",
-        },
-      });
-      assert.ifError(broken.error);
-      assert.notEqual(broken.status, 0);
-      assert.match(broken.stdout, /Unexpected X-Frame-Options header/);
-      assert.equal(
-        fs.existsSync(path.join(directory, "broken-summary.txt")),
-        false,
-      );
-      const stale = spawnSync(
-        "bash",
-        ["-c", `sleep() { :; }\n${shellScript}`],
+      headers["strict-transport-security"] = "max-age=31536000";
+      const summaryPath = path.join(directory, "summary.txt");
+
+      await isolatedModule.verifyProductionSite(
         {
-          cwd: directory,
-          encoding: "utf8",
-          env: {
-            ...process.env,
-            DEPLOYMENT_TOKEN: "disposable-test-token",
-            DEPLOYMENT_SHA: revision.stdout.trim(),
-            DEPLOYED_URL:
-              name === "deploy"
-                ? "https://ashy-beach-033c7d01e.7.azurestaticapps.net"
-                : "https://red-cliff-0ee064a1e.2.azurestaticapps.net",
-            RELEASE_VERSION: "0.1.0",
-            RELEASE_ATTEMPT: "1",
-            GITHUB_RUN_ID: "1",
-            GITHUB_REPOSITORY: "test/repo",
-            GITHUB_EVENT_NAME: "workflow_dispatch",
-            GITHUB_STEP_SUMMARY: "summary.txt",
-            TEST_VERSION: "0.0.9",
+          DEPLOYMENT_APP: appKey,
+          DEPLOYED_URL: expectedUrl,
+          RELEASE_VERSION: "0.1.0",
+          DEPLOYMENT_SHA: sha,
+          GITHUB_RUN_ID: "1",
+          RELEASE_ATTEMPT: "1",
+          ARTIFACT_DIGEST: "disposable-artifact-digest",
+          GITHUB_STEP_SUMMARY: summaryPath,
+        },
+        {
+          configPath: builtConfigPath,
+          sleep: async () => {},
+          request: async (url) => {
+            if (url.includes("/release.json")) {
+              return {
+                status: 200,
+                headers: {},
+                body: Buffer.from(
+                  JSON.stringify({
+                    version: "0.1.0",
+                    revision: sha,
+                    run: "1",
+                    attempt: "1",
+                  }),
+                ),
+              };
+            }
+            if (url.endsWith("/robots.txt")) {
+              return {
+                status: 200,
+                headers: { "content-type": "text/plain" },
+                body: Buffer.alloc(0),
+              };
+            }
+            if (url.endsWith("/__jamula_missing_route__")) {
+              return {
+                status: 404,
+                headers: {},
+                body: Buffer.from("Page not found"),
+              };
+            }
+            return {
+              status: 200,
+              headers,
+              body: Buffer.from("<title>Jamula</title>"),
+            };
           },
         },
       );
-      assert.ifError(stale.error);
-      assert.notEqual(stale.status, 0);
-      assert.match(stale.stdout, /Live release metadata did not match/);
+      const summary = fs.readFileSync(summaryPath, "utf8");
+      assert.match(summary, /Verified Azure deployment/);
+      assert.ok(summary.includes(sha));
+      assert.match(summary, /disposable-artifact-digest/);
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }

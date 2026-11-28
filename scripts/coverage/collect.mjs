@@ -165,14 +165,14 @@ async function collectAll(reportsDir) {
 
   const automationTests = await listFilesMatching(
     path.join(repositoryRoot, ".github", "scripts"),
-    ".test.cjs",
+    ".test.mjs",
   );
   runCommand(process.execPath, [
     c8Bin,
     "--reporter=cobertura",
     `--reports-dir=${path.join(reportsDir, "automation")}`,
-    "--include=.github/scripts/*.cjs",
-    "--exclude=.github/scripts/*.test.cjs",
+    "--include=.github/scripts/*.mjs",
+    "--exclude=.github/scripts/*.test.mjs",
     process.execPath,
     "--test",
     ...automationTests,

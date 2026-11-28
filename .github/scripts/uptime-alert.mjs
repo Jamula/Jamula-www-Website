@@ -1,7 +1,7 @@
 const title = "Scheduled hostname monitor failure";
 const marker = "<!-- jamula-uptime-monitor-alert -->";
 
-async function escalate(github, repo, runUrl) {
+export async function escalate(github, repo, runUrl) {
   const issues = await github.paginate(github.rest.issues.listForRepo, {
     ...repo,
     state: "open",
@@ -28,5 +28,3 @@ After remediation, run the monitor again and close this issue only when the fail
   });
   return data;
 }
-
-module.exports = { escalate };

@@ -1,8 +1,11 @@
-const fs = require("node:fs");
-const path = require("node:path");
-const https = require("node:https");
+import fs from "node:fs";
+import path from "node:path";
+import https from "node:https";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const RETRY_DELAYS = [2000, 4000, 8000, 16000, 30000];
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export const RETRY_DELAYS = [2000, 4000, 8000, 16000, 30000];
 const TRANSIENT_STATUS = new Set([429, 500, 502, 503, 504]);
 const TRANSIENT_CODES = new Set([
   "ETIMEDOUT",
@@ -12,10 +15,10 @@ const TRANSIENT_CODES = new Set([
 ]);
 const BODY_LIMIT = 5 * 1024 * 1024;
 
-function requestPreview(url, expectedStatus = 200) {
+export function requestPreview(url, expectedStatus = 200, requestHeaders) {
   let timer;
   return new Promise((resolve, reject) => {
-    const request = https.get(url, (response) => {
+    const onResponse = (response) => {
       response.on("error", reject);
       if (response.statusCode !== expectedStatus) {
         resolve({
@@ -45,7 +48,10 @@ function requestPreview(url, expectedStatus = 200) {
           body: Buffer.concat(chunks),
         });
       });
-    });
+    };
+    const request = requestHeaders
+      ? https.get(url, { headers: requestHeaders }, onResponse)
+      : https.get(url, onResponse);
     timer = setTimeout(() => {
       const error = new Error("Preview request timed out.");
       error.code = "ETIMEDOUT";
@@ -55,7 +61,7 @@ function requestPreview(url, expectedStatus = 200) {
   }).finally(() => clearTimeout(timer));
 }
 
-async function fetchPreview(url, options = {}) {
+export async function fetchPreview(url, options = {}) {
   const request = options.request ?? requestPreview;
   const sleep =
     options.sleep ??
@@ -63,7 +69,11 @@ async function fetchPreview(url, options = {}) {
   const log = options.log ?? console.error;
   for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt += 1) {
     try {
-      const response = await request(url, options.expectedStatus ?? 200);
+      const response = await request(
+        url,
+        options.expectedStatus ?? 200,
+        options.headers,
+      );
       if (TRANSIENT_STATUS.has(response.status)) {
         const error = new Error(`HTTP ${response.status}`);
         error.status = response.status;
@@ -88,7 +98,7 @@ async function fetchPreview(url, options = {}) {
   }
 }
 
-async function verifyPreview(url, options = {}) {
+export async function verifyPreview(url, options = {}) {
   if (
     !/^https:\/\/ashy-beach-033c7d01e-[1-9][0-9]*\.7\.azurestaticapps\.net\/?(?![\s\S])/.test(
       url,
@@ -153,11 +163,9 @@ async function verifyPreview(url, options = {}) {
   }
 }
 
-module.exports = { verifyPreview, fetchPreview, requestPreview, RETRY_DELAYS };
-
-if (require.main === module) {
+if (import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   if (process.argv.length !== 3) {
-    console.error("Usage: node verify-preview.cjs HTTPS_PREVIEW_URL");
+    console.error("Usage: node verify-preview.mjs HTTPS_PREVIEW_URL");
     process.exitCode = 1;
   } else {
     verifyPreview(process.argv[2]).then(
