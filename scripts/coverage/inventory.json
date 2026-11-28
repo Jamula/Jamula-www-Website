@@ -166,6 +166,26 @@
       }
     },
     {
+      "id": "accelerator-authorization",
+      "reports": ["accelerator-authorization.cobertura.xml"],
+      "sources": [
+        "accelerator/Authorization/CustomerPolicies.cs",
+        "accelerator/Authorization/CustomerContext.cs"
+      ],
+      "sourceReports": {
+        "accelerator/Authorization/CustomerPolicies.cs": "accelerator-authorization.cobertura.xml",
+        "accelerator/Authorization/CustomerContext.cs": "accelerator-authorization.cobertura.xml"
+      }
+    },
+    {
+      "id": "accelerator-telemetry",
+      "reports": ["accelerator-telemetry.cobertura.xml"],
+      "sources": ["accelerator/Telemetry/OperationTelemetry.cs"],
+      "sourceReports": {
+        "accelerator/Telemetry/OperationTelemetry.cs": "accelerator-telemetry.cobertura.xml"
+      }
+    },
+    {
       "id": "mcp-server",
       "reports": ["mcp.cobertura.xml"],
       "sources": [
@@ -185,6 +205,14 @@
     }
   ],
   "excludedSources": [
+    {
+      "path": "accelerator/Telemetry.Tests/Program.cs",
+      "reason": "Offline telemetry fixture runner and assertions, not application behavior."
+    },
+    {
+      "path": "accelerator/Authorization.Tests/Program.cs",
+      "reason": "Offline authorization fixture runner and assertions, not application behavior."
+    },
     {
       "path": ".github/scripts/release.test.cjs",
       "reason": "Test-only source; its assertions are not product behavior."

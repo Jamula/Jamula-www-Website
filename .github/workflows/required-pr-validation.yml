@@ -39,7 +39,7 @@ jobs:
         run: |
           website_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)www/')"
           monitor_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)scripts/monitor/')"
-          dotnet_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)scripts/validation/' ':(top)scripts/validation.tests/' ':(top)scripts/validation.cli.tests/' ':(top)scripts/mbr/' ':(top)scripts/mcp/' ':(top)www/src/content/tech/')"
+          dotnet_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- ':(top)scripts/validation/' ':(top)scripts/validation.tests/' ':(top)scripts/validation.cli.tests/' ':(top)scripts/mbr/' ':(top)scripts/mcp/' ':(top)accelerator/' ':(top)www/src/content/tech/')"
           if [[ -n "$website_files" ]]; then
             echo "website=true" >> "$GITHUB_OUTPUT"
             echo "Website validation required."
@@ -191,3 +191,5 @@ jobs:
           dotnet run --project scripts/mbr/tests/JamulaMbr.Tests.csproj --configuration Release
           node --test scripts/mbr/tests/ui.test.mjs
           dotnet run --project scripts/mcp/tests/JamulaMcp.Tests.csproj --configuration Release
+          dotnet run --project accelerator/Authorization.Tests/JamulaAccelerator.Authorization.Tests.csproj --configuration Release
+          dotnet run --project accelerator/Telemetry.Tests/JamulaAccelerator.Telemetry.Tests.csproj --configuration Release

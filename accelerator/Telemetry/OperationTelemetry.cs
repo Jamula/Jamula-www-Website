@@ -1,0 +1,106 @@
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
+
+namespace JamulaAccelerator.Telemetry;
+
+public enum OperationOutcome
+{
+    Success,
+    Failure,
+    Cancelled
+}
+
+public sealed class OperationTelemetry : IDisposable
+{
+    public const string InstrumentationName = "Jamula.Accelerator";
+    private readonly ActivitySource _activities;
+    private readonly Meter _meter;
+    private readonly Counter<long> _completed;
+    private readonly Histogram<double> _duration;
+
+    public OperationTelemetry()
+    {
+        var parent = Activity.Current;
+        try
+        {
+            Activity.Current = null;
+            _activities = new ActivitySource(InstrumentationName);
+            try
+            {
+                _meter = new Meter(InstrumentationName);
+                try
+                {
+                    _completed = _meter.CreateCounter<long>("jamula.accelerator.operations");
+                    _duration = _meter.CreateHistogram<double>("jamula.accelerator.duration", "ms");
+                }
+                catch
+                {
+                    _meter.Dispose();
+                    throw;
+                }
+            }
+            catch
+            {
+                _activities.Dispose();
+                throw;
+            }
+        }
+        finally
+        {
+            Activity.Current = parent;
+        }
+    }
+
+    public void RecordCompletion(OperationOutcome outcome, TimeSpan duration)
+    {
+        var outcomeLabel = outcome switch
+        {
+            OperationOutcome.Success => "success",
+            OperationOutcome.Failure => "failure",
+            OperationOutcome.Cancelled => "cancelled",
+            _ => throw new ArgumentOutOfRangeException(nameof(outcome))
+        };
+        ArgumentOutOfRangeException.ThrowIfLessThan(duration, TimeSpan.Zero);
+
+        // Keep span and metric recording detached from untrusted request context.
+        var parent = Activity.Current;
+        try
+        {
+            Activity.Current = null;
+            using (var activity = _activities.CreateActivity("accelerator.operation.completed", ActivityKind.Internal))
+            {
+                activity?.Start();
+                if (outcome == OperationOutcome.Failure)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error);
+                }
+                activity?.SetTag("outcome", outcomeLabel);
+                var tag = new KeyValuePair<string, object?>("outcome", outcomeLabel);
+                _completed.Add(1, tag);
+                _duration.Record(duration.TotalMilliseconds, tag);
+            }
+        }
+        finally
+        {
+            Activity.Current = parent;
+        }
+    }
+
+    public void Dispose()
+    {
+        var parent = Activity.Current;
+        try
+        {
+            Activity.Current = null;
+            using (_meter)
+            {
+                _activities.Dispose();
+            }
+        }
+        finally
+        {
+            Activity.Current = parent;
+        }
+    }
+
+}
