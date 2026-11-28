@@ -131,14 +131,14 @@ characterize any candidate as passed.
    privacy, transfers, messaging, vendor terms, and retention. Record exact
    artifact version, reviewer, scope, conditions, expiry, and re-review triggers.
 2. With separately authorized disposable resources and synthetic data, verify
-   least-privilege seats and administrator MFA, purpose versus channel consent,
-   suppression and withdrawal, contact/deal/activity and consent export,
-   booking/calendar conflict behavior, subject deletion and provider-exposed
-   restore/recycle behavior, outage and rollback. Test Jamula-controlled backup
-   restores separately; vendor-held backup evidence must come from the provider.
-   Record actual observed results and unresolved gaps; never infer success from
-   a vendor page. No real customer data or live connections are authorized by
-   this document.
+   least-privilege seats and phishing-resistant administrator MFA, purpose
+   versus channel consent, suppression and withdrawal, contact/deal/activity
+   and consent export, booking/calendar conflict behavior, subject deletion and
+   provider-exposed restore/recycle behavior, outage and rollback. Test
+   Jamula-controlled backup restores separately; vendor-held backup evidence
+   must come from the provider. Record actual observed results and unresolved
+   gaps; never infer success from a vendor page. No real customer data or live
+   connections are authorized by this document.
 3. Before any booking page is made available, verify recording and transcription
    are off by default; review SMS, AI/enrichment, and calendar, CRM and payment
    integrations, leaving unapproved features and connections disabled. Test
