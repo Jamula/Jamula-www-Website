@@ -4,6 +4,8 @@ Cyrus approved two Free apps to serve all four hostnames directly, without
 cross-host redirects. This is the approved configuration; verify live DNS, TLS,
 and response behavior independently before claiming operational success.
 
+Current recovery and cleanup work is tracked in #205 and #206. See the [current architecture](current-architecture.md) for the recovery diagram and [current roadmap](../roadmap/current-roadmap.md) for authorization sequencing.
+
 | App                 | Hostnames                  | Azure hostname                             |
 | ------------------- | -------------------------- | ------------------------------------------ |
 | swa-jamula-web-prod | jamula.net, www.jamula.net | ashy-beach-033c7d01e.7.azurestaticapps.net |

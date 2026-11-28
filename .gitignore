@@ -60,8 +60,5 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 
-# Node / Astro website (www/)
-www/node_modules/
-www/dist/
-www/.astro/
+# Node / Astro website build ignores are maintained in www/.gitignore.
 .impeccable/hook.cache.json

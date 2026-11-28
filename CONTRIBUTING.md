@@ -9,6 +9,8 @@
 - Prefer currently supported `.NET` (`.NET 11.0` / `net11.0` pinned in root [`global.json`](global.json), inheriting `<Nullable>enable</Nullable>`, `<ImplicitUsings>enable</ImplicitUsings>`, and `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` from [`Directory.Build.props`](Directory.Build.props), indexed in [`Jamula.slnx`](Jamula.slnx), with minimal/zero unnecessary third-party NuGet dependencies) and `Node.js` (`26.13.0` / npm `12.2.1` in CI) using ES modules (`.mjs`) or TypeScript (`.ts`). All legacy `.py` and `.cjs` scripts have been retired; do not introduce Python or CommonJS scripts, and keep workflow YAML thin by placing verification, retry, and configuration logic in tested, coverage-inventoried modules.
 - Every first-party executable component and the overall aggregate target at least `95%` line and `90%` branch coverage (`scripts/coverage/inventory.json`), and unmeasured sources remain tracked in [`scripts/coverage/README.md`](scripts/coverage/README.md); prioritize deterministic offline happy-path and failure-path tests.
 
+See [current roadmap](docs/roadmap/current-roadmap.md) for active dependencies, exact-artifact evidence and separate production authorization; do not use historical phase proposals as current assignments.
+
 ## Website validation
 
 From the repository root, install dependencies, check formatting, run `astro check` + static build, and run the generated-output and website regression suites:

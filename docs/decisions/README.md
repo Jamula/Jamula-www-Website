@@ -19,6 +19,8 @@ comparison.
 workload dictionary. It is not approved, forecast evidence, a vendor bill, or a
 capacity promise.
 
+For the current source topology and active release gates, see [current architecture](../architecture/current-architecture.md) and [current roadmap](../roadmap/current-roadmap.md). This index preserves the original ADR decisions and approval history.
+
 ## Proposed ADRs
 
 | ADR | Scope | Current disposition |

@@ -10,6 +10,8 @@ and the client-deployable `.NET 11` Aspire RAG accelerator) records internal
 requirements, evaluations, and approval gates—not shipped features or public
 commitments.
 
+See the [current delivery roadmap](docs/roadmap/current-roadmap.md) and [architecture and trust boundaries](docs/architecture/current-architecture.md) for the active issue map, release sequence and current/proposed distinction.
+
 ## Architecture overview
 
 ```mermaid

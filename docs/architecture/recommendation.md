@@ -4,6 +4,8 @@
 **Evidence date:** 2026-08-25
 **Decision scope:** What to do next, not which platform to buy or build
 
+For the current source topology and release boundaries, see [current architecture](current-architecture.md) and the [current delivery roadmap](../roadmap/current-roadmap.md).
+
 ## Recommendation
 
 The repository's current public site is implemented in Astro. This historical
