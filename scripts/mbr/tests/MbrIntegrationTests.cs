@@ -625,12 +625,12 @@ internal static class MbrIntegrationTests
         Action<bool, string> check, string root, string appAssembly, string month)
     {
         await VerifyWebTreeTerminationCoreAsync(
-            check, Path.Combine(root, "terminated-web"), appAssembly, month,
+            check, Path.Join(root, "terminated-web"), appAssembly, month,
             forcePortableTree: false, "MbrFixture_ForcedHostTerminationWaitsForGatedProviderTree");
         await VerifyWebTreeTerminationCoreAsync(
-            check, Path.Combine(root, "terminated-portable-web"), appAssembly, month,
+            check, Path.Join(root, "terminated-portable-web"), appAssembly, month,
             forcePortableTree: true, "MbrFixture_PortableProcessTreeTerminationWaitsForGatedProviderTree");
-        VerifyProcTreeDiscovery(check, Path.Combine(root, "fake-proc"));
+        VerifyProcTreeDiscovery(check, Path.Join(root, "fake-proc"));
     }
 
     private static async Task VerifyWebTreeTerminationCoreAsync(
@@ -638,53 +638,46 @@ internal static class MbrIntegrationTests
         bool forcePortableTree, string checkName)
     {
         Directory.CreateDirectory(terminatedRoot);
-        var appRoot = Path.Combine(terminatedRoot, "web");
+        var appRoot = Path.Join(terminatedRoot, "web");
         CopyWebRoot(appRoot);
         var app = await StartApplicationAsync(appAssembly, appRoot, terminatedRoot, forcePortableTree);
         using var client = new HttpClient { BaseAddress = app.Address, Timeout = TimeSpan.FromSeconds(15) };
         Task<HttpResponseMessage>? refresh = null;
-        var providers = new List<Process>();
-        try
+        using var providers = new ProcessBag();
+        await WithCleanupAsync(async () =>
         {
-            await WithCleanupAsync(async () =>
-            {
-                refresh = client.SendAsync(RefreshRequest(app.Address, month));
-                await WaitForProvidersAsync(terminatedRoot, TimeSpan.FromSeconds(10));
-                CaptureGatedProviders(terminatedRoot, providers);
-            }, () =>
-            {
-                app.Dispose();
-                return Task.CompletedTask;
-            });
-            var disconnected = false;
-            try { (await refresh!).Dispose(); }
-            catch (HttpRequestException) { disconnected = true; }
-            check(disconnected && providers.Count == 2 && providers.All(provider => provider.WaitForExit(0)) &&
-                !File.Exists(Path.Combine(appRoot, ".local", $"snapshot-{month}.json")),
-                checkName);
-        }
-        finally
+            refresh = client.SendAsync(RefreshRequest(app.Address, month));
+            await WaitForProvidersAsync(terminatedRoot, TimeSpan.FromSeconds(10));
+            CaptureGatedProviders(terminatedRoot, providers.Items);
+        }, () =>
         {
-            foreach (var provider in providers) provider.Dispose();
-        }
+            app.Dispose();
+            return Task.CompletedTask;
+        });
+        var disconnected = false;
+        try { (await refresh!).Dispose(); }
+        catch (HttpRequestException) { disconnected = true; }
+        check(disconnected && providers.Items.Count == 2 && providers.Items.All(provider => provider.WaitForExit(0)) &&
+            !File.Exists(Path.Join(appRoot, ".local", $"snapshot-{month}.json")),
+            checkName);
     }
 
     private static void VerifyProcTreeDiscovery(Action<bool, string> check, string procRoot)
     {
-        Directory.CreateDirectory(Path.Combine(procRoot, "self"));
-        Directory.CreateDirectory(Path.Combine(procRoot, "100"));
-        Directory.CreateDirectory(Path.Combine(procRoot, "201"));
-        Directory.CreateDirectory(Path.Combine(procRoot, "202"));
-        Directory.CreateDirectory(Path.Combine(procRoot, "303"));
-        Directory.CreateDirectory(Path.Combine(procRoot, "404"));
+        Directory.CreateDirectory(Path.Join(procRoot, "self"));
+        Directory.CreateDirectory(Path.Join(procRoot, "100"));
+        Directory.CreateDirectory(Path.Join(procRoot, "201"));
+        Directory.CreateDirectory(Path.Join(procRoot, "202"));
+        Directory.CreateDirectory(Path.Join(procRoot, "303"));
+        Directory.CreateDirectory(Path.Join(procRoot, "404"));
 
-        File.WriteAllText(Path.Combine(procRoot, "100", "stat"), "100 (dotnet) S 1 100 100 0 -1");
-        File.WriteAllText(Path.Combine(procRoot, "201", "stat"), "201 (gh (worker)) S 100 100 100 0 -1");
-        File.WriteAllText(Path.Combine(procRoot, "202", "stat"), "202 (leaf) Z 201 100 100 0 -1");
-        File.WriteAllText(Path.Combine(procRoot, "303", "stat"), "303 (reparented) S 1 100 100 0 -1");
-        File.WriteAllText(Path.Combine(procRoot, "303", "environ"), $"PATH=/usr/bin\0{TreeVariable}=tree-token\0");
-        File.WriteAllText(Path.Combine(procRoot, "404", "stat"), "404 (unrelated) S 1 404 404 0 -1");
-        File.WriteAllText(Path.Combine(procRoot, "404", "environ"), $"PATH=/usr/bin\0{TreeVariable}=other-token\0");
+        File.WriteAllText(Path.Join(procRoot, "100", "stat"), "100 (dotnet) S 1 100 100 0 -1");
+        File.WriteAllText(Path.Join(procRoot, "201", "stat"), "201 (gh (worker)) S 100 100 100 0 -1");
+        File.WriteAllText(Path.Join(procRoot, "202", "stat"), "202 (leaf) Z 201 100 100 0 -1");
+        File.WriteAllText(Path.Join(procRoot, "303", "stat"), "303 (reparented) S 1 100 100 0 -1");
+        File.WriteAllText(Path.Join(procRoot, "303", "environ"), $"PATH=/usr/bin\0{TreeVariable}=tree-token\0");
+        File.WriteAllText(Path.Join(procRoot, "404", "stat"), "404 (unrelated) S 1 404 404 0 -1");
+        File.WriteAllText(Path.Join(procRoot, "404", "environ"), $"PATH=/usr/bin\0{TreeVariable}=other-token\0");
 
         var discovered = PortableFixtureProcessTree.CollectProcTreePids(procRoot, rootPid: 100, "tree-token");
         check(discovered.SetEquals([201, 202, 303]),
@@ -706,9 +699,9 @@ internal static class MbrIntegrationTests
     {
         var source = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!;
         foreach (var file in Directory.EnumerateFiles(source))
-            File.Copy(file, Path.Combine(target, Path.GetFileName(file)), overwrite: true);
-        var sourceAppHost = Path.Combine(source, OperatingSystem.IsWindows() ? "JamulaMbr.Tests.exe" : "JamulaMbr.Tests");
-        var targetAppHost = Path.Combine(target, FakeGhEntrypoint.ExecutableName);
+            File.Copy(file, Path.Join(target, Path.GetFileName(file)), overwrite: true);
+        var sourceAppHost = Path.Join(source, OperatingSystem.IsWindows() ? "JamulaMbr.Tests.exe" : "JamulaMbr.Tests");
+        var targetAppHost = Path.Join(target, FakeGhEntrypoint.ExecutableName);
         File.Copy(sourceAppHost, targetAppHost, overwrite: true);
         if (!OperatingSystem.IsWindows())
         {
@@ -828,43 +821,55 @@ internal static class MbrIntegrationTests
         }
     }
 
+    private sealed class ProcessBag : IDisposable
+    {
+        public List<Process> Items { get; } = [];
+
+        public void Dispose()
+        {
+            foreach (var item in Items) item.Dispose();
+        }
+    }
+
+    private sealed class ProcessMap : IDisposable
+    {
+        public Dictionary<int, Process> ById { get; } = [];
+
+        public void Dispose()
+        {
+            foreach (var process in ById.Values) process.Dispose();
+        }
+    }
+
     private sealed class PortableFixtureProcessTree(Process process, string fixtureRoot, string treeId) : IDisposable
     {
         public void Dispose()
         {
             var deadline = Stopwatch.StartNew();
-            var descendants = new Dictionary<int, Process>();
-            try
+            using var descendants = new ProcessMap();
+            TrackKnownDescendants(process.Id, fixtureRoot, treeId, descendants.ById);
+            if (!process.HasExited)
             {
-                TrackKnownDescendants(process.Id, fixtureRoot, treeId, descendants);
-                if (!process.HasExited)
+                try { process.Kill(entireProcessTree: true); }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException && process.WaitForExit(100))
                 {
-                    try { process.Kill(entireProcessTree: true); }
-                    catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException && process.WaitForExit(100))
-                    {
-                        _ = ex.Message;
-                    }
+                    _ = ex.Message;
                 }
-
-                WaitForRemaining(process, deadline);
-                TrackKnownDescendants(process.Id, fixtureRoot, treeId, descendants);
-                foreach (var descendant in descendants.Values.Where(candidate => !candidate.HasExited))
-                {
-                    try { descendant.Kill(entireProcessTree: true); }
-                    catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException)
-                    {
-                        _ = ex.Message;
-                    }
-                }
-
-                foreach (var descendant in descendants.Values)
-                    WaitForRemaining(descendant, deadline);
             }
-            finally
+
+            WaitForRemaining(process, deadline);
+            TrackKnownDescendants(process.Id, fixtureRoot, treeId, descendants.ById);
+            foreach (var descendant in descendants.ById.Values.Where(candidate => !candidate.HasExited))
             {
-                foreach (var descendant in descendants.Values)
-                    descendant.Dispose();
+                try { descendant.Kill(entireProcessTree: true); }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException)
+                {
+                    _ = ex.Message;
+                }
             }
+
+            foreach (var descendant in descendants.ById.Values)
+                WaitForRemaining(descendant, deadline);
         }
 
         private static void WaitForRemaining(Process target, Stopwatch deadline)
@@ -957,7 +962,7 @@ internal static class MbrIntegrationTests
             ppid = 0;
             try
             {
-                var stat = File.ReadAllText(Path.Combine(procEntry, "stat"));
+                var stat = File.ReadAllText(Path.Join(procEntry, "stat"));
                 var closeParen = stat.LastIndexOf(')');
                 if (closeParen < 0 || closeParen + 4 >= stat.Length) return false;
                 var afterState = stat.AsSpan(closeParen + 2);
@@ -978,7 +983,7 @@ internal static class MbrIntegrationTests
         {
             try
             {
-                var environ = File.ReadAllText(Path.Combine(procEntry, "environ"));
+                var environ = File.ReadAllText(Path.Join(procEntry, "environ"));
                 return environ.Split('\0', StringSplitOptions.RemoveEmptyEntries)
                     .Any(part => string.Equals(part, expectedEntry, StringComparison.Ordinal));
             }

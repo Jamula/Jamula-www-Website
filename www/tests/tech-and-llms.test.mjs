@@ -34,6 +34,15 @@ test("static /llms.txt and /llms-full.txt expose canonical pages and published t
 });
 
 test("Astro Content Collection renders /tech/ index and article static pages", async () => {
+  const contentConfig = await readFile(
+    new URL("../src/content.config.ts", import.meta.url),
+    "utf8"
+  );
+  assert.ok(
+    contentConfig.includes('pattern: "*.md"'),
+    "content.config.ts must restrict glob to top-level *.md files to match MCP PublicCorpus"
+  );
+
   const techIndex = await readFile(distUrl("tech/index.html"), "utf8");
   const techArticle = await readFile(
     distUrl("tech/evidence-gated-static-delivery/index.html"),

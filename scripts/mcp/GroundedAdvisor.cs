@@ -30,7 +30,7 @@ public sealed class GroundedAdvisor(PublicCorpus corpus, IChatClient chatClient,
                         nameof(question));
                 }
 
-                var matches = corpus.Search(question[..Math.Min(question.Length, PublicCorpus.MaxQueryLength)], maxResults: 3);
+                var matches = corpus.Search(question, maxResults: 3);
                 if (matches.Count == 0)
                 {
                     return new GroundedAnswer(false, InsufficientEvidenceMessage, []);

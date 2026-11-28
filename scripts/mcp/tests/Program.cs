@@ -180,8 +180,12 @@ await RunAsync("McpTelemetry_EmitsContentSuppressedSpansAndCountersWithoutQueryL
     Check(answered.Answered && answered.Citations.Contains("https://jamula.net/"), "expected grounded citation");
     Check(fakeClient.CallCount == 1, "expected exactly one model invocation for grounded question");
 
+    var suffixQuestion = new string('z', 260) + " custom software";
+    var suffixAnswered = await advisor.AskAsync(suffixQuestion);
+    Check(suffixAnswered.Answered && fakeClient.CallCount == 2, "accepted questions up to 512 chars must search the full suffix without 256-char truncation");
+
     var ungrounded = await advisor.AskAsync("zzzznonexistenttermzzzz");
-    Check(!ungrounded.Answered && fakeClient.CallCount == 1, "ungrounded query must short-circuit without calling IChatClient");
+    Check(!ungrounded.Answered && fakeClient.CallCount == 2, "ungrounded query must short-circuit without calling IChatClient");
 
     var emptyModelAdvisor = new GroundedAdvisor(corpus, new FakeChatClient("   ", 0, 0), telemetry);
     var blankModelReply = await emptyModelAdvisor.AskAsync("custom software");

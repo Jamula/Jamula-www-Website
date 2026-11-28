@@ -297,15 +297,23 @@ test("configuration excludes advertising linker and sensitive URLs from all requ
 });
 
 test("privacy, tech, and arbitrary not-found paths use fixed safe page values", async (t) => {
-  for (const [label, path, safePath, title] of [
-    ["privacy", "/privacy/", "/privacy/", "Website analytics privacy"],
-    ["tech index", "/tech/", "/tech/", "Technical notes"],
-    ["tech note", "/tech/evidence-gated-static-delivery/", "/tech/", "Technical note"],
-    ["tech unsafe slug", "/tech/private@example.test", "/404", "Page not found"],
-    ["unknown", "/private@example.test?secret=value", "/404", "Page not found"],
+  for (const [label, path, docTitle, safePath, title] of [
+    ["privacy", "/privacy/", undefined, "/privacy/", "Website analytics privacy"],
+    ["tech index", "/tech/", undefined, "/tech/", "Technical notes"],
+    ["tech note", "/tech/evidence-gated-static-delivery/", undefined, "/tech/", "Technical note"],
+    [
+      "tech missing slug 404",
+      "/tech/does-not-exist/",
+      "Page not found — Jamula",
+      "/404",
+      "Page not found",
+    ],
+    ["tech unsafe slug", "/tech/private@example.test", undefined, "/404", "Page not found"],
+    ["unknown", "/private@example.test?secret=value", undefined, "/404", "Page not found"],
   ]) {
     await t.test(label, () => {
       const h = harness({ url: `https://jamula.net${path}` });
+      if (docTitle !== undefined) h.doc.title = docTitle;
       h.init();
       h.click("accept");
       const config = h.commands().find(([command]) => command === "config")[2];

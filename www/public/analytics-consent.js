@@ -126,7 +126,8 @@ export function initializeAnalytics(win = window, doc = document) {
           ? { path: "/privacy/", title: "Website analytics privacy" }
           : ["/tech", "/tech/"].includes(win.location.pathname)
             ? { path: "/tech/", title: "Technical notes" }
-            : /^\/tech\/[a-z0-9-]+(?:\/)?$/.test(win.location.pathname)
+            : /^\/tech\/[a-z0-9-]+(?:\/)?$/.test(win.location.pathname) &&
+                !/^Page not found\b/.test(doc.title ?? "")
               ? { path: "/tech/", title: "Technical note" }
               : { path: "/404", title: "Page not found" };
     win.gtag("consent", "default", {

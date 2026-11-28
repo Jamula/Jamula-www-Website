@@ -66,7 +66,7 @@ public sealed class JamulaMcpTools(PublicCorpus corpus, McpTelemetry telemetry)
         OpenWorld = false)]
     [Description("Searches Jamula's approved public content and returns grounded excerpts with canonical URLs.")]
     public string SearchPublicCorpus(
-        [Description("Search terms (1 to 256 characters).")] string query,
+        [Description("Search terms (1 to 512 characters).")] string query,
         [Description("Maximum matches to return (1 to 10).")] int maxResults = 5) =>
         telemetry.ExecuteTool(
             "search_public_corpus",

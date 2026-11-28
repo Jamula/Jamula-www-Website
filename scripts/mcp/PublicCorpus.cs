@@ -20,7 +20,7 @@ public sealed record CorpusMatch(
 public sealed class PublicCorpus
 {
     public const int MaxFileBytes = 256 * 1024;
-    public const int MaxQueryLength = 256;
+    public const int MaxQueryLength = 512;
     public const int MaxExcerptLength = 280;
 
     private static readonly Regex SafeSlug = new(@"^[a-z0-9-]+$", RegexOptions.Compiled);
