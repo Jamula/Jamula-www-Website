@@ -1,6 +1,6 @@
-const assert = require("node:assert/strict");
-const { test } = require("node:test");
-const { escalate } = require("./uptime-alert.cjs");
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { escalate } from "./uptime-alert.mjs";
 
 function fixture(issues = []) {
   const created = [];

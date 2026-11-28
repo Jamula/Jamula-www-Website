@@ -1,10 +1,12 @@
-const fs = require("node:fs");
-const path = require("node:path");
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 
 const BUILD_PATH = ".github/workflows/azure-static-web-apps.yml";
 const SHA_PATTERN = /^[a-f0-9]{40}(?![\s\S])/;
+const MAX_ARTIFACT_BYTES = 100 * 1024 * 1024;
 
-async function selectPreview(github, repo, run) {
+export async function selectPreview(github, repo, run) {
   const repository = `${repo.owner}/${repo.repo}`;
   if (
     run.event !== "pull_request" ||
@@ -111,7 +113,7 @@ async function selectPreview(github, repo, run) {
     site[0].id <= 0 ||
     !/^sha256:[a-f0-9]{64}$/.test(site[0].digest ?? "") ||
     site[0].size_in_bytes <= 0 ||
-    site[0].size_in_bytes > 100 * 1024 * 1024 ||
+    site[0].size_in_bytes > MAX_ARTIFACT_BYTES ||
     site[0].workflow_run?.id !== run.id ||
     site[0].workflow_run?.head_sha !== run.head_sha
   ) {
@@ -122,7 +124,7 @@ async function selectPreview(github, repo, run) {
   return { action: "upload", pr, sha: run.head_sha, artifact: site[0] };
 }
 
-function writePreviewEvent(selection, repository, destination) {
+export function writePreviewEvent(selection, repository, destination) {
   if (!["upload", "close"].includes(selection.action)) {
     throw new Error("Only a selected PR may produce a deployment event.");
   }
@@ -138,7 +140,7 @@ function writePreviewEvent(selection, repository, destination) {
   );
 }
 
-function previewEnvironment(selection, repository) {
+export function previewEnvironment(selection, repository) {
   const { pr, sha, action } = selection;
   if (
     !["upload", "close"].includes(action) ||
@@ -163,4 +165,85 @@ function previewEnvironment(selection, repository) {
   return String(pr.number);
 }
 
-module.exports = { selectPreview, writePreviewEvent, previewEnvironment };
+export async function runPreviewGate({
+  github,
+  context,
+  core,
+  eventDestination = ".preview/event.json",
+  archiveDestination = ".preview/site.zip",
+}) {
+  const { data: run } = await github.rest.actions.getWorkflowRun({
+    ...context.repo,
+    run_id: context.payload.workflow_run.id,
+  });
+  const selection = await selectPreview(github, context.repo, run);
+  core.setOutput("action", selection.action);
+  if (selection.action === "skip") {
+    await core.summary.addRaw(selection.reason).write();
+    return selection;
+  }
+  previewEnvironment(selection, `${context.repo.owner}/${context.repo.repo}`);
+  writePreviewEvent(selection, context.payload.repository, eventDestination);
+  core.setOutput("number", selection.pr.number);
+  core.setOutput("sha", selection.sha);
+  if (selection.action === "upload") {
+    const archive = await github.rest.actions.downloadArtifact({
+      ...context.repo,
+      artifact_id: selection.artifact.id,
+      archive_format: "zip",
+    });
+    const bytes = Buffer.from(archive.data);
+    if (bytes.length > MAX_ARTIFACT_BYTES) {
+      throw new Error("The artifact archive exceeds the size limit.");
+    }
+    const digest = `sha256:${crypto.createHash("sha256").update(bytes).digest("hex")}`;
+    if (digest !== selection.artifact.digest) {
+      throw new Error(
+        "The artifact archive digest does not match GitHub metadata.",
+      );
+    }
+    fs.mkdirSync(path.dirname(archiveDestination), { recursive: true });
+    fs.writeFileSync(archiveDestination, bytes);
+    core.setOutput("digest", digest);
+  }
+  return selection;
+}
+
+export async function runPreviewRecheck({
+  github,
+  context,
+  core,
+  action,
+  eventPath = ".preview/event.json",
+}) {
+  const saved = JSON.parse(fs.readFileSync(eventPath, "utf8"));
+  const { data: pr } = await github.rest.pulls.get({
+    ...context.repo,
+    pull_number: saved.number,
+  });
+  const current =
+    pr.number === saved.number &&
+    pr.number === saved.pull_request.number &&
+    pr.head.sha === saved.pull_request.head.sha &&
+    pr.head.repo?.full_name === saved.pull_request.head.repo.full_name &&
+    pr.head.ref === saved.pull_request.head.ref &&
+    pr.base.repo?.full_name === `${context.repo.owner}/${context.repo.repo}` &&
+    pr.base.ref === "main" &&
+    pr.base.sha === saved.pull_request.base.sha &&
+    pr.state === saved.pull_request.state;
+  core.setOutput("deploy", current);
+  if (current) {
+    core.setOutput(
+      "environment",
+      previewEnvironment(
+        { action, pr, sha: saved.pull_request.head.sha },
+        `${context.repo.owner}/${context.repo.repo}`,
+      ),
+    );
+  } else {
+    await core.summary
+      .addRaw("Preview not changed: the PR changed after artifact selection.")
+      .write();
+  }
+  return current;
+}

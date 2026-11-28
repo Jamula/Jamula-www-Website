@@ -1,0 +1,25 @@
+<Solution>
+  <Folder Name="/accelerator/">
+    <Project Path="accelerator/Authorization/JamulaAccelerator.Authorization.csproj" />
+    <Project Path="accelerator/Authorization.Tests/JamulaAccelerator.Authorization.Tests.csproj" />
+    <Project Path="accelerator/Telemetry/JamulaAccelerator.Telemetry.csproj" />
+    <Project Path="accelerator/Telemetry.Tests/JamulaAccelerator.Telemetry.Tests.csproj" />
+  </Folder>
+  <Folder Name="/mbr/">
+    <Project Path="scripts/mbr/JamulaMbr.csproj" />
+    <Project Path="scripts/mbr/tests/JamulaMbr.Tests.csproj" />
+  </Folder>
+  <Folder Name="/mcp/">
+    <Project Path="scripts/mcp/JamulaMcp.csproj" />
+    <Project Path="scripts/mcp/tests/JamulaMcp.Tests.csproj" />
+  </Folder>
+  <Folder Name="/monitor/">
+    <Project Path="scripts/monitor/JamulaMonitor.csproj" />
+    <Project Path="scripts/monitor/tests/JamulaMonitor.Tests.csproj" />
+  </Folder>
+  <Folder Name="/validation/">
+    <Project Path="scripts/validation/JamulaValidation.csproj" />
+    <Project Path="scripts/validation.tests/JamulaValidation.Tests.csproj" />
+    <Project Path="scripts/validation.cli.tests/JamulaValidation.Cli.Tests.csproj" />
+  </Folder>
+</Solution>

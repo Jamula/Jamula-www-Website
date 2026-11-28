@@ -80,20 +80,20 @@
       "id": "github-automation",
       "reports": ["automation/cobertura-coverage.xml"],
       "sources": [
-        ".github/scripts/production-deployment.cjs",
-        ".github/scripts/release.cjs",
-        ".github/scripts/swa-preview.cjs",
-        ".github/scripts/uptime-alert.cjs",
-        ".github/scripts/verify-preview.cjs",
-        ".github/scripts/verify-swa-csp.cjs"
+        ".github/scripts/production-deployment.mjs",
+        ".github/scripts/release.mjs",
+        ".github/scripts/swa-preview.mjs",
+        ".github/scripts/uptime-alert.mjs",
+        ".github/scripts/verify-preview.mjs",
+        ".github/scripts/verify-swa-csp.mjs"
       ],
       "sourceReports": {
-        ".github/scripts/production-deployment.cjs": "automation/cobertura-coverage.xml",
-        ".github/scripts/release.cjs": "automation/cobertura-coverage.xml",
-        ".github/scripts/swa-preview.cjs": "automation/cobertura-coverage.xml",
-        ".github/scripts/uptime-alert.cjs": "automation/cobertura-coverage.xml",
-        ".github/scripts/verify-preview.cjs": "automation/cobertura-coverage.xml",
-        ".github/scripts/verify-swa-csp.cjs": "automation/cobertura-coverage.xml"
+        ".github/scripts/production-deployment.mjs": "automation/cobertura-coverage.xml",
+        ".github/scripts/release.mjs": "automation/cobertura-coverage.xml",
+        ".github/scripts/swa-preview.mjs": "automation/cobertura-coverage.xml",
+        ".github/scripts/uptime-alert.mjs": "automation/cobertura-coverage.xml",
+        ".github/scripts/verify-preview.mjs": "automation/cobertura-coverage.xml",
+        ".github/scripts/verify-swa-csp.mjs": "automation/cobertura-coverage.xml"
       },
       "validatedDeclarative": [
         {
@@ -114,12 +114,12 @@
         {
           "path": ".github/workflows/required-pr-validation.yml",
           "kind": "github-actions-workflow",
-          "reason": "Declarative GitHub Actions workflow YAML verified by release.test.cjs and gate.test.mjs."
+          "reason": "Declarative GitHub Actions workflow YAML verified by release.test.mjs and gate.test.mjs."
         },
         {
           "path": ".github/workflows/uptime-apex-monitor.yml",
           "kind": "github-actions-workflow",
-          "reason": "Declarative GitHub Actions workflow YAML invoking measured monitor executable."
+          "reason": "Declarative GitHub Actions workflow YAML invoking measured monitor executable and uptime-alert.mjs."
         }
       ]
     },
@@ -231,19 +231,19 @@
       "reason": "Coverage collection support runner, not gate evaluation or shipped application behavior."
     },
     {
-      "path": ".github/scripts/release.test.cjs",
+      "path": ".github/scripts/release.test.mjs",
       "reason": "Test-only source; its assertions are not product behavior."
     },
     {
-      "path": ".github/scripts/swa-preview.test.cjs",
+      "path": ".github/scripts/swa-preview.test.mjs",
       "reason": "Test-only source; its assertions are not product behavior."
     },
     {
-      "path": ".github/scripts/uptime-alert.test.cjs",
+      "path": ".github/scripts/uptime-alert.test.mjs",
       "reason": "Test-only source; its assertions are not product behavior."
     },
     {
-      "path": ".github/scripts/verify-preview.test.cjs",
+      "path": ".github/scripts/verify-preview.test.mjs",
       "reason": "Test-only source; its assertions are not product behavior."
     },
     {

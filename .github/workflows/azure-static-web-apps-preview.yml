@@ -30,45 +30,19 @@ jobs:
       - name: Set up trusted .NET SDK
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
-          global-json-file: trusted/scripts/validation/global.json
+          global-json-file: trusted/global.json
 
       - name: Select current preview and download immutable artifact
         id: gate
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const fs = require("node:fs");
-            const crypto = require("node:crypto");
-            const { selectPreview, writePreviewEvent, previewEnvironment } =
-              require("./trusted/.github/scripts/swa-preview.cjs");
-            const { data: run } = await github.rest.actions.getWorkflowRun({
-              ...context.repo, run_id: context.payload.workflow_run.id,
-            });
-            const selection = await selectPreview(github, context.repo, run);
-            core.setOutput("action", selection.action);
-            if (selection.action === "skip") {
-              await core.summary.addRaw(selection.reason).write();
-              return;
-            }
-            previewEnvironment(selection, `${context.repo.owner}/${context.repo.repo}`);
-            writePreviewEvent(selection, context.payload.repository, ".preview/event.json");
-            core.setOutput("number", selection.pr.number);
-            core.setOutput("sha", selection.sha);
-            if (selection.action === "upload") {
-              const archive = await github.rest.actions.downloadArtifact({
-                ...context.repo, artifact_id: selection.artifact.id, archive_format: "zip",
-              });
-              const bytes = Buffer.from(archive.data);
-              if (bytes.length > 100 * 1024 * 1024) {
-                throw new Error("The artifact archive exceeds the size limit.");
-              }
-              const digest = `sha256:${crypto.createHash("sha256").update(bytes).digest("hex")}`;
-              if (digest !== selection.artifact.digest) {
-                throw new Error("The artifact archive digest does not match GitHub metadata.");
-              }
-              fs.writeFileSync(".preview/site.zip", bytes);
-              core.setOutput("digest", digest);
-            }
+            const path = require("node:path");
+            const { pathToFileURL } = require("node:url");
+            const { runPreviewGate } = await import(
+              pathToFileURL(path.resolve("trusted/.github/scripts/swa-preview.mjs")).href,
+            );
+            await runPreviewGate({ github, context, core });
 
       - name: Extract only static files and verify trusted configuration
         if: steps.gate.outputs.action == 'upload'
@@ -81,31 +55,17 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const fs = require("node:fs");
-            const saved = JSON.parse(fs.readFileSync(".preview/event.json", "utf8"));
-            const { data: pr } = await github.rest.pulls.get({
-              ...context.repo, pull_number: saved.number,
+            const path = require("node:path");
+            const { pathToFileURL } = require("node:url");
+            const { runPreviewRecheck } = await import(
+              pathToFileURL(path.resolve("trusted/.github/scripts/swa-preview.mjs")).href,
+            );
+            await runPreviewRecheck({
+              github,
+              context,
+              core,
+              action: "${{ steps.gate.outputs.action }}",
             });
-            const current =
-              pr.number === saved.number &&
-              pr.number === saved.pull_request.number &&
-              pr.head.sha === saved.pull_request.head.sha &&
-              pr.head.repo?.full_name === saved.pull_request.head.repo.full_name &&
-              pr.head.ref === saved.pull_request.head.ref &&
-              pr.base.repo?.full_name === `${context.repo.owner}/${context.repo.repo}` &&
-              pr.base.ref === "main" &&
-              pr.base.sha === saved.pull_request.base.sha &&
-              pr.state === saved.pull_request.state;
-            core.setOutput("deploy", current);
-            if (current) {
-              const { previewEnvironment } = require("./trusted/.github/scripts/swa-preview.cjs");
-              core.setOutput("environment", previewEnvironment({
-                action: "${{ steps.gate.outputs.action }}", pr, sha: saved.pull_request.head.sha,
-              }, `${context.repo.owner}/${context.repo.repo}`));
-            }
-            if (!current) {
-              await core.summary.addRaw("Preview not changed: the PR changed after artifact selection.").write();
-            }
 
       - name: Require trusted deployment token
         if: steps.current.outputs.deploy == 'true'
@@ -151,7 +111,7 @@ jobs:
             echo "::error::The deployment URL is not the selected PR preview."
             exit 1
           fi
-          node trusted/.github/scripts/verify-preview.cjs "$DEPLOYED_URL"
+          node trusted/.github/scripts/verify-preview.mjs "$DEPLOYED_URL"
           {
             echo "### Verified isolated PR preview"
             echo "- PR: ${PR_NUMBER}"

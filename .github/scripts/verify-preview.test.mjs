@@ -1,17 +1,19 @@
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const https = require("node:https");
-const { EventEmitter } = require("node:events");
-const { spawnSync } = require("node:child_process");
-const { test } = require("node:test");
-const {
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import https from "node:https";
+import { EventEmitter } from "node:events";
+import { spawnSync } from "node:child_process";
+import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+import {
   verifyPreview,
   fetchPreview,
   requestPreview,
   RETRY_DELAYS,
-} = require("./verify-preview.cjs");
+} from "./verify-preview.mjs";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const URL = "https://ashy-beach-033c7d01e-74.7.azurestaticapps.net";
 
 function fixture() {
@@ -250,10 +252,16 @@ test("transient statuses return the eventual successful response", async () => {
   assert.deepEqual(f.delays, [2000]);
 });
 
-test("HTTP transport returns redirects without following their location", async (t) => {
+test("HTTP transport returns redirects without following their location and forwards optional headers", async (t) => {
   const calls = [];
-  t.mock.method(https, "get", (url, callback) => {
-    calls.push(url);
+  t.mock.method(https, "get", (url, optionsOrCallback, maybeCallback) => {
+    const callback =
+      typeof optionsOrCallback === "function"
+        ? optionsOrCallback
+        : maybeCallback;
+    const options =
+      typeof optionsOrCallback === "function" ? undefined : optionsOrCallback;
+    calls.push({ url, options });
     const request = new EventEmitter();
     queueMicrotask(() => {
       const response = new EventEmitter();
@@ -267,7 +275,14 @@ test("HTTP transport returns redirects without following their location", async 
   });
   const response = await requestPreview(`${URL}/`);
   assert.equal(response.status, 302);
-  assert.deepEqual(calls, [`${URL}/`]);
+  const noCache = await requestPreview(`${URL}/`, 200, {
+    "Cache-Control": "no-cache",
+  });
+  assert.equal(noCache.status, 302);
+  assert.deepEqual(calls, [
+    { url: `${URL}/`, options: undefined },
+    { url: `${URL}/`, options: { headers: { "Cache-Control": "no-cache" } } },
+  ]);
 });
 
 test("HTTP transport rejects an oversized body without a retryable error", async (t) => {
@@ -354,7 +369,6 @@ test("HTTP transport preserves permanent statuses despite reset or deadline with
             response.emit("error", error);
             request.emit("error", error);
           } else {
-            // Advance before promise cleanup to reproduce a deadline after headers.
             t.mock.timers.tick(20000);
           }
         });
@@ -449,14 +463,14 @@ test("HTTP transport reads the expected 404 body", async (t) => {
   assert.equal(response.body.toString(), "Page not found");
 });
 
-test("CLI rejects missing arguments and production URLs with a failing exit", () => {
+test("CLI verifies mocked HTTPS preview or rejects missing arguments and production URLs", async () => {
   for (const arguments_ of [
     [],
     ["https://ashy-beach-033c7d01e.7.azurestaticapps.net"],
   ]) {
     const result = spawnSync(
       process.execPath,
-      [path.join(__dirname, "verify-preview.cjs"), ...arguments_],
+      [path.join(__dirname, "verify-preview.mjs"), ...arguments_],
       { encoding: "utf8" },
     );
     assert.ifError(result.error);

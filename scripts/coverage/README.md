@@ -148,8 +148,8 @@ node --test www/tests/measure-local-performance.test.mjs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 & .\www\node_modules\.bin\c8.cmd --reporter=cobertura --reports-dir="$reports\automation" `
-  --include=".github/scripts/*.cjs" --exclude=".github/scripts/*.test.cjs" `
-  node --test .github/scripts/*.test.cjs
+  --include=".github/scripts/*.mjs" --exclude=".github/scripts/*.test.mjs" `
+  node --test .github/scripts/*.test.mjs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 & .\www\node_modules\.bin\c8.cmd --reporter=cobertura --reports-dir="$reports\mbr-ui" `
@@ -288,7 +288,8 @@ Do not merge separately exported Cobertura reports with `dotnet-coverage merge`
 `PreviewArtifactValidator.cs`.
 Merging native `.coverage` inputs then exporting also lost the branch evidence.
 The shared-session Cobertura export preserves the original denominators.
-Live preview HTTP verification is owned by `.github/scripts/verify-preview.cjs`
+Live preview and production HTTP verification are owned by
+`.github/scripts/verify-preview.mjs` and `.github/scripts/production-deployment.mjs`
 (`github-automation` component); `validation-tool` covers offline governance
 and preview-artifact validation only.
 
@@ -404,9 +405,11 @@ collector, empty report, or console-only runner summary as a successful gate.
 - The website also has an executable `www/astro.config.ts`. The runtime
   coverage report measures only `www/public/analytics-consent.js`; separate
   configuration coverage does not measure the templates.
-- Workflow YAML contains inline shell/JavaScript and workflow control logic not
-  represented by the `.github/scripts/*.cjs` Cobertura report. All tracked
-  workflows are named in the inventory.
+- Workflow YAML contains workflow control logic and minimal git/gh orchestration
+  not represented by the `.github/scripts/*.mjs` Cobertura report (preview
+  gate/recheck and production live-site/CSP/config verification have been moved
+  into measured `.github/scripts/*.mjs` modules). All tracked workflows are
+  named in the inventory.
 - In the 2026-11-13 run, the measured monitor, MBR, and validation component
   totals met the 90% line and branch thresholds. Some individual sources remain
   below 90%; external DNS/GitHub/server paths remain in their denominators.
@@ -421,7 +424,7 @@ collector, empty report, or console-only runner summary as a successful gate.
   `PreviewArtifactValidator.cs`, and `Program.cs`) is measured separately from
   its offline unit and CLI test runners (`PreviewSiteVerifier.cs` and its
   `verify-site` subcommand were retired in favor of
-  `.github/scripts/verify-preview.cjs`). Combining both runners measured
+  `.github/scripts/verify-preview.mjs`). Combining both runners measured
   313/320 lines (97.81%) and 241/254 branches (94.88%) locally, with every
   `validation-tool` source above 90% line and branch coverage (`Program.cs`
   19/19 lines and 12/12 branches; `GovernanceValidator.cs` 108/109 lines and

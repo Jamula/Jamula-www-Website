@@ -1,11 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <!-- .NET 11 STS; CI installs the SDK selected by scripts/monitor/global.json. -->
-    <TargetFramework>net11.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- .NET 11 STS; CI installs the SDK selected by root global.json. -->
     <AssemblyName>JamulaMonitor</AssemblyName>
     <RootNamespace>JamulaMonitor</RootNamespace>
   </PropertyGroup>

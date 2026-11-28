@@ -1,10 +1,12 @@
-const fs = require("node:fs");
-const crypto = require("node:crypto");
+import fs from "node:fs";
+import crypto from "node:crypto";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const BASELINE = "0.1.0";
 const SHA = /^[0-9a-f]{40}$/;
 
-function parseVersion(value) {
+export function parseVersion(value) {
   const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(value);
   if (!match) throw new Error(`Invalid release version: ${value}`);
   const parts = match.slice(1).map(Number);
@@ -20,7 +22,7 @@ function compare(a, b) {
   return 0;
 }
 
-function selectRelease(tags, releases, classification, revision) {
+export function selectRelease(tags, releases, classification, revision) {
   if (!["material", "fix"].includes(classification))
     throw new Error("Invalid change classification");
   if (!SHA.test(revision)) throw new Error("Invalid revision");
@@ -82,7 +84,7 @@ function selectRelease(tags, releases, classification, revision) {
   return { version: parts.join("."), releaseSha, fingerprint };
 }
 
-function metadata(version, revision, run, attempt) {
+export function metadata(version, revision, run, attempt) {
   parseVersion(version);
   if (
     !SHA.test(revision) ||
@@ -93,7 +95,7 @@ function metadata(version, revision, run, attempt) {
   return { version, revision, run, attempt };
 }
 
-function verifyMetadata(actual, expected) {
+export function verifyMetadata(actual, expected) {
   if (
     !actual ||
     typeof actual !== "object" ||
@@ -102,22 +104,30 @@ function verifyMetadata(actual, expected) {
     throw new Error("Live release metadata does not match this deployment");
 }
 
-if (require.main === module) {
-  const [command, ...args] = process.argv.slice(2);
+export function runReleaseCli(
+  argv,
+  append = fs.appendFileSync,
+  log = console.log,
+) {
+  const [command, ...args] = argv;
   if (command === "select") {
-    const [tagsFile, releasesFile, classification, revision] = args;
+    const [tagsFile, releasesFile, classification, revision, outputFile] = args;
     const readPages = (file) =>
       JSON.parse(fs.readFileSync(file, "utf8")).flat();
-    console.log(
-      JSON.stringify(
-        selectRelease(
-          readPages(tagsFile),
-          readPages(releasesFile),
-          classification,
-          revision,
-        ),
-      ),
+    const selected = selectRelease(
+      readPages(tagsFile),
+      readPages(releasesFile),
+      classification,
+      revision,
     );
+    const serialized = JSON.stringify(selected);
+    if (outputFile) {
+      append(
+        outputFile,
+        `version=${selected.version}\nselection=${serialized}\n`,
+      );
+    }
+    log(serialized);
   } else if (command === "write" || command === "verify") {
     const [file, version, revision, run, attempt] = args;
     const expected = metadata(version, revision, run, attempt);
@@ -129,4 +139,6 @@ if (require.main === module) {
   }
 }
 
-module.exports = { selectRelease, metadata, verifyMetadata };
+if (import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  runReleaseCli(process.argv.slice(2));
+}

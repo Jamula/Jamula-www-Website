@@ -92,11 +92,7 @@ jobs:
           set -euo pipefail
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/tags?per_page=100" > release-tags.json
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > release-history.json
-          selection="$(node .github/scripts/release.cjs select release-tags.json release-history.json "$CHANGE_TYPE" "$DEPLOYMENT_SHA")"
-          version="$(node -e 'console.log(JSON.parse(process.argv[1]).version)' "$selection")"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "selection=$selection" >> "$GITHUB_OUTPUT"
-          echo "Selected v$version for $DEPLOYMENT_SHA."
+          node .github/scripts/release.mjs select release-tags.json release-history.json "$CHANGE_TYPE" "$DEPLOYMENT_SHA" "$GITHUB_OUTPUT"
 
   build:
     name: Build verified artifact
@@ -163,21 +159,11 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          node ../.github/scripts/release.cjs write dist/release.json "$RELEASE_VERSION" "$DEPLOYMENT_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
+          node ../.github/scripts/release.mjs write dist/release.json "$RELEASE_VERSION" "$DEPLOYMENT_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
           echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
       - name: Verify deployment configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f dist/staticwebapp.config.json
-          node -e "
-            const fs = require('node:fs');
-            const config = JSON.parse(fs.readFileSync('dist/staticwebapp.config.json', 'utf8'));
-            if (config.responseOverrides?.['404']?.statusCode !== 404) process.exit(1);
-            if (!config.globalHeaders?.['Content-Security-Policy']) process.exit(1);
-            if (config.mimeTypes?.['.txt'] !== 'text/plain') process.exit(1);
-          "
+        run: node ../.github/scripts/verify-swa-csp.mjs dist/staticwebapp.config.json
 
       - name: Upload immutable deployment artifact
         id: artifact
@@ -235,9 +221,10 @@ jobs:
           ref: ${{ env.DEPLOYMENT_SHA }}
           persist-credentials: false
           sparse-checkout: |
-            .github/scripts/verify-swa-csp.cjs
-            .github/scripts/release.cjs
-            .github/scripts/production-deployment.cjs
+            .github/scripts/verify-swa-csp.mjs
+            .github/scripts/verify-preview.mjs
+            .github/scripts/release.mjs
+            .github/scripts/production-deployment.mjs
           sparse-checkout-cone-mode: false
 
       - name: Require production deployment token
@@ -257,8 +244,7 @@ jobs:
           path: www/dist
 
       - name: Verify downloaded configuration
-        shell: bash
-        run: test -f www/dist/staticwebapp.config.json
+        run: node .github/scripts/verify-swa-csp.mjs www/dist/staticwebapp.config.json
 
       - name: Require current main revision
         shell: bash
@@ -271,7 +257,7 @@ jobs:
 
       - name: Record production deployment
         id: record
-        run: node .github/scripts/production-deployment.cjs start
+        run: node .github/scripts/production-deployment.mjs start
 
       - name: Deploy prebuilt site
         id: deploy
@@ -285,116 +271,10 @@ jobs:
 
       - name: Verify live site
         id: verify
-        shell: bash
         env:
           DEPLOYED_URL: ${{ steps.deploy.outputs.static_web_app_url }}
           ARTIFACT_DIGEST: ${{ needs.build.outputs.artifact_digest }}
-          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-          RELEASE_ATTEMPT: ${{ needs.build.outputs.release_attempt }}
-        run: |
-          set -euo pipefail
-          if [[ "${DEPLOYED_URL%/}" != "https://ashy-beach-033c7d01e.7.azurestaticapps.net" ]]; then
-            echo "::error::The deployment action returned an unexpected URL."
-            exit 1
-          fi
-
-          headers="$(mktemp)"
-          robots_headers="$(mktemp)"
-          body="$(mktemp)"
-          trap 'rm -f "$headers" "$robots_headers" "$body"' EXIT
-
-          for attempt in {1..18}; do
-            if curl --fail --silent --show-error --location \
-              --proto '=https' --tlsv1.2 \
-              --dump-header "$headers" --output "$body" \
-              "${DEPLOYED_URL%/}/"; then
-              break
-            fi
-            if [[ "$attempt" == 18 ]]; then
-              echo "::error::The deployed home page did not become ready."
-              exit 1
-            fi
-            sleep 10
-          done
-
-          metadata_file="release-metadata.json"
-          for attempt in {1..18}; do
-            if curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
-              --header 'Cache-Control: no-cache' --output "$metadata_file" \
-              "${DEPLOYED_URL%/}/release.json?run=${GITHUB_RUN_ID}-${RELEASE_ATTEMPT}" &&
-              node .github/scripts/release.cjs verify "$metadata_file" "$RELEASE_VERSION" "$DEPLOYMENT_SHA" "$GITHUB_RUN_ID" "$RELEASE_ATTEMPT"; then
-              break
-            fi
-            if [[ "$attempt" == 18 ]]; then
-              echo "::error::Live release metadata did not match the deployed artifact."
-              exit 1
-            fi
-            sleep 10
-          done
-          rm -f "$metadata_file"
-          curl --fail --silent --show-error --location \
-            --proto '=https' --tlsv1.2 --header 'Cache-Control: no-cache' \
-            --dump-header "$headers" --output "$body" \
-            "${DEPLOYED_URL%/}/"
-
-          header_value() {
-            awk -F': ' -v wanted="$1" '
-              tolower($1) == tolower(wanted) {
-                sub(/\r$/, "", $2)
-                value = $2
-              }
-              END { print value }
-            ' "$headers"
-          }
-          expect_header() {
-            local name="$1"
-            local expected="$2"
-            local observed
-            observed="$(header_value "$name")"
-            if [[ "$observed" != "$expected" ]]; then
-              echo "::error::Unexpected ${name} header."
-              exit 1
-            fi
-          }
-
-          grep -qi '<title>.*Jamula' "$body"
-          node .github/scripts/verify-swa-csp.cjs \
-            www/dist/staticwebapp.config.json "$headers"
-          expect_header "X-Frame-Options" "DENY"
-          expect_header "X-Content-Type-Options" "nosniff"
-          expect_header "Referrer-Policy" "strict-origin-when-cross-origin"
-          expect_header "Permissions-Policy" "camera=(), microphone=(), geolocation=()"
-
-          hsts="$(header_value "Strict-Transport-Security")"
-          [[ -n "$hsts" ]] || {
-            echo "::error::Strict-Transport-Security was not enforced."
-            exit 1
-          }
-
-          curl --fail --silent --show-error --location \
-            --proto '=https' --tlsv1.2 \
-            --dump-header "$robots_headers" --output /dev/null \
-            "${DEPLOYED_URL%/}/robots.txt"
-          grep -Eiq '^content-type: *text/plain([;[:space:]]|$)' "$robots_headers"
-
-          missing_status="$(
-            curl --silent --show-error --location \
-              --proto '=https' --tlsv1.2 \
-              --output "$body" --write-out '%{http_code}' \
-              "${DEPLOYED_URL%/}/__jamula_missing_route__"
-          )"
-          [[ "$missing_status" == "404" ]]
-          grep -qi 'Page not found' "$body"
-
-          {
-            echo "### Verified Azure deployment"
-            echo "- Release: \`v${RELEASE_VERSION}\`"
-            echo "- Revision: \`${DEPLOYMENT_SHA}\`"
-            echo "- Artifact digest: \`${ARTIFACT_DIGEST}\`"
-            echo "- URL: ${DEPLOYED_URL}"
-            echo "- Configuration: CSP, framing, MIME, referrer, permissions, 404 response"
-            echo "- Azure platform: TLS/HSTS"
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: node .github/scripts/production-deployment.mjs verify
 
       - name: Record deployment result
         if: always() && steps.record.outputs.id != ''
@@ -402,10 +282,7 @@ jobs:
           DEPLOYMENT_ID: ${{ steps.record.outputs.id }}
           VERIFY_OUTCOME: ${{ steps.verify.outcome }}
           DEPLOYED_URL: ${{ steps.deploy.outputs.static_web_app_url }}
-        run: |
-          state=failure
-          if [[ "$VERIFY_OUTCOME" == "success" ]]; then state=success; fi
-          node .github/scripts/production-deployment.cjs status "$DEPLOYMENT_ID" "$state" "$DEPLOYED_URL"
+        run: node .github/scripts/production-deployment.mjs finish
 
   deploy-com:
     name: Deploy and verify .com app
@@ -434,9 +311,10 @@ jobs:
           ref: ${{ env.DEPLOYMENT_SHA }}
           persist-credentials: false
           sparse-checkout: |
-            .github/scripts/verify-swa-csp.cjs
-            .github/scripts/release.cjs
-            .github/scripts/production-deployment.cjs
+            .github/scripts/verify-swa-csp.mjs
+            .github/scripts/verify-preview.mjs
+            .github/scripts/release.mjs
+            .github/scripts/production-deployment.mjs
           sparse-checkout-cone-mode: false
 
       - name: Require companion deployment token
@@ -456,8 +334,7 @@ jobs:
           path: www/dist
 
       - name: Verify downloaded configuration
-        shell: bash
-        run: test -f www/dist/staticwebapp.config.json
+        run: node .github/scripts/verify-swa-csp.mjs www/dist/staticwebapp.config.json
 
       - name: Require current main revision
         shell: bash
@@ -470,7 +347,7 @@ jobs:
 
       - name: Record production deployment
         id: record
-        run: node .github/scripts/production-deployment.cjs start
+        run: node .github/scripts/production-deployment.mjs start
 
       - name: Deploy prebuilt site
         id: deploy
@@ -484,117 +361,10 @@ jobs:
 
       - name: Verify live site
         id: verify
-        shell: bash
         env:
           DEPLOYED_URL: ${{ steps.deploy.outputs.static_web_app_url }}
           ARTIFACT_DIGEST: ${{ needs.build.outputs.artifact_digest }}
-          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-          RELEASE_ATTEMPT: ${{ needs.build.outputs.release_attempt }}
-        run: |
-          set -euo pipefail
-          if [[ "${DEPLOYED_URL%/}" != "https://red-cliff-0ee064a1e.2.azurestaticapps.net" ]]; then
-            echo "::error::The deployment action returned an unexpected URL."
-            exit 1
-          fi
-
-          headers="$(mktemp)"
-          robots_headers="$(mktemp)"
-          body="$(mktemp)"
-          trap 'rm -f "$headers" "$robots_headers" "$body"' EXIT
-
-          for attempt in {1..18}; do
-            if curl --fail --silent --show-error --location \
-              --proto '=https' --tlsv1.2 \
-              --dump-header "$headers" --output "$body" \
-              "${DEPLOYED_URL%/}/"; then
-              break
-            fi
-            if [[ "$attempt" == 18 ]]; then
-              echo "::error::The deployed home page did not become ready."
-              exit 1
-            fi
-            sleep 10
-          done
-
-          metadata_file="release-metadata.json"
-          for attempt in {1..18}; do
-            if curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
-              --header 'Cache-Control: no-cache' --output "$metadata_file" \
-              "${DEPLOYED_URL%/}/release.json?run=${GITHUB_RUN_ID}-${RELEASE_ATTEMPT}" &&
-              node .github/scripts/release.cjs verify "$metadata_file" "$RELEASE_VERSION" "$DEPLOYMENT_SHA" "$GITHUB_RUN_ID" "$RELEASE_ATTEMPT"; then
-              break
-            fi
-            if [[ "$attempt" == 18 ]]; then
-              echo "::error::Live release metadata did not match the deployed artifact."
-              exit 1
-            fi
-            sleep 10
-          done
-          rm -f "$metadata_file"
-
-          curl --fail --silent --show-error --location \
-            --proto '=https' --tlsv1.2 --header 'Cache-Control: no-cache' \
-            --dump-header "$headers" --output "$body" \
-            "${DEPLOYED_URL%/}/"
-
-          header_value() {
-            awk -F': ' -v wanted="$1" '
-              tolower($1) == tolower(wanted) {
-                sub(/\r$/, "", $2)
-                value = $2
-              }
-              END { print value }
-            ' "$headers"
-          }
-          expect_header() {
-            local name="$1"
-            local expected="$2"
-            local observed
-            observed="$(header_value "$name")"
-            if [[ "$observed" != "$expected" ]]; then
-              echo "::error::Unexpected ${name} header."
-              exit 1
-            fi
-          }
-
-          grep -qi '<title>.*Jamula' "$body"
-          node .github/scripts/verify-swa-csp.cjs \
-            www/dist/staticwebapp.config.json "$headers"
-          expect_header "X-Frame-Options" "DENY"
-          expect_header "X-Content-Type-Options" "nosniff"
-          expect_header "Referrer-Policy" "strict-origin-when-cross-origin"
-          expect_header "Permissions-Policy" "camera=(), microphone=(), geolocation=()"
-
-          hsts="$(header_value "Strict-Transport-Security")"
-          [[ -n "$hsts" ]] || {
-            echo "::error::Strict-Transport-Security was not enforced."
-            exit 1
-          }
-
-          curl --fail --silent --show-error --location \
-            --proto '=https' --tlsv1.2 \
-            --dump-header "$robots_headers" --output /dev/null \
-            "${DEPLOYED_URL%/}/robots.txt"
-          grep -Eiq '^content-type: *text/plain([;[:space:]]|$)' "$robots_headers"
-
-          missing_status="$(
-            curl --silent --show-error --location \
-              --proto '=https' --tlsv1.2 \
-              --output "$body" --write-out '%{http_code}' \
-              "${DEPLOYED_URL%/}/__jamula_missing_route__"
-          )"
-          [[ "$missing_status" == "404" ]]
-          grep -qi 'Page not found' "$body"
-
-          {
-            echo "### Verified Azure deployment"
-            echo "- Release: \`v${RELEASE_VERSION}\`"
-            echo "- Revision: \`${DEPLOYMENT_SHA}\`"
-            echo "- Artifact digest: \`${ARTIFACT_DIGEST}\`"
-            echo "- URL: ${DEPLOYED_URL}"
-            echo "- Configuration: CSP, framing, MIME, referrer, permissions, 404 response"
-            echo "- Azure platform: TLS/HSTS"
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: node .github/scripts/production-deployment.mjs verify
 
       - name: Record deployment result
         if: always() && steps.record.outputs.id != ''
@@ -602,10 +372,7 @@ jobs:
           DEPLOYMENT_ID: ${{ steps.record.outputs.id }}
           VERIFY_OUTCOME: ${{ steps.verify.outcome }}
           DEPLOYED_URL: ${{ steps.deploy.outputs.static_web_app_url }}
-        run: |
-          state=failure
-          if [[ "$VERIFY_OUTCOME" == "success" ]]; then state=success; fi
-          node .github/scripts/production-deployment.cjs status "$DEPLOYMENT_ID" "$state" "$DEPLOYED_URL"
+        run: node .github/scripts/production-deployment.mjs finish
 
   publish:
     name: Publish verified release
@@ -635,13 +402,13 @@ jobs:
           for url in "$NET_URL" "$COM_URL"; do
             curl --fail --silent --show-error --proto '=https' --tlsv1.2 --header 'Cache-Control: no-cache' \
               --output release-metadata.json "${url%/}/release.json?run=${GITHUB_RUN_ID}-${RELEASE_ATTEMPT}"
-            node .github/scripts/release.cjs verify release-metadata.json "$RELEASE_VERSION" "$DEPLOYMENT_SHA" "$GITHUB_RUN_ID" "$RELEASE_ATTEMPT"
+            node .github/scripts/release.mjs verify release-metadata.json "$RELEASE_VERSION" "$DEPLOYMENT_SHA" "$GITHUB_RUN_ID" "$RELEASE_ATTEMPT"
           done
           latest_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
           [[ "$latest_main" == "$DEPLOYMENT_SHA" ]] || { echo "::error::main advanced; release not published."; exit 1; }
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/tags?per_page=100" > release-tags.json
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > release-history.json
-          selection="$(node .github/scripts/release.cjs select release-tags.json release-history.json "$CHANGE_TYPE" "$DEPLOYMENT_SHA")"
+          selection="$(node .github/scripts/release.mjs select release-tags.json release-history.json "$CHANGE_TYPE" "$DEPLOYMENT_SHA")"
           [[ "$selection" == "$RELEASE_SELECTION" ]] || { echo "::error::Release history changed; publication aborted."; exit 1; }
           if [[ "$CHANGE_TYPE" == "material" ]]; then
             gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" -f "ref=refs/tags/v$RELEASE_VERSION" -f "sha=$DEPLOYMENT_SHA"

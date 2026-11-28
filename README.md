@@ -17,7 +17,7 @@ flowchart TB
   subgraph Repo["Repository Components (main)"]
     WWW["www/ — Astro 7 Static Site<br/>Woven Plane CSS · /tech/ Content Collection<br/>/llms.txt & /llms-full.txt · analytics-consent.js"]
     VAL["scripts/validation/ (.NET 11)<br/>Governance + CRC32/ZIP Preview Validator"]
-    GHA[".github/workflows + scripts/ (Node CJS)<br/>Secretless PR Build, Release & CSP Verifier"]
+    GHA[".github/workflows + scripts/ (Node MJS)<br/>Secretless PR Build, Release & Live Site Verifier"]
     MCP["scripts/mcp/ (.NET 11)<br/>Caller-Brings-LLM Read-Only MCP Server<br/>ModelContextProtocol + MEAI + Content-Free OTel"]
     MON["scripts/monitor/ (.NET 11)<br/>4-Host DNS, HTTP→HTTPS, 200 & Custom 404 Monitor"]
     MBR["scripts/mbr/ (.NET 11 + Vanilla JS)<br/>Loopback CEO/CTO Monthly Business Review"]
@@ -69,10 +69,11 @@ flowchart TB
     [#120](https://github.com/Jamula/Jamula-www-Website/issues/120)).
   - `M04 - Turnkey business operations (CRM, scheduling & billing)` (`M04.01`–`M04.99`).
   - `M05 - Client-deployable .NET 11 Aspire RAG accelerator` (`M05.01`–`M05.99`).
-- **Operational, MCP, and governance tooling (`scripts/`):**
+- **Operational, MCP, and governance tooling (`scripts/` and `Jamula.slnx`):**
   - [`scripts/validation/`](scripts/validation/) — `.NET 11` repository governance
-    and preview-archive validator (`JamulaValidation`; live preview HTTP
-    verification runs via `.github/scripts/verify-preview.cjs`).
+    and preview-archive validator (`JamulaValidation`; live preview and production
+    HTTP/CSP verification run via `.github/scripts/verify-preview.mjs` and
+    `.github/scripts/production-deployment.mjs`).
   - [`scripts/monitor/`](scripts/monitor/) — zero-dependency `.NET 11` scheduled
     apex DNS A-record, HTTP-to-HTTPS same-host upgrade, HTTPS 200 content,
     canonical link, and Jamula custom 404 drift monitor (`JamulaMonitor`).
@@ -122,12 +123,11 @@ verification, retries, and partial-deployment recovery.
 
 ## Local development
 
-CI uses `global.json`-pinned `.NET 11.0` SDKs
-([`scripts/validation/global.json`](scripts/validation/global.json),
-[`scripts/monitor/global.json`](scripts/monitor/global.json),
-[`scripts/mbr/global.json`](scripts/mbr/global.json), and
-[`scripts/mcp/global.json`](scripts/mcp/global.json) via `actions/setup-dotnet`),
-Node.js `26.13.0`, and npm `12.2.1`. From the repository root:
+CI uses a single root [`global.json`](global.json) (`11.0.100`), shared MSBuild
+settings in [`scripts/Directory.Build.props`](scripts/Directory.Build.props),
+and the [`Jamula.slnx`](Jamula.slnx) solution alongside Node.js `26.13.0` and
+npm `12.2.1` (all first-party Node automation and tests use ES modules in `.mjs`
+or TypeScript in `.ts`). From the repository root:
 
 ```sh
 npm --prefix www ci
@@ -167,11 +167,12 @@ node --test "www/tests/*.test.mjs"
 For governance, workflow, MCP, and `.NET 11` validation checks from the repository root:
 
 ```sh
+dotnet build Jamula.slnx --configuration Release --nologo
 dotnet run --project scripts/validation/JamulaValidation.csproj --configuration Release -- validate-governance .
 dotnet run --project scripts/validation.tests/JamulaValidation.Tests.csproj --configuration Release
 dotnet run --project scripts/validation.cli.tests/JamulaValidation.Cli.Tests.csproj --configuration Release
 dotnet run --project scripts/mcp/tests/JamulaMcp.Tests.csproj --configuration Release
-node --test .github/scripts/swa-preview.test.cjs .github/scripts/verify-preview.test.cjs .github/scripts/release.test.cjs
+node --test .github/scripts/swa-preview.test.mjs .github/scripts/verify-preview.test.mjs .github/scripts/release.test.mjs
 ```
 
 For `#109` coverage-inventory and template checks (requires `npm --prefix www ci`

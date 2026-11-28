@@ -2,9 +2,10 @@
 
 ## Technology preferences
 
-- Prefer a currently supported .NET LTS release for new tools, utilities, and systems.
-- If .NET is not a practical fit, prefer Node.js and JavaScript.
-- Avoid Python for new tooling when .NET or Node.js can meet the requirement; use Python only when an existing tool or a clear technical constraint makes it the better fit.
+- Prefer a currently supported `.NET` release for backend, MCP, operational, and governance systems (`.NET 11` / `net11.0` in this repository, pinned in root `global.json`, configured centrally via `scripts/Directory.Build.props`, and indexed in `Jamula.slnx`).
+- Use `Node.js` (`26.x` in CI) with TypeScript (`.ts`) and native ES modules (`.mjs`) for the Astro website (`www/`), coverage gate (`scripts/coverage/`), and GitHub Actions automation (`.github/scripts/`); reserve plain `.js` for browser-loaded runtime scripts (`www/public/`, `scripts/mbr/wwwroot/`). Do not introduce CommonJS (`.cjs`) scripts.
+- Keep GitHub Actions workflow YAML thin: place HTTP/CSP/header verification, retries, configuration checks, and release/preview selection logic in tested `.github/scripts/*.mjs` or `.NET 11` modules classified in `scripts/coverage/inventory.json` rather than duplicating inline Bash or `node -e` / `actions/github-script` blocks.
+- Keep the repository Python-free for first-party tooling when `.NET` or `Node.js` meets the requirement; use Python only if an external technical constraint strictly requires it.
 - Follow existing repository architecture and explicit project requirements when they call for a different technology.
 
 ## Autonomous delivery
